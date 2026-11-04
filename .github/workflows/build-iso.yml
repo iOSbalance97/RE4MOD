@@ -37,6 +37,17 @@ jobs:
           echo "$CLEAN1  work/disc1.iso" | sha1sum -c
           echo "$CLEAN2  work/disc2.iso" | sha1sum -c
 
+      - name: Publicar ISO limpias (una sola vez)
+        run: |
+          if ! gh release view LIMPIA -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            mkdir -p clean
+            cp work/disc1.iso clean/RE4_PAL_disc1_limpia.iso
+            cp work/disc2.iso clean/RE4_PAL_disc2_limpia.iso
+            gh release create LIMPIA --prerelease --target "$GITHUB_SHA" --title "ISO limpias (base de los parches)" \
+              --notes "ISO PAL G4BP08 rev 0 sin modificar. SHA-1 disco 1: $CLEAN1 / disco 2: $CLEAN2. Los parches xdelta se aplican sobre estas." clean/*
+            rm -rf clean
+          fi
+
       - name: Aplicar parche
         run: |
           TAG=$(tr -d '[:space:]' < patches/LATEST)
