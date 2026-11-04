@@ -1,4 +1,4 @@
-name: Construir ISO parcheada
+name: Verificar y publicar parche
 
 # Aplica el parche indicado en patches/LATEST a los discos limpios (release V1)
 # y publica las ISO resultantes en una release nueva con el nombre del parche.
@@ -54,10 +54,11 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           mkdir -p dist
           for n in disc1 disc2; do
-            xdelta3 -d -s work/$n.iso patches/$TAG/$n.xdelta dist/RE4_PAL_${n}_$TAG.iso
+            xdelta3 -d -s work/$n.iso patches/$TAG/$n.xdelta work/out.iso
             rm work/$n.iso
             want=$(awk -v n=$n '$1==n{print $2}' patches/$TAG/sha1.txt)
-            echo "$want  dist/RE4_PAL_${n}_$TAG.iso" | sha1sum -c
+            echo "$want  work/out.iso" | sha1sum -c
+            rm work/out.iso
           done
           cp patches/$TAG/G4BP08.ini dist/
           cp patches/$TAG/disc1.xdelta dist/RE4_PAL_disc1_$TAG.xdelta

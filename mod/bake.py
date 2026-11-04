@@ -4,7 +4,9 @@
 import struct,subprocess,re,sys,shutil,os,zlib
 sys.path.insert(0,'.')
 import shrink
-from shrink import transform
+from shrink import transform,fbits
+DOOR_FAST=1.5    # push + swing speed when opening while running
+DOOR_EXITF=34.0  # push frame (of 51) from which the stick ends the open
 B='/home/claude/tools/binutils/powerpc-eabi-'
 TAG=sys.argv[1] if len(sys.argv)>1 else 'b1'
 BASE=0x802BD5E0          # retail __ArenaLo (OSInit 0x80069160 / 0x80069198)
@@ -31,7 +33,7 @@ def addrs(src,PB,VB):
 POOLSET="    lis   r10,0x8000\n    ori   r10,r10,PB        # constant pool\n"
 def build(PB,VB):
     shrink.pool.clear()
-    mv=transform(open('m14.s').read().replace('PWINDOW','15'),P_move,'r30',PB-VB)
+    mv=transform(open('m15.s').read().replace('PWINDOW','15'),P_move,'r30',PB-VB)
     cf=POOLSET+transform(open('camfree.s').read(),P_cf,'r10',0)
     cm=POOLSET+transform(open('c12.s').read(),P_cam,'r10',0)
     pr=POOLSET+transform(open('p13.s').read(),P_pr,'r10',0)
@@ -39,6 +41,11 @@ def build(PB,VB):
     if "(r1)" not in cm.replace("stwu  r1,-0x10(r1)","").replace("stwu  r1,-432(r1)",""):
         cm=cm.replace("    stwu  r1,-0x10(r1)\n","").replace("    addi  r1,r1,0x10\n","")
     srcs={'ns':open('nosnap.s').read(),'mv':mv,'cf':cf,'cm':cm,'pr':pr,'am':am,'dot':open('dot2.s').read()}
+    D={'FASTHI':hex(fbits(DOOR_FAST)>>16),'EXITHI':hex(fbits(DOOR_EXITF)>>16)}
+    for k in ('dA','dB','dC','dD'):
+        t=open(k+'.s').read()
+        for a,b in D.items(): t=t.replace(a,b)
+        srcs[k]=t
     return {k:addrs(s,PB,VB) for k,s in srcs.items()}, list(shrink.pool)
 _,pool=build(BASE,BASE+0x100)
 PB=BASE; VB=PB+4*len(pool)
@@ -46,7 +53,8 @@ srcs,pool2=build(PB,VB); assert pool2==pool
 for k,s in srcs.items(): assert '0x8000\n' not in s and 'VB' not in re.sub(r'#.*','',s), k
 DATA=b''.join(struct.pack('>I',x) for x in pool)+b'\0'*VARS_SIZE
 TEXT_ADDR=(VB+VARS_SIZE+0x1F)&~0x1F
-HOOKS=[('mv',0x80051F30),('cf',0x800BCD6C),('cm',0x800BDAE4),('pr',0x800D0478),('am',0x80146D50),('dot',0x8003EB6C),('ns',0x800BEE88)]
+HOOKS=[('mv',0x80051F30),('cf',0x800BCD6C),('cm',0x800BDAE4),('pr',0x800D0478),('am',0x80146D50),('dot',0x8003EB6C),('ns',0x800BEE88),
+       ('dA',0x800DF888),('dB',0x800DF940),('dC',0x800DF918),('dD',0x800DBAC4)]
 def bran(src,dst):
     d=dst-src; assert -0x2000000<=d<0x2000000 and d%4==0
     return 0x48000000|(d&0x03FFFFFC)
