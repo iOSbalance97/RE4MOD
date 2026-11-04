@@ -66,6 +66,32 @@ for k,a in HOOKS:
     text+=code
     hookw[a]=bran(a,start)
     while len(text)%0x20: text+=b'\0'
+# ---- C part (clang for the 750 + binutils ld), linked right after the asm blocks
+CMOD=TEXT_ADDR+len(text)
+C_SRCS=['c/item.c']; C_ASM=['c/hooks.s']
+C_HOOKS=[(0x80150EAC,'hook_item')]
+def build_c(addr):
+    objs=[]
+    for f in C_SRCS:
+        o=f[:-2]+'.o'
+        subprocess.check_call(['clang','--target=powerpc-unknown-eabi','-mcpu=750','-O2','-ffreestanding','-fno-builtin',
+            '-fno-common','-fno-asynchronous-unwind-tables','-Wall','-Werror','-c',f,'-o',o]); objs.append(o)
+    for f in C_ASM:
+        o=f[:-2]+'.o'; subprocess.check_call([B+'as','-mgekko','-mregnames',f,'-o',o]); objs.append(o)
+    ld=open('c/hooksyms.ld').read()+open('c/game.ld').read().replace('CMOD_ADDR',hex(addr))
+    open('c/link.gen.ld','w').write(ld)
+    subprocess.check_call([B+'ld','-T','c/link.gen.ld','-o','c/cmod.elf','--no-warn-execstack']+objs)
+    for sec in subprocess.run([B+'readelf','-S','c/cmod.elf'],capture_output=True,text=True).stdout.splitlines():
+        assert not any(x in sec for x in ('.sdata','.sbss','.data ','.bss ')), sec
+    subprocess.check_call([B+'objcopy','-O','binary','-j','.text','c/cmod.elf','c/cmod.bin'])
+    syms={}
+    for l in subprocess.run([B+'nm','c/cmod.elf'],capture_output=True,text=True).stdout.splitlines():
+        p=l.split(); syms[p[2]]=int(p[0],16)
+    return open('c/cmod.bin','rb').read(),syms
+cbin,csyms=build_c(CMOD)
+text+=cbin
+for a,sym in C_HOOKS: hookw[a]=bran(a,csyms[sym])
+while len(text)%0x20: text+=b'\0'
 END=(TEXT_ADDR+len(text)+0x1F)&~0x1F
 assert END<0x80300000 and END<(HI+1)<<16
 W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x80147004:0x881ED0D2,0x801470AC:0x881ED0D2,0x8014713C:0x881ED0D2,
@@ -98,4 +124,4 @@ new=patch_dol(orig)
 os.makedirs('bake',exist_ok=True)
 open(f'bake/main_{TAG}.dol','wb').write(new)
 print(f"pool {len(pool)} at {PB:#x}, vars {VB:#x}, text {TEXT_ADDR:#x}+{len(text):#x}, new ArenaLo {END:#x}; dol {len(orig):#x}->{len(new):#x}")
-for k,a in HOOKS: print(f"  hook {k} {a:#x} -> {hookw[a]:#010x}")
+for a,w in sorted(hookw.items()): print(f"  hook {a:#x} -> {w:#010x}")
