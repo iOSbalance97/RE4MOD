@@ -174,9 +174,13 @@ void NoticeBarDraw(void)
 }
 
 void SwapFrame(void);
+void LegsFrame(void);
+void CrouchFrame(void);
 void ModFrame(void)
 {
     SwapFrame();
+    LegsFrame();
+    CrouchFrame();
     IconFrame();
     draw_now = 0;
     if (SwapDiag(-1) > 0 && modvars[VB_GAMEPLAY]) draw_now = 1;   /* swap timing box (test) */

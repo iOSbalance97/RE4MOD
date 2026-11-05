@@ -14,6 +14,8 @@ void WeaponPadIdle(void);
 void CaseAssign(int dir);
 int CaseActive(void);
 int SwapLock(void);
+void CrouchPress(void);
+extern int crouch_stand;
 static u32 prev_raw;
 
 void PadRemap(void)
@@ -39,7 +41,9 @@ void PadRemap(void)
         if (l2) out |= PAD_R;                                /* L2: aim */
         if (in & PAD_Z) out |= PAD_L;                        /* L1/R1: knife */
         if (in & PAD_X) out |= PAD_Y;                        /* Triangle: case */
-        if (in & PAD_A) out |= PAD_MOD_CROUCH;               /* Circle: crouch */
+        if (in & PAD_A) out |= PAD_MOD_CROUCH;               /* Circle: crouch (legs.c) */
+        if ((in & ~prev_raw) & PAD_A) CrouchPress();
+        if (crouch_stand > 0) { crouch_stand--; out |= PAD_B; }   /* stand up: the routine's B */
         if (in & PAD_Y) out |= l2 ? PAD_B : PAD_MOD_RELOAD;  /* Square: reload (aiming: R+B) */
         if (l3) out |= PAD_B;                                /* L3: run */
         if (r3) out |= PAD_Z;                                /* R3: map */
