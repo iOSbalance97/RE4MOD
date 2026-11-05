@@ -75,3 +75,10 @@ hook_dvdread:
 1:  addi  r1,r1,32
     li    r3,1                # DVDReadAsyncPrio's TRUE
     blr
+
+# Main loop, before cMes.Trans (0x80124A3C `addi r3,r29,-30888`): the pickup notice backing bar.
+    .globl hook_mesbar
+hook_mesbar:
+    bl    NoticeBarDraw
+    addi  r3,r29,-30888       # original instruction
+    b     ret_mesbar

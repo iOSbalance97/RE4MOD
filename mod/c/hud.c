@@ -9,8 +9,8 @@ extern const int sil_count;
 
 #define PANEL_VIS  75            /* VIs the panel stays (1.25 s at 60 Hz) */
 #define PANEL_FADE 18            /* VIs of fade out */
-#define CX 320.0f                /* panel centre, virtual 640 x 480 screen: middle */
-#define CY 250.0f
+#define CX 548.0f                /* panel centre, virtual 640 x 480 screen: right side, like the remake */
+#define CY 236.0f
 #define SW 54.0f                 /* slot size */
 #define SH 28.0f
 #define GAP 2.0f
@@ -38,6 +38,15 @@ static void Quad(f32 x, f32 y, f32 w, f32 h, u32 rgba, int tex)
 }
 
 static void Quad(f32 x, f32 y, f32 w, f32 h, u32 rgba, int tex);
+/* horizontal gradient: colour cl on the left edge, cr on the right */
+static void QuadH(f32 x, f32 y, f32 w, f32 h, u32 cl, u32 cr)
+{
+    GXBegin(0x80, 0, 4);
+    GXFIFO_F32 = x;     GXFIFO_F32 = y;     GXFIFO_F32 = 0.0f; GXFIFO_U32 = cl;
+    GXFIFO_F32 = x + w; GXFIFO_F32 = y;     GXFIFO_F32 = 0.0f; GXFIFO_U32 = cr;
+    GXFIFO_F32 = x + w; GXFIFO_F32 = y + h; GXFIFO_F32 = 0.0f; GXFIFO_U32 = cr;
+    GXFIFO_F32 = x;     GXFIFO_F32 = y + h; GXFIFO_F32 = 0.0f; GXFIFO_U32 = cl;
+}
 static void Frame(f32 x, f32 y, f32 w, f32 h, u32 rgba)    /* 1-unit outline */
 {
     Quad(x - 1.0f, y - 1.0f, w + 2.0f, 1.0f, rgba, 0);
@@ -134,6 +143,35 @@ static int dbg_frame, dbg_play, dbg_hud, dbg_vis;   /* DIAG: what ModFrame saw *
 
 /* Main loop, after the task scheduler: decides whether the panel is drawn this frame. */
 void IconFrame(void);
+/* Pickup notice backing (remake style): a dark band fading out to the left behind the text and the
+   icon, drawn just before cMes.Trans so the text lands on top. Notice: right edge 446, top 64 of
+   the 512 x 384 message screen = 557, 80 here. */
+int NoticeLeft(void);
+#define BAR_X0 330.0f
+#define BAR_X1 612.0f
+#define BAR_Y  74.0f
+#define BAR_H  26.0f
+void NoticeBarDraw(void)
+{
+    static const u32 black = 0;
+    Mtx44 p; Mtx m;
+    int left = NoticeLeft(), a = 150;
+    if (left <= 0 || !modvars[VB_GAMEPLAY]) return;
+    if (left < 12) a = a * left / 12;
+    GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);
+    ViewportOn();
+    GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
+    C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
+    PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
+    GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
+    GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
+    ModeFlat();
+    QuadH(BAR_X0, BAR_Y, 120.0f, BAR_H, 0x00000000, (u32)a);
+    Quad(BAR_X0 + 120.0f, BAR_Y, BAR_X1 - BAR_X0 - 120.0f, BAR_H, (u32)a, 0);
+    GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
+    ViewportOff();
+}
+
 void SwapFrame(void);
 void ModFrame(void)
 {

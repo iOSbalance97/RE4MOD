@@ -14,6 +14,7 @@
 #define MES_SLOT(n) (cMes + 4 + 236 * (n))
 static u32 mes_attr;
 static int mes_left;
+int NoticeLeft(void) { return mes_left; }
 
 /* Run-time item areas (enemy drops: be_flg & 4) are unlinked from the scenario list
    (SceAtSys ot[15]) at once, but their memory is freed at the start of the next frame:
@@ -104,7 +105,7 @@ int QuickItem(u8* w)
     }
     /* "Munición de pistola x10": code 00 page, 10 item name (type 3 text, ends with a space),
        glyph 'x' (0x78 + 0x60 in the European fonts), 0A number, 01 end */
-    cnt = info.type == 8 ? money : (num ? (int)num : info.defNum);
+    cnt = info.type == 8 ? money : info.type == 2 ? (num ? (int)num : info.defNum) : 1;  /* x N: ammo, money */
     txt[0] = 0x00; txt[1] = 0x10;
     if (cnt > 1) { txt[2] = 0xD8; txt[3] = 0x0A; txt[4] = 0x01; MesSetNumber(MES_SLOT(MES_WK), cnt, 0); }
     else txt[2] = 0x01;

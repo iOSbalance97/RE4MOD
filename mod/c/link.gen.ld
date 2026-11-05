@@ -7,6 +7,7 @@ ret_pzl_quit       = 0x8014905C;
 ret_frame          = 0x801249BC;
 ret_draw           = 0x80124A48;
 ret_dvdread        = 0x800C5E88;
+ret_mesbar         = 0x80124A40;
 itemInfo           = 0x80019C90;
 ItemMgr_get        = 0x8001A934;
 PutInCase          = 0x8014A928;

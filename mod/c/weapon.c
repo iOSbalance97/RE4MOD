@@ -140,6 +140,7 @@ static int sw_on, sw_vi, sw_gesture, sw_cleanup;
    m_Fwork0 = 0); put back where Leon was aiming for a few frames after it ran */
 static int aim_restore;
 static f32 aim_pitch, aim_yaw;
+static int aim_guard;
 #define HOLSTER_VI (2 * HOLSTER_FRAMES - 2)          /* earliest swap: the hand is almost there */
 
 void SwapFrame(void)
@@ -152,7 +153,8 @@ void SwapFrame(void)
         if (pl && pl[0xFD] == 6 && *(u8**)(pl + 0x788)) {
             *(f32*)(*(u8**)(pl + 0x788) + 0x28) = aim_pitch;
             *(f32*)(pl + 0x400) = aim_yaw;
-            aim_restore--;
+            if (pl[0xFE] != 0) aim_restore--;            /* ready step: keep; then 4 more */
+            if (--aim_guard <= 0) aim_restore = 0;
         } else aim_restore = 0;
     }
     if (!sw_on) return;
@@ -185,7 +187,7 @@ void SwapFrame(void)
             MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, 0, 5, 0);
             pl[0xFE] = 0;
             pl[0xFF] = 0;          /* r_no_3: the handgun's ready step table has 4 entries */
-            if (st == 6) aim_restore = 6;
+            if (st == 6) { aim_restore = 4; aim_guard = 40; }
         }
     }
     sw_on = 0;
