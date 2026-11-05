@@ -22,7 +22,7 @@ P_move=dict(KTURN=0.35,WALK_K=48.0/72,STRAFE_K=-42.0/72,EASE=0.15,MAXTURN=0.12,F
 P_cf={'YAW_K':-0.0012,'PITCH_K':0.0016}
 P_cam={'CAM_BACK':0.25,'CAM_FOV':1.10,'DEASE':0.12,'DMIN':1500.0,'WSTEP':0.15,'AEASE':0.15}
 P_pr={'RANGE2':2200.0**2}
-LOW=0.3; P_aim={'YAWK':1.05,'PITCHK':0.7,'LOWK':LOW,'CURVEK':(1-LOW)/59.0}
+LOW=0.3; P_aim={'YAWK':1.05,'PITCHK':0.7,'LOWK':LOW,'CURVEK':(1-LOW)/59.0,'ACCK':0.8/16}
 def addrs(src,PB,VB):
     def rep(m):
         val=eval(m.group(0).replace('VB',str(VB)).replace('PB',str(PB)))
@@ -97,7 +97,8 @@ assert END<0x80300000 and VB+VARS_SIZE<=(HI+1)<<16
 W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x80147004:0x881ED0D2,0x801470AC:0x881ED0D2,0x8014713C:0x881ED0D2,
      0x80146E04:0x38000000,0x80146EA0:0x38000000,0x80146FD8:0x38000000,0x80147070:0x38000000,0x80147104:0x38000000,
      0x80146D8C:0xC0091FA8,0x800BCD5C:0x813E0788,0x800BCD64:0xC0090030,0x80157A20:0x60000000,0x80157A2C:0x48000060,
-     0x8003EB68:0x60000000}   # no laser dot on enemies (reticle instead)
+     0x8003EB68:0x60000000,   # no laser dot on enemies (reticle instead)
+     0x801472DC:0x60000000}   # PlWepLockRand: no random weapon sway (the reticle stays put; bloom instead)
 # __ArenaLo: lis r3,hi / addi r3,r3,lo at both sites
 ha=(END+0x8000)>>16; lo=END-(ha<<16)
 W04[0x80069160]=0x3C600000|ha; W04[0x80069164]=0x38630000|(lo&0xFFFF)

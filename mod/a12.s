@@ -47,4 +47,33 @@ L_c:
     fmadds f1,f1,f2,f3          # factor
     fmuls f30,f30,f1
     fmuls f31,f31,f1
+    # acceleration (modern aim): held at full deflection for 8 frames, the turn speeds up to
+    # 1 + 16 * ACCK times over the next 16 frames; any smaller push resets it
+    lwz   r9,VB+0x3C-PB(r11)
+    cmpwi r0,54
+    bge   L_acc
+    li    r9,0
+    b     L_accs
+L_acc:
+    cmpwi r9,24
+    bge   L_accs
+    addi  r9,r9,1
+L_accs:
+    stw   r9,VB+0x3C-PB(r11)
+    addi  r10,r9,-8
+    cmpwi r10,0
+    bge   L_acp
+    li    r10,0
+L_acp:
+    stb   r10,VB+0x25-PB(r11)
+    psq_l f1,VB+0x25-PB(r11),1,4
+    lis   r12,ACCK@h
+    ori   r12,r12,ACCK@l
+    stw   r12,0(r11)
+    lfs   f2,0(r11)
+    lis   r12,0x3F80
+    stw   r12,0(r11)
+    lfs   f3,0(r11)
+    fmadds f1,f1,f2,f3
+    fmuls f30,f30,f1
     lis   r9,-32727             # original instruction

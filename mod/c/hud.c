@@ -171,13 +171,28 @@ void LaserHook(int res, int draw)
     ret_seen = 1; ret_hit = res;
 }
 static f32 fabsf_(f32 x) { return x < 0.0f ? -x : x; }
-static void RetTicks(f32 cx, f32 cy, f32 g, f32 len, f32 t, u32 c)
+#define RN 32
+static const f32 rc[RN + 1] = { 1.00000f, 0.98079f, 0.92388f, 0.83147f, 0.70711f, 0.55557f, 0.38268f, 0.19509f, 0.00000f, -0.19509f, -0.38268f, -0.55557f, -0.70711f, -0.83147f, -0.92388f, -0.98079f, -1.00000f, -0.98079f, -0.92388f, -0.83147f, -0.70711f, -0.55557f, -0.38268f, -0.19509f, -0.00000f, 0.19509f, 0.38268f, 0.55557f, 0.70711f, 0.83147f, 0.92388f, 0.98079f, 1.00000f };
+static const f32 rs[RN + 1] = { 0.00000f, 0.19509f, 0.38268f, 0.55557f, 0.70711f, 0.83147f, 0.92388f, 0.98079f, 1.00000f, 0.98079f, 0.92388f, 0.83147f, 0.70711f, 0.55557f, 0.38268f, 0.19509f, 0.00000f, -0.19509f, -0.38268f, -0.55557f, -0.70711f, -0.83147f, -0.92388f, -0.98079f, -1.00000f, -0.98079f, -0.92388f, -0.83147f, -0.70711f, -0.55557f, -0.38268f, -0.19509f, -0.00000f };
+static void Ring(f32 cx, f32 cy, f32 r, f32 t, u32 c)        /* thin ring: triangle strip */
 {
-    Quad(cx - t * 0.5f, cy - g - len, t, len, c, 0);          /* top */
-    Quad(cx - t * 0.5f, cy + g, t, len, c, 0);                /* bottom */
-    Quad(cx - g - len, cy - t * 0.5f, len, t, c, 0);          /* left */
-    Quad(cx + g, cy - t * 0.5f, len, t, c, 0);                /* right */
-    Quad(cx - t * 0.5f, cy - t * 0.5f, t, t, c, 0);           /* dot */
+    f32 ri = r - t * 0.5f, ro = r + t * 0.5f;
+    int k;
+    if (ri < 0.0f) ri = 0.0f;
+    GXBegin(0x98, 0, (RN + 1) * 2);
+    for (k = 0; k <= RN; k++) {
+        GXFIFO_F32 = cx + rc[k] * ro; GXFIFO_F32 = cy + rs[k] * ro; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+        GXFIFO_F32 = cx + rc[k] * ri; GXFIFO_F32 = cy + rs[k] * ri; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+    }
+}
+static void Disc(f32 cx, f32 cy, f32 r, u32 c)               /* filled circle: triangle fan */
+{
+    int k;
+    GXBegin(0xA0, 0, RN / 2 + 2);
+    GXFIFO_F32 = cx; GXFIFO_F32 = cy; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+    for (k = 0; k <= RN; k += 2) {
+        GXFIFO_F32 = cx + rc[k] * r; GXFIFO_F32 = cy + rs[k] * r; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+    }
 }
 static void ReticleDraw(void)
 {
@@ -233,9 +248,9 @@ static void ReticleDraw(void)
 
     {
         Mtx44 pm; Mtx m;
-        f32 g = 4.0f + 15.0f * ret_spread;
+        f32 g = 5.0f + 17.0f * ret_spread;
         int a = 230 * ret_a / 8;
-        u32 col = (ret_hit == 2 ? 0xFF505000 : 0xFFFFFF00);
+        u32 col = (ret_hit == 2 ? 0xFF484000 : 0xFFFFFF00);
         GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);
         ViewportOn();
         GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
@@ -244,8 +259,12 @@ static void ReticleDraw(void)
         GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
         GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
         ModeFlat();
-        RetTicks(ret_x, ret_y, g - 0.75f, 7.5f, 3.2f, (u32)(a * 2 / 5));     /* dark outline */
-        RetTicks(ret_x, ret_y, g, 6.0f, 1.7f, col | (u32)a);
+        /* remake style: a centre dot and a thin ring that blooms open and focuses down to the dot,
+           both with a soft dark edge so they read on any background */
+        Ring(ret_x, ret_y, g, 3.4f, (u32)(a / 3));
+        Ring(ret_x, ret_y, g, 1.3f, col | (u32)(a * 4 / 5));
+        Disc(ret_x, ret_y, 2.4f, (u32)(a / 3));
+        Disc(ret_x, ret_y, 1.4f, col | (u32)a);
         GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
         ViewportOff();
         GXSetProjection((f32(*)[4])(0x80284420 + 0x64), 0);
