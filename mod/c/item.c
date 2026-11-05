@@ -49,8 +49,10 @@ static void WaistTick(void)
 
 /* Called every frame from PadRemap: removes the notice when its time is up, unless the slot
    has been taken by another message in the meantime. */
+void SwapDiagTick(void);
 void ModMesTick(void)
 {
+    SwapDiagTick();
     FreeTick();
     WaistTick();
     if (mes_left <= 0) return;

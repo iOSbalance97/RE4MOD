@@ -96,6 +96,32 @@ static void DummyWep(u8* pl, int on)
     }
 }
 
+/* ---- swap timing (test builds): shown at the top left for 4 s after a swap ----
+   [frames holding the holster pose while loading] [ms weaponRelease] [ms load: read+link, wall]
+   [ms weaponInit]. Time base: bus clock / 4 = 40.5 MHz. */
+#define SWAP_DIAG 1
+static u32 Tb(void) { u32 t; __asm__ volatile("mftbl %0" : "=r"(t)); return t; }
+static int diag[4], diag_left;
+static u16 diag_txt[4][4];
+static void DiagShow(void)
+{
+    int i;
+    for (i = 0; i < 4; i++) {
+        u8* m = cMes + 4 + 236 * (3 + i);
+        diag_txt[i][0] = 0x00; diag_txt[i][1] = 0x0A; diag_txt[i][2] = 0x01;
+        MesSetNumber(m, diag[i], 0);
+        MesSet(cMes, 0x15, 40 + 70 * i, 40, 0x11 | 0x40 | 0x20000 | 0x01000000, 3 + i, 0, 4);
+        *(u16**)(m + 0x98) = diag_txt[i];
+    }
+    diag_left = 240;
+}
+void SwapDiagTick(void)
+{
+    int i;
+    if (diag_left && !--diag_left)
+        for (i = 0; i < 4; i++) MesDelete(cMes, 3 + i);
+}
+
 static void SwapTask(int unused)
 {
     u8* pl = pPL;
@@ -104,6 +130,7 @@ static void SwapTask(int unused)
     u8* neck;
     u32 id;
     int no, type, lv, i;
+    u32 t0, t1, t2, t3, v0, v1;
     (void)unused;
     TaskSleep(HOLSTER_FRAMES);
     pl = pPL;
@@ -120,13 +147,19 @@ static void SwapTask(int unused)
             *(void**)(pl + 0x42C) = 0;                   /* m_SubMot (neck turn) off */
             neck = *(u8**)(pl + 0x78C);
             if (neck) { *(void**)(neck + 0x14) = 0; *(void**)(neck + 0x18) = 0; }  /* cPlNeck::clear */
+            t0 = Tb(); v0 = GetSystemVcnt();
             weaponRelease(pl);
-            DummyWep(pl, 1);                                /* spread the heavy steps over frames */
+            DummyWep(pl, 1);
+            t1 = Tb();                                /* spread the heavy steps over frames */
             weaponLoad(pl, no, type);                    /* sleeps a frame per poll: no freeze */
             G8(0x4FBE) = lv;
+            t2 = Tb(); v1 = GetSystemVcnt();
             *(void***)(pl + 0x424) = tbl;
             DummyWep(pl, 0);
             weaponInit(pl);
+            t3 = Tb();
+            diag[0] = (v1 - v0) / 2; diag[1] = (t1 - t0) / 40500; diag[2] = (t2 - t1) / 40500; diag[3] = (t3 - t2) / 40500;
+            if (SWAP_DIAG) DiagShow();
             /* the neck keeps its mode (B20 switched it off and the layer then stayed at full
                weight); with its motions cleared it waits for footwork's Neck->init below */
             pl = pPL;
