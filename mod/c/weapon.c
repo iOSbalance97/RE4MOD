@@ -67,8 +67,8 @@ static void Equip(cItem* it)
    frame; run from task slot 1 the game keeps drawing. Meanwhile the old archive is gone, so
    nothing may touch it: the input is held, Leon's motion table points at the holster pose and the
    neck turn motion is off. */
-#define HOLSTER_FRAMES 10      /* blend into the holster pose before the weapon goes away */
-#define DRAW_FRAMES    12      /* blend from the holster pose into the new weapon's idle */
+#define HOLSTER_FRAMES 8       /* blend into the holster pose before the weapon goes away */
+#define DRAW_FRAMES    10      /* blend from the holster pose into the new weapon's idle */
 extern unsigned char mot_holster[];
 static volatile int swap_busy;
 static cItem* swap_item;
@@ -121,8 +121,7 @@ static void SwapTask(int unused)
             neck = *(u8**)(pl + 0x78C);
             if (neck) { *(void**)(neck + 0x14) = 0; *(void**)(neck + 0x18) = 0; }  /* cPlNeck::clear */
             weaponRelease(pl);
-            DummyWep(pl, 1);
-            TaskSleep(1);                                /* spread the heavy steps over frames */
+            DummyWep(pl, 1);                                /* spread the heavy steps over frames */
             weaponLoad(pl, no, type);                    /* sleeps a frame per poll: no freeze */
             G8(0x4FBE) = lv;
             *(void***)(pl + 0x424) = tbl;
@@ -130,7 +129,6 @@ static void SwapTask(int unused)
             weaponInit(pl);
             /* the neck keeps its mode (B20 switched it off and the layer then stayed at full
                weight); with its motions cleared it waits for footwork's Neck->init below */
-            TaskSleep(1);
             pl = pPL;
         }
     }
@@ -185,7 +183,7 @@ static void Assign(int dir)
 static void ShowPanel(void)
 {
     u16* s = Slots();
-    cItem* w = IM_PWEP(ItemMgr);
+    cItem* w = swap_busy ? swap_item : IM_PWEP(ItemMgr);   /* a pending swap shows its target */
     int i, eq = -1, miss = 0;
     for (i = 0; i < 4; i++) {
         if (!s[i]) continue;
