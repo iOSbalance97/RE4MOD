@@ -41,3 +41,10 @@ hook_frame:
     bl    ModFrame
     lwz   r9,-29912(r13)      # original instruction
     b     ret_frame
+
+# Main loop, after cMes.Trans (0x80124A44 was `bl CinescoMove`): direct HUD drawing.
+    .globl hook_draw
+hook_draw:
+    bl    ModDraw
+    bl    CinescoMove         # original instruction
+    b     ret_draw

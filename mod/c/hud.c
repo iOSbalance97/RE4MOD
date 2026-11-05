@@ -103,13 +103,26 @@ static void PanelDraw(void* unused)
     GXSetAlphaUpdate(1);
 }
 
-/* Main loop, after the task scheduler (the ordering tables are filled for this frame). */
+static int draw_now;
+
+/* Main loop, after the task scheduler: decides whether the panel is drawn this frame. */
 void ModFrame(void)
 {
+    draw_now = 0;
     if (panel_t <= 0) return;
     panel_t -= GetSystemVcnt();
     if (panel_t <= 0) return;
     if (!modvars[VB_GAMEPLAY]) return;                       /* only while Leon is in control */
     if (!(*(u32*)(pG + 88) & 0x10000)) return;              /* HUD hidden */
-    AddOtDirect(0x15, 0, PanelDraw, 0, 0x400, 0, 0.0f);
+    draw_now = 1;
+}
+
+/* Main loop, right after the messages are drawn (direct GX, like cMes.Trans): the panel. */
+void ModDraw(void)
+{
+    static const u32 black = 0;
+    if (!draw_now) return;
+    draw_now = 0;
+    GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);            /* messages leave the room fog on */
+    PanelDraw(0);
 }
