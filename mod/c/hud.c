@@ -233,6 +233,7 @@ void SpreadShot(u8* pl, f32* p0, f32* p1)
 /* Recoil: each shot raises the camera's aim point (c12 adds VB+0x40 to it); the kick decays by
  * itself in a few frames, also during the shotgun's pump. Shots follow the camera centre, so the
  * kick is real until it settles. */
+#define RAISE_LONG 90.0f    /* units the aim camera goes up with a shotgun */
 static int rc_prev;
 static f32 rc_k;
 static void RecoilFrame(void)
@@ -245,6 +246,13 @@ static void RecoilFrame(void)
         if (rc_k > 0.09f) rc_k = 0.09f;
     }
     rc_prev = fire;
+    {   /* camera raise while aiming a long gun (c12, VB+0x44) */
+        static f32 raise;
+        u8 w = pG[0x4FBC];
+        f32 t = (pl && pl[0xFC] == 0 && pl[0xFD] == 6 && (w == 7 || w == 8 || w == 0x21)) ? RAISE_LONG : 0.0f;
+        raise += (t - raise) * 0.25f;
+        *(f32*)(modvars + 0x44) = raise;
+    }
     if (!pl || pl[0xFD] != 6) rc_k = 0.0f;
     *(f32*)(modvars + 0x40) = rc_k;            /* c12: target raised by tan(kick) * distance */
     rc_k *= 0.84f;

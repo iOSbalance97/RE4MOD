@@ -26,10 +26,16 @@
     srawi r9,r10,31
     xor   r10,r10,r9
     subf  r10,r9,r10            # |y|
+    # radial magnitude ~ max + 0.414 * min: diagonals as fast as the axes (was max(|x|, |y|))
     cmpw  r0,r10
     bge   L_m
+    mr    r9,r0
     mr    r0,r10
+    mr    r10,r9
 L_m:
+    mulli r10,r10,106
+    srawi r10,r10,8
+    add   r0,r0,r10
     cmpwi r0,59
     ble   L_c
     li    r0,59

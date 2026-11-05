@@ -43,6 +43,18 @@
     cmpwi r0,2
     bne   L_reset
 L_aim:
+    # long guns sit right under the camera: raise the aim camera (position, close point and target)
+    # by VB+0x44 (hud.c, eased) so the barrel stays below the reticle
+    lfs   f12,0x30(r11)
+    lfs   f0,0x04(r5)
+    fadds f0,f0,f12
+    stfs  f0,0x04(r5)
+    lfs   f0,0x10(r5)
+    fadds f0,f0,f12
+    stfs  f0,0x10(r5)
+    lfs   f0,0x1C(r5)
+    fadds f0,f0,f12
+    stfs  f0,0x1C(r5)
     # modern aim (B48): the camera stays the game's own aim camera (no more following the laser:
     # no pull towards enemies, no push into Leon at walls). The laser ray itself is cast from the
     # camera centre (hud.c LaserRay) and the shots are bent onto it. Only the recoil is added here:
