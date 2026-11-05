@@ -146,6 +146,40 @@ void ModFrame(void)
 }
 
 /* Main loop, right after the messages are drawn (direct GX, like cMes.Trans): the panel. */
+/* swap timing numbers (weapon.c), seven-segment digits drawn with quads, top left */
+int SwapDiag(int i);
+static void Digit(f32 x, f32 y, int d, u32 c)
+{
+    static const u8 seg[10] = { 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F };
+    const f32 w = 10.0f, h = 9.0f, t = 2.0f;
+    u8 m = seg[d];
+    if (m & 0x01) Quad(x, y, w, t, c, 0);
+    if (m & 0x02) Quad(x + w - t, y, t, h, c, 0);
+    if (m & 0x04) Quad(x + w - t, y + h, t, h, c, 0);
+    if (m & 0x08) Quad(x, y + 2 * h - t, w, t, c, 0);
+    if (m & 0x10) Quad(x, y + h, t, h, c, 0);
+    if (m & 0x20) Quad(x, y, t, h, c, 0);
+    if (m & 0x40) Quad(x, y + h - t / 2, w, t, c, 0);
+}
+static void DiagDraw(void)
+{
+    Mtx44 p; Mtx m; int i, k, n, nd; char buf[8];
+    if (SwapDiag(-1) <= 0) return;
+    GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
+    C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
+    PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
+    GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
+    GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
+    ModeFlat();
+    Quad(36.0f, 36.0f, 4 * 66.0f, 28.0f, 0x000000A0, 0);
+    for (i = 0; i < 4; i++) {
+        n = SwapDiag(i); if (n < 0) n = 0; if (n > 9999) n = 9999;
+        nd = 0; do { buf[nd++] = (char)(n % 10); n /= 10; } while (n);
+        for (k = 0; k < nd; k++) Digit(40.0f + 66.0f * i + 13.0f * (nd - 1 - k), 41.0f, buf[k], i == 0 ? 0xFFE040FF : 0xFFFFFFFF);
+    }
+    GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
+}
+
 void ModDraw(void)
 {
     static const u32 black = 0;
@@ -178,5 +212,6 @@ void ModDraw(void)
     GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);            /* messages leave the room fog on */
     ViewportOn();
     PanelDraw(0);
+    DiagDraw();
     ViewportOff();
 }

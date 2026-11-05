@@ -102,25 +102,9 @@ static void DummyWep(u8* pl, int on)
 #define SWAP_DIAG 1
 static u32 Tb(void) { u32 t; __asm__ volatile("mftbl %0" : "=r"(t)); return t; }
 static int diag[4], diag_left;
-static u16 diag_txt[4][4];
-static void DiagShow(void)
-{
-    int i;
-    for (i = 0; i < 4; i++) {
-        u8* m = cMes + 4 + 236 * (3 + i);
-        diag_txt[i][0] = 0x00; diag_txt[i][1] = 0x0A; diag_txt[i][2] = 0x01;
-        MesSetNumber(m, diag[i], 0);
-        MesSet(cMes, 0x15, 40 + 70 * i, 40, 0x11 | 0x40 | 0x20000 | 0x01000000, 3 + i, 0, 4);
-        *(u16**)(m + 0x98) = diag_txt[i];
-    }
-    diag_left = 240;
-}
-void SwapDiagTick(void)
-{
-    int i;
-    if (diag_left && !--diag_left)
-        for (i = 0; i < 4; i++) MesDelete(cMes, 3 + i);
-}
+static void DiagShow(void) { diag_left = 240; }
+int SwapDiag(int i) { return i < 0 ? diag_left : diag[i]; }
+void SwapDiagTick(void) { if (diag_left) diag_left--; }
 
 static void SwapTask(int unused)
 {
