@@ -174,6 +174,8 @@ static void SwapTask(int unused)
                new weapon) */
             MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, 0, 5, 0);
             pl[0xFE] = 0;
+            pl[0xFF] = 0;          /* r_no_3: the handgun's ready step table has 4 entries; a stale 4
+                                      ("set" step) indexed past it (B32: odd poses while aiming) */
         }
     }
     swap_lock = 0;
