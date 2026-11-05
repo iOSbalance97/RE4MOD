@@ -139,7 +139,9 @@ static int sw_on, sw_vi, sw_gesture, sw_cleanup;
 /* aiming: the new weapon's ready step 0 resets the aim (Wep->pitch from the camera, the aim yaw
    m_Fwork0 = 0); put back where Leon was aiming for a few frames after it ran */
 static int aim_restore;
-static f32 aim_pitch, aim_yaw;
+static f32 aim_pitch, aim_yaw, aim_m3r[2];
+#define M3R ((f32*)0x8021D970)                       /* cDelayF m3r: aim pitch blend; the shoulder
+                                                        camera's pitch follows it (getPitch) */
 static int aim_guard;
 #define HOLSTER_VI (2 * HOLSTER_FRAMES - 2)          /* earliest swap: the hand is almost there */
 
@@ -153,6 +155,7 @@ void SwapFrame(void)
         if (pl && pl[0xFD] == 6 && *(u8**)(pl + 0x788)) {
             *(f32*)(*(u8**)(pl + 0x788) + 0x28) = aim_pitch;
             *(f32*)(pl + 0x400) = aim_yaw;
+            M3R[0] = aim_m3r[0]; M3R[1] = aim_m3r[1];
             if (pl[0xFE] != 0) aim_restore--;            /* ready step: keep; then 4 more */
             if (--aim_guard <= 0) aim_restore = 0;
         } else aim_restore = 0;
@@ -173,6 +176,7 @@ void SwapFrame(void)
         if (st == 6 && *(u8**)(pl + 0x788)) {
             aim_pitch = *(f32*)(*(u8**)(pl + 0x788) + 0x28);
             aim_yaw = *(f32*)(pl + 0x400);
+            aim_m3r[0] = M3R[0]; aim_m3r[1] = M3R[1];
         }
         DoSwap(pl, swap_item);
         st = SwapState(pl);

@@ -144,7 +144,7 @@ static int dbg_frame, dbg_play, dbg_hud, dbg_vis;   /* DIAG: what ModFrame saw *
 /* Main loop, after the task scheduler: decides whether the panel is drawn this frame. */
 void IconFrame(void);
 /* Pickup notice backing (remake style): a dark band fading out to the left behind the text and the
-   icon, drawn just before cMes.Trans so the text lands on top. Notice: right edge 446, top 64 of
+   icon, drawn before the item camera pass and the messages, so icon and text land on top. Notice: right edge 446, top 64 of
    the 512 x 384 message screen = 557, 80 here. */
 int NoticeLeft(void);
 #define BAR_X0 330.0f
@@ -170,6 +170,7 @@ void NoticeBarDraw(void)
     Quad(BAR_X0 + 120.0f, BAR_Y, BAR_X1 - BAR_X0 - 120.0f, BAR_H, (u32)a, 0);
     GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
     ViewportOff();
+    GXSetProjection((f32(*)[4])(0x80284420 + 0x64), 0);   /* the item camera pass comes next */
 }
 
 void SwapFrame(void);

@@ -76,9 +76,10 @@ hook_dvdread:
     li    r3,1                # DVDReadAsyncPrio's TRUE
     blr
 
-# Main loop, before cMes.Trans (0x80124A3C `addi r3,r29,-30888`): the pickup notice backing bar.
+# Render, after ExecOt(0x13) and before the item camera pass ExecOt(0x14) (0x80169718): the pickup
+# notice backing bar, so the 3D icon (item camera pass) and the messages both land on top of it.
     .globl hook_mesbar
 hook_mesbar:
     bl    NoticeBarDraw
-    addi  r3,r29,-30888       # original instruction
+    lwz   r9,-29912(r13)      # original instruction
     b     ret_mesbar
