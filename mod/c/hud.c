@@ -9,10 +9,10 @@ extern const int sil_count;
 
 #define PANEL_VIS  150           /* VIs the panel stays (2.5 s at 60 Hz) */
 #define PANEL_FADE 24            /* VIs of fade out */
-#define CX 548.0f                /* panel centre, virtual 640 x 480 screen */
-#define CY 300.0f
-#define SW 66.0f                 /* slot size */
-#define SH 36.0f
+#define CX 320.0f                /* panel centre, virtual 640 x 480 screen: middle */
+#define CY 250.0f
+#define SW 54.0f                 /* slot size */
+#define SH 28.0f
 #define GAP 2.0f
 
 static int panel_t;
@@ -90,13 +90,13 @@ static void PanelDraw(void* unused)
         const u8* img = s[i] ? SilFor(s[i] - 1) : 0;
         u32 bg = i == panel_equipped ? 0xC8A040 : 0x101010;
         ModeFlat();
-        Quad(x - 1.0f, y - 1.0f, SW + 2.0f, SH + 2.0f, RGBA(i == panel_equipped ? 0xFFE080 : 0x808080, a * 3 / 5), 0);
-        Quad(x, y, SW, SH, RGBA(bg, a * 3 / 4), 0);
+        Quad(x - 1.0f, y - 1.0f, SW + 2.0f, SH + 2.0f, RGBA(i == panel_equipped ? 0xFFE080 : 0x808080, a * 2 / 5), 0);
+        Quad(x, y, SW, SH, RGBA(bg, a * 2 / 5), 0);
         if (s[i] && !img) Quad(x + 18.0f, y + 10.0f, SW - 36.0f, SH - 20.0f, RGBA(0xE0E0E0, a), 0);   /* no silhouette: a bar */
         if (img) {
             ModeTex(img);
             Quad(x + 1.0f, y + 2.0f, SW - 2.0f, SH - 4.0f,
-                 RGBA((panel_missing >> i) & 1 ? 0xC04040 : (i == panel_equipped ? 0x181818 : 0xF0F0F0), a), 1);
+                 RGBA((panel_missing >> i) & 1 ? 0xC04040 : (i == panel_equipped ? 0x181818 : 0xF0F0F0), a * 4 / 5), 1);
         }
     }
     GXSetZMode(1, 3, 1);
@@ -104,16 +104,31 @@ static void PanelDraw(void* unused)
 }
 
 static int draw_now;
+static f32 vp_save[6];
+
+/* Full-screen viewport for the HUD (the game leaves a reduced one set at this point); the
+   previous one is put back afterwards. Screen size: the game's Screen.width / height. */
+static void ViewportOn(void)
+{
+    GXGetViewportv(vp_save);
+    GXSetViewport(0.0f, 0.0f, *(f32*)0x8028DB44, *(f32*)0x8028DB48, 0.0f, 1.0f);
+}
+static void ViewportOff(void)
+{
+    GXSetViewport(vp_save[0], vp_save[1], vp_save[2], vp_save[3], vp_save[4], vp_save[5]);
+}
+static int dbg_frame, dbg_play, dbg_hud, dbg_vis;   /* DIAG: what ModFrame saw */
+#define DIAG 0
 
 /* Main loop, after the task scheduler: decides whether the panel is drawn this frame. */
 void ModFrame(void)
 {
     draw_now = 0;
+    dbg_frame = 1; dbg_play = modvars[VB_GAMEPLAY] != 0; dbg_hud = (*(u32*)(pG + 88) & 0x10000) != 0; dbg_vis = panel_t > 0;
     if (panel_t <= 0) return;
     panel_t -= GetSystemVcnt();
     if (panel_t <= 0) return;
     if (!modvars[VB_GAMEPLAY]) return;                       /* only while Leon is in control */
-    if (!(*(u32*)(pG + 88) & 0x10000)) return;              /* HUD hidden */
     draw_now = 1;
 }
 
@@ -121,8 +136,34 @@ void ModFrame(void)
 void ModDraw(void)
 {
     static const u32 black = 0;
+#if DIAG
+    {   /* test squares, top left: white = drawing works; then green/red: ModFrame ran, Leon in
+           control, HUD on, panel timer running; last: a silhouette (texture path) */
+        Mtx44 p; Mtx m; int k; u32 g = 0x20C020, r = 0xC02020;
+        GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);
+        ViewportOn();
+        GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
+        C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
+        PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
+        GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
+        GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
+        ModeFlat();
+        Quad(40.0f, 40.0f, 24.0f, 24.0f, 0xFFFFFFFF, 0);
+        for (k = 0; k < 4; k++) {
+            int on = k == 0 ? dbg_frame : k == 1 ? dbg_play : k == 2 ? dbg_hud : dbg_vis;
+            Quad(70.0f + 30.0f * k, 40.0f, 24.0f, 24.0f, RGBA(on ? g : r, 255), 0);
+        }
+        ModeTex(sil_tex);
+        Quad(190.0f, 36.0f, 64.0f, 32.0f, 0xFFFFFFFF, 1);
+        GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
+        ViewportOff();
+        dbg_frame = 0;
+    }
+#endif
     if (!draw_now) return;
     draw_now = 0;
     GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);            /* messages leave the room fog on */
+    ViewportOn();
     PanelDraw(0);
+    ViewportOff();
 }

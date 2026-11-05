@@ -9,7 +9,7 @@ def world(mm, model, m, i):
     x,y,z=m.position(i); part=m.vtx[i][3]
     return x,y,z
 def sil(id_, size=(256,128)):
-    p=f'/home/claude/disc/ext1/files/ss/Item/idm{id_:03d}.bin'
+    p=f'/home/claude/disc/ext1/files/ss/Item/idm{id_:03x}.bin'
     if not os.path.exists(p): return None
     d=open(p,'rb').read()
     m=meshbin.parse(d)
@@ -29,18 +29,22 @@ def sil(id_, size=(256,128)):
             poly=[(cx+(pts[vi[0]][u]-mn[u])*sc, H-(cy+(pts[vi[0]][v]-mn[v])*sc)) for vi in t]
             dr.polygon(poly,fill=255)
     return img
+def orient(im):
+    """Barrel to the right: the heavier half (grip / stock) goes left."""
+    W,H=im.size; px=im.load()
+    def mass(x0,x1): return sum(1 for x in range(x0,x1) for y in range(H) if px[x,y]>127)
+    return im.transpose(Image.FLIP_LEFT_RIGHT) if mass(W//2,W)>mass(0,W//2) else im
 if __name__=='__main__':
     out=[]
     for i in IDS:
         im=sil(i)
-        if im: out.append((i,im))
+        if im: out.append((i,orient(im)))
     g=Image.new('L',(256*6,128*((len(out)+5)//6)),40)
     dr=ImageDraw.Draw(g)
     for k,(i,im) in enumerate(out):
         g.paste(im,((k%6)*256,(k//6)*128)); dr.text(((k%6)*256+4,(k//6)*128+2),hex(i),fill=128)
     g.save('/home/claude/gecko/sil/grid.png'); print(len(out),'of',len(IDS))
 
-FLIP_H={0x03,0x21}
 def i4(img):
     W,H=img.size; px=img.load(); out=bytearray()
     for ty in range(0,H,8):
@@ -55,7 +59,7 @@ def gen_c(path):
     for i in IDS:
         im=sil(i)
         if not im: continue
-        if i in FLIP_H: im=im.transpose(Image.FLIP_LEFT_RIGHT)
+        im=orient(im)
         im=im.resize((64,32),Image.LANCZOS)
         ents.append((i,len(blob))); blob+=i4(im)
     with open(path,'w') as f:

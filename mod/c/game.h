@@ -82,6 +82,8 @@ void GXSetChanCtrl(int chan, int enable, int amb, int mat, int lights, int diff,
 void GXSetTevOrder(int stage, int coord, int map, int color);
 void GXSetTevOp(int stage, int mode);
 void GXSetZMode(int enable, int func, int update);
+void GXSetViewport(f32 x, f32 y, f32 w, f32 h, f32 n, f32 f);
+void GXGetViewportv(f32* v);
 void GXSetFog(int type, f32 startz, f32 endz, f32 nearz, f32 farz, const u32* color);
 void GXInitTexObj(GXTexObj* o, const void* img, int w, int h, int fmt, int ws, int wt, int mip);
 void GXInitTexObjLOD(GXTexObj* o, int minf, int magf, f32 minlod, f32 maxlod, f32 bias, int bclamp, int edge, int aniso);
