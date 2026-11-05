@@ -173,11 +173,11 @@ static void DiagDraw(void)
     GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
     GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
     ModeFlat();
-    Quad(36.0f, 36.0f, 4 * 66.0f, 28.0f, 0x000000A0, 0);
+    Quad(96.0f, 116.0f, 4 * 66.0f, 28.0f, 0x000000A0, 0);   /* inside the 16:9 crop */
     for (i = 0; i < 4; i++) {
         n = SwapDiag(i); if (n < 0) n = 0; if (n > 9999) n = 9999;
         nd = 0; do { buf[nd++] = (char)(n % 10); n /= 10; } while (n);
-        for (k = 0; k < nd; k++) Digit(40.0f + 66.0f * i + 13.0f * (nd - 1 - k), 41.0f, buf[k], i == 0 ? 0xFFE040FF : 0xFFFFFFFF);
+        for (k = 0; k < nd; k++) Digit(100.0f + 66.0f * i + 13.0f * (nd - 1 - k), 121.0f, buf[k], i == 0 ? 0xFFE040FF : 0xFFFFFFFF);
     }
     GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
 }
