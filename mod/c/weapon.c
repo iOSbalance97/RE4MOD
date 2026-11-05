@@ -43,23 +43,6 @@ static int CanSwap(void)
     return pl[0xFC] == 0 && (pl[0xFD] <= 3 || pl[0xFD] == 6);
 }
 
-static void Equip(cItem* it)
-{
-    void* pl = pPL;
-    u32 id;
-    int no, type, lv;
-    if (!ItemMgr_arm(ItemMgr, it)) return;
-    id = *(u16*)((u8*)ItemMgr + 0x10);
-    no = WeaponId2WeaponNo(id);
-    type = WeaponId2WeaponType(id);
-    lv = it->bullet >> 13;
-    if (G8(0x4FBC) == no && G8(0x4FBD) == type && G8(0x4FBE) == lv) return;
-    SndBlkStop(2);
-    weaponRelease(pl);
-    weaponLoad(pl, no, type);
-    G8(0x4FBE) = lv;
-    weaponInit(pl);
-}
 
 /* ---- Remake-style swap: holster, load while the game keeps running, draw ----
    The weapon archive (model, REL code and Leon's motions for that weapon) is read from the disc
@@ -67,8 +50,8 @@ static void Equip(cItem* it)
    frame; run from task slot 1 the game keeps drawing. Meanwhile the old archive is gone, so
    nothing may touch it: the input is held, Leon's motion table points at the holster pose and the
    neck turn motion is off. */
-#define HOLSTER_FRAMES 6       /* blend into the holster pose before the weapon goes away */
-#define DRAW_FRAMES    8       /* blend from the holster pose into the new weapon's idle */
+#define HOLSTER_FRAMES 5       /* blend into the holster pose before the weapon goes away */
+#define DRAW_FRAMES    6       /* blend from the holster pose into the new weapon's idle */
 extern unsigned char mot_holster[];
 static volatile int swap_busy;
 static cItem* swap_item;
@@ -149,51 +132,61 @@ static void DoSwap(u8* pl, cItem* it)
     weaponInit(pl);
 }
 
-static void SwapTask(int unused)
+/* The swap runs from the main loop (ModFrame, after the tasks), one step per frame: no task slot
+   is needed (B32 used slot 1, sometimes busy -> fallback with the full disc stall). DoSwap then
+   runs in one go: the load is answered from the prefetched copy, so nothing ever sleeps. */
+static int sw_on, sw_vi, sw_gesture, sw_cleanup;
+#define HOLSTER_VI (2 * HOLSTER_FRAMES - 2)          /* earliest swap: the hand is almost there */
+
+void SwapFrame(void)
 {
     u8* pl;
-    cItem* it = swap_item;
-    int i, st, gesture = swap_lock;
-    (void)unused;
-    if (gesture) TaskSleep(HOLSTER_FRAMES);
-    for (i = 0; i < 90 && PrefetchPoll() == 0; i++) TaskSleep(1);   /* archive still coming */
-    /* moving / aiming: wait for a state that allows it (not mid-action) */
-    for (i = 0; i < 60 && (st = SwapState(pPL)) < 0; i++) TaskSleep(1);
+    int pr, st;
+    if (sw_cleanup && PrefetchPoll() != 0) { PrefetchEnd(); sw_cleanup = 0; }
+    if (!sw_on) return;
+    sw_vi += GetSystemVcnt();
+    if (!modvars[VB_GAMEPLAY]) return;               /* paused / menu: wait */
+    pr = PrefetchPoll();
+    if (pr == 0 && sw_vi < 180) return;              /* archive still coming (3 s at most) */
+    if (sw_gesture && sw_vi < HOLSTER_VI) return;
     pl = pPL;
-    if (pl && (gesture || st >= 0)) {
-        DoSwap(pl, it);
+    st = SwapState(pl);
+    if (!sw_gesture && st < 0) {                     /* mid-action: wait a little, else give up */
+        if (sw_vi < 240) return;
+        pl = 0;
+    }
+    if (pl) {
+        DoSwap(pl, swap_item);
         st = SwapState(pl);
-        if (gesture || st == 0) {                        /* footwork: restart the idle, blended */
+        if (sw_gesture || st == 0) {                     /* footwork: restart the idle, blended */
             pl[0x4FD] = DRAW_FRAMES;                     /* m_Hokan */
             pl[0x4FC] = 0;                               /* m_Frame */
             pl[0xFF] |= 1;
             pl[0xFE] = 0;
         } else if (st > 0) {
-            /* the playing motion pointed into the old archive: hold a safe pose for this frame
-               and let the routine set its motion again (walk/run blend in; aiming raises the
-               new weapon) */
+            /* the playing motion pointed into the old archive: a safe motion until the routine
+               sets its own again (walk/run blend in; aiming raises the new weapon) */
             MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, 0, 5, 0);
             pl[0xFE] = 0;
-            pl[0xFF] = 0;          /* r_no_3: the handgun's ready step table has 4 entries; a stale 4
-                                      ("set" step) indexed past it (B32: odd poses while aiming) */
+            pl[0xFF] = 0;          /* r_no_3: the handgun's ready step table has 4 entries */
         }
     }
+    sw_on = 0;
     swap_lock = 0;
     swap_busy = 0;
-    for (i = 0; i < 300 && PrefetchBusy(); i++) { PrefetchPoll(); TaskSleep(1); }
-    PrefetchEnd();
-    TaskExit();
+    if (PrefetchPoll() == 0) sw_cleanup = 1; else PrefetchEnd();
 }
 
 static void SwapStart(cItem* it)
 {
     u8* pl = pPL;
     int st = SwapState(pl);
-    if (st < 0) return;
+    if (st < 0 || sw_on || sw_cleanup) return;
     swap_item = it;
     swap_busy = 1;
-    swap_lock = st == 0;
-    if (!TaskExec(1, SwapTask, 0)) { swap_busy = swap_lock = 0; Equip(it); return; }
+    sw_on = 1;
+    sw_vi = 0;
+    sw_gesture = swap_lock = st == 0;
     PrefetchStart(it->id);                               /* old weapon intact meanwhile */
     if (st == 0) {
         MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, HOLSTER_FRAMES, 5, 0);

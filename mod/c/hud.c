@@ -134,8 +134,10 @@ static int dbg_frame, dbg_play, dbg_hud, dbg_vis;   /* DIAG: what ModFrame saw *
 
 /* Main loop, after the task scheduler: decides whether the panel is drawn this frame. */
 void IconFrame(void);
+void SwapFrame(void);
 void ModFrame(void)
 {
+    SwapFrame();
     IconFrame();
     draw_now = 0;
     if (SwapDiag(-1) > 0 && modvars[VB_GAMEPLAY]) draw_now = 1;   /* swap timing box (test) */

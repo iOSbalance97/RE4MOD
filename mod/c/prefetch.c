@@ -16,16 +16,19 @@
 #define OLD_WEP_ID  (*(u8*)0x802B8358)              /* ReadWepData oldWepId (r13 - 26056) */
 #define FST_PTR     (*(u8**)0x80000038)             /* OS globals: FST in memory */
 
-int  DvdReadN(const char* name, void* dst, int a, int b, int c, int mode, const char* file, int line);
-int  DvdReadCheck(void* dvd, int req, void* info);
+int  DVDReadAsyncPrio(void* fi, void* addr, s32 len, s32 ofs, void (*cb)(s32, void*), s32 prio);
 int  DvdFileExistCheck(void* dvd, const char* name, u32* len);
 void* mem_alloc(u32 size, const char* file, int line, int flag, int heap);
 
 void PrefetchEnd(void);
+static void Flush(void* p, u32 n);
 static u8* pf_buf;
 static u32 pf_start, pf_len, pf_alloc;
-static int pf_req = -1, pf_ready, pf_hits;
-static u32 pf_info[0x80];                            /* DVD_READINFO (0x110 bytes used) */
+static int pf_ready, pf_hits;
+static volatile int pf_done;                         /* 0 reading, 1 done, -1 failed */
+static int pf_req = -1;                              /* >= 0 while the DMA may still write */
+static u32 pf_fi[0x10];                              /* DVDFileInfo: command block, startAddr, length */
+static void PfDone(s32 result, void* fi) { (void)fi; pf_done = result >= 0 ? 1 : -1; }
 static char pf_name[40];
 
 /* ReadWepData's module mapping for Leon (pl_type 0) */
@@ -77,21 +80,28 @@ int PrefetchStart(u32 id)
     if (!pf_buf) return 0;                           /* no room in the heap now: plain read */
     pf_start = *(u32*)(fe + 4);
     pf_len = len;
-    pf_req = DvdReadN(pf_name, pf_buf, 0, 0, 0, 0, "", 0);   /* raw file, asynchronous */
-    if (pf_req < 0) { PrefetchEnd(); return 0; }
+    /* one raw DMA of the whole file through the SDK (no 128 KB piece per frame of the game queue):
+       as fast as the drive gives it; the lines are flushed first so the CPU later reads RAM */
+    for (i = 0; i < 0x10; i++) pf_fi[i] = 0;
+    pf_fi[0x30 / 4] = pf_start;
+    pf_fi[0x34 / 4] = pf_len;
+    Flush(pf_buf, pf_alloc + 0x40);
+    pf_done = 0;
+    pf_req = 1;
+    if (!DVDReadAsyncPrio(pf_fi, pf_buf, (s32)pf_alloc, 0, PfDone, 2)) { pf_req = -1; PrefetchEnd(); return 0; }
     return 1;
 }
 
 /* Polls the prefetch: 1 ready, 0 still reading, -1 failed (or none). */
 int PrefetchPoll(void)
 {
-    int r;
     if (pf_ready) return 1;
     if (pf_req < 0 || !pf_buf) return -1;
-    r = DvdReadCheck(DVD_OBJ, pf_req, pf_info);
-    if (r == 1) { pf_req = -1; pf_ready = 1; return 1; }
-    if (r < 0) { pf_req = -1; PrefetchEnd(); return -1; }
-    return 0;
+    if (pf_done == 0) return 0;
+    pf_req = -1;
+    if (pf_done < 0) { PrefetchEnd(); return -1; }
+    pf_ready = 1;
+    return 1;
 }
 
 void PrefetchEnd(void)
@@ -105,7 +115,7 @@ void PrefetchEnd(void)
 int PrefetchBusy(void) { return pf_req >= 0; }
 int PrefetchHits(void) { return pf_hits; }
 
-static void Flush(u8* p, u32 n)
+static void Flush(void* p, u32 n)
 {
     u32 a = (u32)p & ~0x1F, e = (u32)p + n;
     for (; a < e; a += 32) __asm__ volatile("dcbf 0,%0" : : "r"(a) : "memory");
