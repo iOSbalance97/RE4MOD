@@ -37,6 +37,15 @@ static void Quad(f32 x, f32 y, f32 w, f32 h, u32 rgba, int tex)
     GXFIFO_F32 = x;     GXFIFO_F32 = y + h; GXFIFO_F32 = 0.0f; GXFIFO_U32 = rgba; if (tex) { GXFIFO_F32 = 0.0f; GXFIFO_F32 = 1.0f; }
 }
 
+static void Quad(f32 x, f32 y, f32 w, f32 h, u32 rgba, int tex);
+static void Frame(f32 x, f32 y, f32 w, f32 h, u32 rgba)    /* 1-unit outline */
+{
+    Quad(x - 1.0f, y - 1.0f, w + 2.0f, 1.0f, rgba, 0);
+    Quad(x - 1.0f, y + h, w + 2.0f, 1.0f, rgba, 0);
+    Quad(x - 1.0f, y, 1.0f, h, rgba, 0);
+    Quad(x + w, y, 1.0f, h, rgba, 0);
+}
+
 static void ModeFlat(void)
 {
     GXClearVtxDesc();
@@ -88,15 +97,17 @@ static void PanelDraw(void* unused)
     for (i = 0; i < 4; i++) {
         f32 x = CX + ox[i] * (SW + GAP) - SW * 0.5f, y = CY + oy[i] * (SH + GAP) - SH * 0.5f;
         const u8* img = s[i] ? SilFor(s[i] - 1) : 0;
-        u32 bg = i == panel_equipped ? 0xC8A040 : 0x101010;
+        int eq = i == panel_equipped, miss = (panel_missing >> i) & 1;
         ModeFlat();
-        Quad(x - 1.0f, y - 1.0f, SW + 2.0f, SH + 2.0f, RGBA(i == panel_equipped ? 0xFFE080 : 0x808080, a * 2 / 5), 0);
-        Quad(x, y, SW, SH, RGBA(bg, a * 2 / 5), 0);
-        if (s[i] && !img) Quad(x + 18.0f, y + 10.0f, SW - 36.0f, SH - 20.0f, RGBA(0xE0E0E0, a), 0);   /* no silhouette: a bar */
+        /* equipped: lighter glass box with a thin white frame and a bright silhouette;
+           the rest: dark glass, faint frame, dimmed silhouette; red tint = not carried */
+        Quad(x, y, SW, SH, RGBA(eq ? 0x404040 : 0x101010, eq ? a / 2 : a * 2 / 5), 0);
+        Frame(x, y, SW, SH, RGBA(eq ? 0xFFFFFF : 0x909090, eq ? a * 3 / 4 : a / 4));
+        if (s[i] && !img) Quad(x + 16.0f, y + 9.0f, SW - 32.0f, SH - 18.0f, RGBA(0xE0E0E0, a * 3 / 5), 0);
         if (img) {
             ModeTex(img);
             Quad(x + 1.0f, y + 2.0f, SW - 2.0f, SH - 4.0f,
-                 RGBA((panel_missing >> i) & 1 ? 0xC04040 : (i == panel_equipped ? 0x181818 : 0xF0F0F0), a * 4 / 5), 1);
+                 RGBA(miss ? 0xD05050 : (eq ? 0xFFFFFF : 0xB0B0B0), eq ? a : a * 3 / 5), 1);
         }
     }
     GXSetZMode(1, 3, 1);
