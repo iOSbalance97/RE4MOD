@@ -8,12 +8,14 @@
 
 #define MES_X   32       /* left edge of the notice (message screen units) */
 #define MES_VIS 210      /* notice time in VIs: 3.5 s at 60 Hz */
+#define MES_WK  2        /* message slot of the notice (0 is shared with other game texts) */
+#define MES_SLOT(n) (cMes + 4 + 236 * (n))
 static u32 mes_attr;
 static int mes_left;
 
-/* Run-time item areas (enemy drops: be_flg & 4) are freed and unlinked from the scenario list
-   (pS->ot[15]) at the start of the next frame: QuickItem runs from inside the loop that walks
-   that list, and unlinking the current entry there breaks the walk (crash in DelPrim). */
+/* Run-time item areas (enemy drops: be_flg & 4) are unlinked from the scenario list
+   (SceAtSys ot[15]) at once, but their memory is freed at the start of the next frame:
+   QuickItem runs from inside a loop over that list, which still reads this entry's link. */
 #define FREE_MAX 8
 static u8* free_q[FREE_MAX];
 static int free_n;
@@ -21,9 +23,7 @@ static int free_n;
 static void FreeTick(void)
 {
     while (free_n > 0) {
-        u8* w = free_q[--free_n];
-        Mem_free(w);
-        DelPrim(pS + 140, w);
+        Mem_free(free_q[--free_n]);
     }
 }
 
@@ -54,7 +54,7 @@ void ModMesTick(void)
     if (mes_left <= 0) return;
     mes_left -= GetSystemVcnt();
     if (mes_left > 0) return;
-    if (*(u32*)(cMes + 4 + 0x80) == mes_attr) MesDelete(cMes, 0);
+    if (*(u32*)(MES_SLOT(MES_WK) + 0x80) == mes_attr) MesDelete(cMes, MES_WK);
 }
 
 int QuickItem(u8* w)
@@ -88,7 +88,7 @@ int QuickItem(u8* w)
         if (id == 0x73 || id == 0x75) return 0;
         money = (s32)G32(0x4FA4);
         ItemMgr_get(ItemMgr, id, num);
-        if (money < (s32)G32(0x4FA4)) MesSetNumber(cMes + 4, (s32)G32(0x4FA4) - money, 0);
+        if (money < (s32)G32(0x4FA4)) MesSetNumber(MES_SLOT(MES_WK), (s32)G32(0x4FA4) - money, 0);
         mes = 0x14; attr = 0x10000011;
         SndCall(0, 0x10, 0, 0, 0, 0);
         break;
@@ -96,11 +96,12 @@ int QuickItem(u8* w)
         return 0;                                    /* weapons, parts, files, special: as before */
     }
     y = 297 - (s8)cMes[4 + 119] - (s8)cMes[4 + 25];
-    /* 0x80 game keeps running, 0x40 whole text at once, 0x20000 left aligned, 0x01000000 stays
-       on screen after its end: ModMesTick removes it after MES_VIS */
-    attr |= 0x80 | 0x40 | 0x20000 | 0x01000000;
-    MesSet(cMes, mes, MES_X, y, attr, 0, 0, 4);
-    if (mes == 0x15) *(u16*)(cMes + 30) = id;        /* item name */
+    /* attr 0x10 (already set): the game keeps running; 0x40 whole text at once; 0x20000 left
+       aligned; 0x01000000 stays on screen after its end: ModMesTick removes it after MES_VIS.
+       (0x80 would also skip the text's timed waits.) */
+    attr |= 0x40 | 0x20000 | 0x01000000;
+    MesSet(cMes, mes, MES_X, y, attr, MES_WK, 0, 4);
+    if (mes == 0x15) *(u16*)(MES_SLOT(MES_WK) + 0x1A) = id;   /* item name (code 10) */
     mes_attr = attr; mes_left = MES_VIS;
 
     model = (void*)W32(w, 104);
@@ -117,7 +118,9 @@ int QuickItem(u8* w)
     if ((W8(w, 132) & 8) && (s16)W16(w, 134) >= 0)
         memclr_asm(pG + 29428 + ((s16)W16(w, 134) << 4), 16);
     if (W8(w, 52) & 4) {
+        DelPrim(pS + 140, w);
         if (free_n < FREE_MAX) free_q[free_n++] = w;   /* freed next frame (FreeTick) */
+        else Mem_free(w);
     }
     return 1;
 }

@@ -6,7 +6,7 @@ typedef struct { u16 id; u8 type; u8 defNum; u16 maxNum; } ITEM_INFO;
 
 /* globals (pointers held in small data) */
 #define pG   (*(u8**)0x802B7548)
-#define pS   (*(u8**)0x802B857C)
+#define pS   (*(u8**)0x802B847C)   /* SceAtSys work: r13-26020 */
 #define G8(o)  (*(u8*)(pG + (o)))
 #define G32(o) (*(u32*)(pG + (o)))
 
