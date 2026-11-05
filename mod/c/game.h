@@ -113,3 +113,4 @@ void partsWorldCalc(void* model);
 void* getPartsPtr(void* model, int no);
 f32  SQRTF(f32 x);
 void* examInfo(int id, int ext);
+void ModelTrans(void* model);

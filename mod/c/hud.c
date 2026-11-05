@@ -7,8 +7,8 @@ extern const u8 sil_tex[];
 extern const u16 sil_ids[];
 extern const int sil_count;
 
-#define PANEL_VIS  150           /* VIs the panel stays (2.5 s at 60 Hz) */
-#define PANEL_FADE 24            /* VIs of fade out */
+#define PANEL_VIS  75            /* VIs the panel stays (1.25 s at 60 Hz) */
+#define PANEL_FADE 18            /* VIs of fade out */
 #define CX 320.0f                /* panel centre, virtual 640 x 480 screen: middle */
 #define CY 250.0f
 #define SW 54.0f                 /* slot size */
@@ -161,13 +161,13 @@ void ModDraw(void)
         GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
         GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
         ModeFlat();
-        Quad(40.0f, 40.0f, 24.0f, 24.0f, 0xFFFFFFFF, 0);
+        Quad(40.0f, 200.0f, 24.0f, 24.0f, 0xFFFFFFFF, 0);
         for (k = 0; k < 4; k++) {
-            int on = k == 0 ? dbg_frame : k == 1 ? dbg_play : k == 2 ? dbg_hud : dbg_vis;
-            Quad(70.0f + 30.0f * k, 40.0f, 24.0f, 24.0f, RGBA(on ? g : r, 255), 0);
+            extern int IconDbg(int);
+            int on = IconDbg(k);
+            Quad(70.0f + 30.0f * k, 200.0f, 24.0f, 24.0f, RGBA(on ? g : r, 255), 0);
         }
-        ModeTex(sil_tex);
-        Quad(190.0f, 36.0f, 64.0f, 32.0f, 0xFFFFFFFF, 1);
+
         GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
         ViewportOff();
         dbg_frame = 0;

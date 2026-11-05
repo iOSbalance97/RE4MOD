@@ -6,7 +6,8 @@
 
 #define ICON_NDC_X (-0.84f)      /* icon centre, normalised screen coordinates */
 #define ICON_NDC_Y (-0.46f)
-#define ICON_SCALE 0.16f         /* relative to a model filling the screen height */
+#define ICON_SCALE 0.13f         /* relative to a model filling the screen height */
+#define ICON_DIAG 0              /* 1: plain centred projection, 5 s (test) */
 
 #define M8(m,o)   (*(u8*)((u8*)(m)+(o)))
 #define M32(m,o)  (*(u32*)((u8*)(m)+(o)))
@@ -14,7 +15,9 @@
 #define MP(m,o)   (*(u8**)((u8*)(m)+(o)))
 
 static u8* icon;                 /* the model, 0 = none */
-static int icon_kind;            /* 0 ObjMgr, 1 EmMgr (how to destroy it) */
+int IconDbg(int k);
+static int icon_kind;
+static int dbg_started, dbg_framed, dbg_kind = -1;            /* 0 ObjMgr, 1 EmMgr (how to destroy it) */
 static int icon_t;
 static f32 icon_len;
 
@@ -38,7 +41,12 @@ int IconStart(u8* m, int kind, u32 id, int vis)
     u8 *pl, *head, *parts, *info;
     f32 s;
     IconKill();
+    if (m) { dbg_kind = kind; }
     if (!m || (kind != 0 && kind != 1)) return 0;
+    dbg_started = 1;
+#if ICON_DIAG
+    vis = 300;
+#endif
     M32(m, 0) |= 0x4000;                                /* drawn by the item camera pass */
     pl = MP(m, 244);                                    /* root parts */
     MP(pl, 108) = m;
@@ -76,6 +84,7 @@ void IconFrame(void)
     Mtx r; Vec axis = { 0.0f, 1.0f, 0.0f }, zero = { 0.0f, 0.0f, 0.0f };
     f32* P; f32 d;
     if (!icon) return;
+    dbg_framed = 1;
     icon_t -= GetSystemVcnt();
     if (icon_t <= 0) { IconKill(); return; }
     PSMTXIdentity(r);
@@ -91,9 +100,17 @@ void IconFrame(void)
     MF(itemCamera, 0xC0) = 30.0f;
     P = (f32*)(itemCamera + 0x64);
     C_MTXPerspective((f32 (*)[4])P, 30.0f, 1.3333334f, ZNEAR, ZFAR);
+#if !ICON_DIAG
     P[0] *= ICON_SCALE;  P[2] -= ICON_NDC_X;            /* row 0: scale, then shift in NDC */
     P[5] *= ICON_SCALE;  P[6] -= ICON_NDC_Y;            /* row 1 */
-    P[10] = 0.0f; P[11] = -0.7f * d;                    /* depth: always in front of the scene */
+#endif
     C_MTXLookAt((f32 (*)[4])(itemCamera + 0x30), (Vec*)(itemCamera + 0xA4), (Vec*)(itemCamera + 0xC4), (Vec*)(itemCamera + 0xB0));
     LightMgr_setModel2(LightMgr, icon);
+    M32(icon, 0) |= 7;                                  /* alive + visible: ModelTrans skips it otherwise */
+    ModelTrans(icon);                                   /* queue it for drawing (as ItemExamine::trans) */
+}
+
+int IconDbg(int k)               /* DIAG squares: started, icon alive, frame ran, kind is 0/1 */
+{
+    return k == 0 ? dbg_started : k == 1 ? icon != 0 : k == 2 ? dbg_framed : (dbg_kind == 0 || dbg_kind == 1);
 }

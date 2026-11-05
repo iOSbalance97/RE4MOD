@@ -64,6 +64,7 @@ partsWorldCalc     = 0x80129624;
 getPartsPtr        = 0x8012B158;
 SQRTF              = 0x80128A50;
 examInfo           = 0x80112E84;
+ModelTrans         = 0x8016876C;
 SECTIONS {
   . = CMOD_ADDR;
   .text : { *(.text.hooks) *(.text*) *(.rodata*) . = ALIGN(32); *(.data*) *(.sdata*) *(.sbss*) *(.bss*) *(COMMON) . = ALIGN(32); }
