@@ -103,8 +103,8 @@ L_setaim:
     lfs   f11,4(r12)
     fcmpo cr0,f12,f11
     bgt   L_ease
-    fmr   f12,f13               # first aiming frame: start at the real distance
-    b     L_dmin
+    fmr   f12,f11               # fixed convergence distance (DMIN): the camera no longer turns when the
+    b     L_dmin                # laser jumps between near and far surfaces (felt like aim assist)
 L_ease:
     fsubs f11,f13,f12
     lis   r0,DEASE@h
@@ -183,6 +183,8 @@ L_store:
     li    r0,1
     stw   r0,0x20(r12)
 L_blend:
+    lfs   f9,0x2C(r12)          # recoil: the aim point raised by VB+0x40 (hud.c, decays by itself)
+    fadds f7,f7,f9
     lfs   f9,4(r12)             # w: how much of the aim point is used (eases in over a few frames)
     lis   r0,WSTEP@h
     ori   r0,r0,WSTEP@l

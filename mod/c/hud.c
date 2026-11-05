@@ -176,6 +176,15 @@ void LaserHook(int res, int draw)
 #define RN 32
 static const f32 rc[RN + 1] = { 1.00000f, 0.98079f, 0.92388f, 0.83147f, 0.70711f, 0.55557f, 0.38268f, 0.19509f, 0.00000f, -0.19509f, -0.38268f, -0.55557f, -0.70711f, -0.83147f, -0.92388f, -0.98079f, -1.00000f, -0.98079f, -0.92388f, -0.83147f, -0.70711f, -0.55557f, -0.38268f, -0.19509f, -0.00000f, 0.19509f, 0.38268f, 0.55557f, 0.70711f, 0.83147f, 0.92388f, 0.98079f, 1.00000f };
 static const f32 rs[RN + 1] = { 0.00000f, 0.19509f, 0.38268f, 0.55557f, 0.70711f, 0.83147f, 0.92388f, 0.98079f, 1.00000f, 0.98079f, 0.92388f, 0.83147f, 0.70711f, 0.55557f, 0.38268f, 0.19509f, 0.00000f, -0.19509f, -0.38268f, -0.55557f, -0.70711f, -0.83147f, -0.92388f, -0.98079f, -1.00000f, -0.98079f, -0.92388f, -0.83147f, -0.70711f, -0.55557f, -0.38268f, -0.19509f, -0.00000f };
+static f32 Sqrt(f32 x)                         /* frsqrte + 3 Newton steps */
+{
+    f32 y;
+    int i;
+    if (x <= 0.0f) return 0.0f;
+    __asm__("frsqrte %0,%1" : "=f"(y) : "f"(x));
+    for (i = 0; i < 3; i++) y = y * (1.5f - 0.5f * x * y * y);
+    return x * y;
+}
 static int mod_frame;
 static u32 rng = 0x2F6B1D35u;
 static f32 Rnd(void) { rng = rng * 1664525u + 1013904223u; return (f32)(rng >> 8) * (1.0f / 16777216.0f); }
@@ -188,7 +197,7 @@ void SpreadShot(u8* pl, f32* p0, f32* p1)
     static int frame = -1;
     static f32 dx, dy;
     f32* v = (f32*)(pG + 0x74 + 0x30);
-    f32 p00 = *(f32*)(pG + 0x74 + 0x64), l2, l, k;
+    f32 p00 = *(f32*)(pG + 0x74 + 0x64), l2, k;
     int i;
     if (!pl || pl != pPL || pl[0xFD] != 6 || !modvars[VB_GAMEPLAY] || p00 <= 0.0f) return;
     if (frame != mod_frame) {
@@ -200,28 +209,45 @@ void SpreadShot(u8* pl, f32* p0, f32* p1)
     }
     l2 = (p1[0] - p0[0]) * (p1[0] - p0[0]) + (p1[1] - p0[1]) * (p1[1] - p0[1]) + (p1[2] - p0[2]) * (p1[2] - p0[2]);
     if (l2 < 1.0f) return;
-    l = l2; k = 1.0f;                                          /* sqrt: a few Newton steps */
-    for (i = 0; i < 12; i++) k = 0.5f * (k + l / k);
+    k = Sqrt(l2);
+    {   /* bend the shot onto the camera's centre line: aim at the point on that line as far from the
+         * camera as the laser's hit, keeping each pellet's own deviation */
+        f32 c[3], q[3], g[3], dc2 = 0.0f, dc, gl2 = 0.0f, gl, ql2 = 0.0f, ql;
+        for (i = 0; i < 3; i++)          /* camera position = -R^T t */
+            c[i] = -(v[i] * v[3] + v[4 + i] * v[7] + v[8 + i] * v[11]);
+        for (i = 0; i < 3; i++) { f32 d = LCROSS[i] - c[i]; dc2 += d * d; }
+        dc = Sqrt(dc2);
+        for (i = 0; i < 3; i++) { q[i] = c[i] - v[8 + i] * dc - p0[i]; ql2 += q[i] * q[i]; }
+        for (i = 0; i < 3; i++) { g[i] = LCROSS[i] - ((f32*)0x8021D820)[i]; gl2 += g[i] * g[i]; }
+        if (ql2 > 1.0f && gl2 > 1.0f) {
+            ql = Sqrt(ql2); gl = Sqrt(gl2);
+            for (i = 0; i < 3; i++) p1[i] += (q[i] / ql - g[i] / gl) * k;
+        }
+    }
     for (i = 0; i < 3; i++) p1[i] += (v[i] * dx + v[4 + i] * dy) * k;
 }
 
 /* Recoil: each shot raises the camera's aim point (the one c12 keeps in Leon's frame during the
  * shot, VB+0x28); when the shot / pump ends the camera eases back down by itself. */
+/* Recoil: each shot raises the camera's aim point (c12 adds VB+0x40 to it); the kick decays by
+ * itself in a few frames, also during the shotgun's pump. Shots follow the camera centre, so the
+ * kick is real until it settles. */
 static int rc_prev;
+static f32 rc_k;
 static void RecoilFrame(void)
 {
     u8* pl = pPL;
     int fire = pl && pl[0xFC] == 0 && pl[0xFD] == 6 && pl[0xFE] == 2 && modvars[VB_GAMEPLAY];
-    if (fire && !rc_prev && *(u32*)(modvars + 0x34)) {
-        f32* a = (f32*)(modvars + 0x28);
+    if (fire && !rc_prev) {
         u8 w = pG[0x4FBC];                     /* weapon_no (PAL: NTSC 0x4FB0 + 0xC) */
-        f32 t = (w == 7 || w == 8 || w == 0x21) ? 0.060f : 0.028f;   /* tan 3.4 / 1.6 degrees */
-        f32 l2 = a[0] * a[0] + a[1] * a[1] + a[2] * a[2], k = 1.0f;
-        int i;
-        for (i = 0; i < 12; i++) k = 0.5f * (k + l2 / k);
-        a[1] += k * t;
+        rc_k += (w == 7 || w == 8 || w == 0x21) ? 0.055f : 0.026f;   /* tan of the kick */
+        if (rc_k > 0.09f) rc_k = 0.09f;
     }
     rc_prev = fire;
+    if (!pl || pl[0xFD] != 6) rc_k = 0.0f;
+    *(f32*)(modvars + 0x40) = rc_k * 5000.0f;  /* at the convergence distance (DMIN) */
+    rc_k *= 0.84f;
+    if (rc_k < 0.0005f) rc_k = 0.0f;
 }
 
 void SpreadShot2(u8* pl, f32* p0, f32* p1) { SpreadShot(pl, p0, p1); }
@@ -252,20 +278,19 @@ static void ReticleDraw(void)
     ret_seen = 0;
     if (!aiming) { ret_hold = 0; ret_a = 0; ret_have = 0; ret_r2 = 0; return; }
 
-    if (seen) {   /* project the laser hit point with the game camera (pG->Camera, at pG + 0x74) */
+    if (seen) {   /* game camera: pG->Camera at pG + 0x74 */
         f32* v = (f32*)(pG + 0x74 + 0x30);
         f32* p = (f32*)(pG + 0x74 + 0x64);
-        f32 x = LCROSS[0], y = LCROSS[1], z = LCROSS[2];
-        f32 vx = v[0] * x + v[1] * y + v[2] * z + v[3];
-        f32 vy = v[4] * x + v[5] * y + v[6] * z + v[7];
-        f32 vz = v[8] * x + v[9] * y + v[10] * z + v[11];
-        f32 cx = p[0] * vx + p[1] * vy + p[2] * vz + p[3];
-        f32 cy = p[4] * vx + p[5] * vy + p[6] * vz + p[7];
-        f32 cw = p[12] * vx + p[13] * vy + p[14] * vz + p[15];
+        /* modern: the reticle sits on the camera's centre line (view (0, 0, -1000)), the camera moves
+         * and the shots are bent onto that line (SpreadShot) */
+        f32 vz = -1000.0f;
+        f32 cx = p[2] * vz + p[3];
+        f32 cy = p[6] * vz + p[7];
+        f32 cw = p[14] * vz + p[15];
+        (void)v;
         if (cw > 1.0f) {
             f32 nx = 320.0f * (1.0f + cx / cw), ny = 240.0f * (1.0f - cy / cw);
-            if (!ret_hold) { ret_x = nx; ret_y = ny; }
-            else { ret_x += (nx - ret_x) * 0.6f; ret_y += (ny - ret_y) * 0.6f; }   /* no 1-px jitter */
+            ret_x = nx; ret_y = ny;
             ret_hold = 45;
         }
     } else if (ret_hold > 0) ret_hold--;

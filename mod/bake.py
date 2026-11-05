@@ -11,7 +11,7 @@ B='/home/claude/tools/binutils/powerpc-eabi-'
 TAG=sys.argv[1] if len(sys.argv)>1 else 'b1'
 BASE=0x802BD5E0          # retail __ArenaLo (OSInit 0x80069160 / 0x80069198)
 HI=BASE>>16
-VARS_SIZE=0x40
+VARS_SIZE=0x48
 def asm(src,name):
     open(name+'.gen.s','w').write(src)
     subprocess.check_call([B+'as','-mgekko','-mregnames',name+'.gen.s','-o',name+'.o'])
@@ -20,7 +20,7 @@ def asm(src,name):
 P_move=dict(KTURN=0.35,WALK_K=48.0/72,STRAFE_K=-42.0/72,EASE=0.15,MAXTURN=0.12,FOLLOW=0.97,RELOAD_K=-0.0012,QUICK=2.6,
        BACKANG=1.75,BACKLIM=0.8,WAISTMAX=1.0,WAISTRATE=0.25,STRAFE_SMOOTH=0.55)
 P_cf={'YAW_K':-0.0012,'PITCH_K':0.0016}
-P_cam={'CAM_BACK':0.25,'CAM_FOV':1.10,'DEASE':0.12,'DMIN':1500.0,'WSTEP':0.15,'AEASE':0.15}
+P_cam={'CAM_BACK':0.25,'CAM_FOV':1.10,'DEASE':0.0,'DMIN':5000.0,'WSTEP':0.15,'AEASE':0.15}
 P_pr={'RANGE2':2200.0**2}
 LOW=0.3; P_aim={'YAWK':1.05,'PITCHK':0.7,'LOWK':LOW,'CURVEK':(1-LOW)/59.0,'ACCK':0.8/16}
 def addrs(src,PB,VB):
