@@ -9,6 +9,8 @@
 #include "game.h"
 
 void ModMesTick(void);
+u32 WeaponPad(u32 in, int sx, int sy);
+void WeaponPadIdle(void);
 
 void PadRemap(void)
 {
@@ -27,6 +29,7 @@ void PadRemap(void)
 
     if (modvars[VB_GAMEPLAY]) {
         modvars[VB_GAMEPLAY]--;
+        out &= ~WeaponPad(in, p->stickX, p->stickY);      /* D-pad: quick weapons */
         if (in & PAD_B) out |= PAD_A;                        /* Cross: action */
         if (r2) out |= PAD_A;                                /* R2: fire */
         if (l2) out |= PAD_R;                                /* L2: aim */
@@ -37,6 +40,7 @@ void PadRemap(void)
         if (l3) out |= PAD_B;                                /* L3: run */
         if (r3) out |= PAD_Z;                                /* R3: map */
     } else {
+        WeaponPadIdle();
         out |= in & (PAD_L | PAD_R | PAD_Z);
         if (in & PAD_B) out |= PAD_A;
         if (in & PAD_A) out |= PAD_B;

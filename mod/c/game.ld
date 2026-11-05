@@ -15,6 +15,13 @@ memclr_asm         = 0x80128C58;
 Mem_free           = 0x80125D50;
 DelPrim            = 0x8011FF64;
 MesDelete          = 0x8002407C;
+ItemMgr_arm        = 0x8001BBC8;
+WeaponId2WeaponNo  = 0x8001CE60;
+WeaponId2WeaponType = 0x8001CEA8;
+SndBlkStop         = 0x80056F64;
+weaponRelease      = 0x80145618;
+weaponLoad         = 0x8014591C;
+weaponInit         = 0x80145954;
 GetSystemVcnt      = 0x80125018;
 SECTIONS {
   . = CMOD_ADDR;

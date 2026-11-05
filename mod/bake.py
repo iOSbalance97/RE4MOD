@@ -68,7 +68,7 @@ for k,a in HOOKS:
     while len(text)%0x20: text+=b'\0'
 # ---- C part (clang for the 750 + binutils ld), linked right after the asm blocks
 CMOD=TEXT_ADDR+len(text)
-C_SRCS=['c/item.c','c/pad.c']; C_ASM=['c/hooks.s']
+C_SRCS=['c/item.c','c/pad.c','c/weapon.c']; C_ASM=['c/hooks.s']
 C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad')]
 def build_c(addr):
     objs=[]

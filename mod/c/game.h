@@ -35,6 +35,14 @@ void memclr_asm(void* p, u32 n);
 void Mem_free(void* p);
 void DelPrim(void* ot, void* p);
 void MesDelete(void* mes, int no);
+int  ItemMgr_arm(void* mgr, void* item);
+int  WeaponId2WeaponNo(u32 id);
+int  WeaponId2WeaponType(u32 id);
+void SndBlkStop(int blk);
+void weaponRelease(void* pl);
+void weaponLoad(void* pl, int no, int type);
+void weaponInit(void* pl);
+#define pPL (*(u8**)0x802B8344)
 int  GetSystemVcnt(void);
 
 /* the mod's asm variables (VB, see bake.py); +0x20: gameplay frames left (set by the move hook) */
@@ -50,3 +58,4 @@ enum { PAD_LEFT=1, PAD_RIGHT=2, PAD_DOWN=4, PAD_UP=8, PAD_Z=0x10, PAD_R=0x20, PA
 
 /* mod storage inside the saved global block (retail pG+0x8368..0x8683 is unused, verified) */
 #define MOD_SEEN_OFS 0x8600   /* 64 bytes: item ids 0..511 already presented */
+#define MOD_SLOT_OFS 0x8640   /* 4 x u16: quick weapon slots up/right/down/left, item id + 1 (0 = empty) */
