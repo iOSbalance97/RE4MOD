@@ -11,6 +11,9 @@
 void ModMesTick(void);
 u32 WeaponPad(u32 in, int sx, int sy);
 void WeaponPadIdle(void);
+void CaseAssign(int dir);
+int CaseActive(void);
+static u32 prev_raw;
 
 void PadRemap(void)
 {
@@ -41,6 +44,14 @@ void PadRemap(void)
         if (r3) out |= PAD_Z;                                /* R3: map */
     } else {
         WeaponPadIdle();
+        if ((in & PAD_Z) && CaseActive()) {                 /* case: L1 + D-pad assigns */
+            static const u32 bit[4] = { PAD_UP, PAD_RIGHT, PAD_DOWN, PAD_LEFT };
+            u32 trg = in & ~prev_raw;
+            int i;
+            for (i = 0; i < 4; i++) if (trg & bit[i]) { CaseAssign(i); break; }
+            out &= ~0xF;                                     /* the cursor does not move meanwhile */
+            in &= ~PAD_Z;                                    /* and Z does not reach the case */
+        }
         out |= in & (PAD_L | PAD_R | PAD_Z);
         if (in & PAD_B) out |= PAD_A;
         if (in & PAD_A) out |= PAD_B;
@@ -49,6 +60,7 @@ void PadRemap(void)
         if (l3) out |= PAD_B;
         if (r3) out |= PAD_Z;
     }
+    prev_raw = p->button;
     p->button = (u16)out;
     p->triggerLeft = (out & PAD_L) ? 0xFF : 0;     /* the game also turns any analog L/R into L/R */
     p->triggerRight = (out & PAD_R) ? 0xFF : 0;

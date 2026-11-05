@@ -68,8 +68,8 @@ for k,a in HOOKS:
     while len(text)%0x20: text+=b'\0'
 # ---- C part (clang for the 750 + binutils ld), linked right after the asm blocks
 CMOD=TEXT_ADDR+len(text)
-C_SRCS=['c/item.c','c/pad.c','c/weapon.c']; C_ASM=['c/hooks.s']
-C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad')]
+C_SRCS=['c/item.c','c/pad.c','c/weapon.c','c/hud.c','c/sil_data.c']; C_ASM=['c/hooks.s']
+C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame')]
 def build_c(addr):
     objs=[]
     for f in C_SRCS:
@@ -93,7 +93,7 @@ text+=cbin
 for a,sym in C_HOOKS: hookw[a]=bran(a,csyms[sym])
 while len(text)%0x20: text+=b'\0'
 END=(TEXT_ADDR+len(text)+0x1F)&~0x1F
-assert END<0x80300000 and END<(HI+1)<<16
+assert END<0x80300000 and VB+VARS_SIZE<=(HI+1)<<16
 W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x80147004:0x881ED0D2,0x801470AC:0x881ED0D2,0x8014713C:0x881ED0D2,
      0x80146E04:0x38000000,0x80146EA0:0x38000000,0x80146FD8:0x38000000,0x80147070:0x38000000,0x80147104:0x38000000,
      0x80146D8C:0xC0091FA8,0x800BCD5C:0x813E0788,0x800BCD64:0xC0090030,0x80157A20:0x60000000,0x80157A2C:0x48000060}

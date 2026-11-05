@@ -59,3 +59,37 @@ enum { PAD_LEFT=1, PAD_RIGHT=2, PAD_DOWN=4, PAD_UP=8, PAD_Z=0x10, PAD_R=0x20, PA
 /* mod storage inside the saved global block (retail pG+0x8368..0x8683 is unused, verified) */
 #define MOD_SEEN_OFS 0x8600   /* 64 bytes: item ids 0..511 already presented */
 #define MOD_SLOT_OFS 0x8640   /* 4 x u16: quick weapon slots up/right/down/left, item id + 1 (0 = empty) */
+
+/* ---- GX (Dolphin SDK in main.dol) ---- */
+typedef f32 Mtx[3][4];
+typedef f32 Mtx44[4][4];
+typedef struct { u32 d[8]; } GXTexObj;
+void GXSetAlphaCompare(int c0, int r0, int op, int c1, int r1);
+void GXSetColorUpdate(int on);
+void GXSetAlphaUpdate(int on);
+void GXSetCullMode(int m);
+void C_MTXOrtho(Mtx44 m, f32 t, f32 b, f32 l, f32 r, f32 n, f32 f);
+void GXSetProjection(Mtx44 m, int type);
+void PSMTXIdentity(Mtx m);
+void GXLoadPosMtxImm(Mtx m, int id);
+void GXSetCurrentMtx(int id);
+void GXSetBlendMode(int type, int src, int dst, int op);
+void GXSetNumTevStages(int n);
+void GXSetNumChans(int n);
+void GXSetNumTexGens(int n);
+void GXSetTexCoordGen2(int dst, int type, int src, int mtx, int norm, int pt);
+void GXSetChanCtrl(int chan, int enable, int amb, int mat, int lights, int diff, int attn);
+void GXSetTevOrder(int stage, int coord, int map, int color);
+void GXSetTevOp(int stage, int mode);
+void GXSetZMode(int enable, int func, int update);
+void GXInitTexObj(GXTexObj* o, const void* img, int w, int h, int fmt, int ws, int wt, int mip);
+void GXInitTexObjLOD(GXTexObj* o, int minf, int magf, f32 minlod, f32 maxlod, f32 bias, int bclamp, int edge, int aniso);
+void GXLoadTexObj(GXTexObj* o, int map);
+void GXClearVtxDesc(void);
+void GXSetVtxDesc(int attr, int type);
+void GXSetVtxAttrFmt(int fmt, int attr, int cnt, int type, int frac);
+void GXBegin(int prim, int fmt, int n);
+int  AddOtDirect(int ot, void* data, void (*func)(void*), u32 no, u16 flag, void* pos, f32 radius);
+void* pzlBoard_getPiece(void* board, int x, int y);
+#define GXFIFO_F32 (*(volatile f32*)0xCC008000)
+#define GXFIFO_U32 (*(volatile u32*)0xCC008000)
