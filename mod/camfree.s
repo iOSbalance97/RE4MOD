@@ -1,5 +1,15 @@
 # Hook at 0x800BCD6C (CameraQuasiFPS::calcDepressionRatio, not-aiming branch). r31 = this.
 # Right stick turns the camera freely (no 60 deg limit, no return); pitch accumulates.
+    # only while Leon moves freely (footwork / walk / back / run / turn): during actions (ladder,
+    # jumps, windows...) the game's camera path ignores the free angles, so turning the stick there
+    # piled up an angle that snapped the camera at the end of the action
+    lwz   r12,-26332(r13)       # pPL
+    lbz   r0,0xFC(r12)
+    cmpwi r0,0
+    bne   L_skip
+    lbz   r0,0xFD(r12)
+    cmplwi r0,5
+    bgt   L_skip
     lis   r8,0x8029
     addi  r8,r8,-9616           # Key
     lbz   r0,2(r8)
@@ -44,6 +54,7 @@ L_b1: fcmpo cr0,f0,f6
     bge   L_b2
     fmr   f0,f6
 L_b2: stfs  f0,512(r31)
+L_skip:
     lis   r12,0x800B
     ori   r12,r12,0xCE80        # function epilogue
     mtctr r12
