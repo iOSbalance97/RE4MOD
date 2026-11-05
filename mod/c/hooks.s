@@ -142,3 +142,14 @@ hook_laserray:
     bl    LaserRay
     lwz   r9,-29912(r13)      # original instruction
     b     ret_laserray
+
+# CameraQuasiFPS::calcDepressionRatio, aiming branch (0x800BCD54): r30 = player, r31 = this.
+    .globl hook_aimcam
+hook_aimcam:
+    stwu  r1,-16(r1)
+    mr    r3,r30
+    mr    r4,r31
+    bl    AimCamEnter
+    addi  r1,r1,16
+    lwz   r3,1928(r30)        # original instruction
+    b     ret_aimcam

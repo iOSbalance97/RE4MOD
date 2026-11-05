@@ -22,7 +22,7 @@ P_move=dict(KTURN=0.35,WALK_K=48.0/72,STRAFE_K=-42.0/72,EASE=0.15,MAXTURN=0.12,F
 P_cf={'YAW_K':-0.0012,'PITCH_K':0.0016}
 P_cam={'CAM_BACK':0.25,'CAM_FOV':1.10,'DEASE':0.0,'DMIN':5000.0,'WSTEP':0.15,'AEASE':0.15}
 P_pr={'RANGE2':2200.0**2}
-LOW=0.3; P_aim={'YAWK':1.05,'PITCHK':0.7,'LOWK':LOW,'CURVEK':(1-LOW)/59.0,'ACCK':0.8/16}
+LOW=0.3; P_aim={'YAWK':1.05,'PITCHK':1.05,'LOWK':LOW,'CURVEK':(1-LOW)/59.0,'ACCK':0.8/16}
 def addrs(src,PB,VB):
     def rep(m):
         val=eval(m.group(0).replace('VB',str(VB)).replace('PB',str(PB)))
@@ -69,7 +69,7 @@ for k,a in HOOKS:
 # ---- C part (clang for the 750 + binutils ld), linked right after the asm blocks
 CMOD=TEXT_ADDR+len(text)
 C_SRCS=['c/item.c','c/pad.c','c/weapon.c','c/hud.c','c/icon.c','c/sil_data.c','c/mot_data.c','c/prefetch.c','c/legs.c']; C_ASM=['c/hooks.s']
-C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame'),(0x80124A44,'hook_draw'),(0x800C5E84,'hook_dvdread'),(0x80169718,'hook_mesbar'),(0x8003EB6C,'hook_laser'),(0x80145A0C,'hook_hitchk'),(0x801472DC,'hook_sway'),(0x8003EA48,'hook_laserray')]
+C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame'),(0x80124A44,'hook_draw'),(0x800C5E84,'hook_dvdread'),(0x80169718,'hook_mesbar'),(0x8003EB6C,'hook_laser'),(0x80145A0C,'hook_hitchk'),(0x801472DC,'hook_sway'),(0x8003EA48,'hook_laserray'),(0x800BCD54,'hook_aimcam')]
 def build_c(addr):
     objs=[]
     for f in C_SRCS:

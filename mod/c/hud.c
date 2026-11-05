@@ -282,6 +282,52 @@ void LaserRay(void)
     }
 }
 
+/* Aim entry with the free camera turned away from Leon (after a ladder, a jump, looking around):
+ * the game's aim camera snapped back behind Leon. Modern: Leon turns to where the camera looks and
+ * the aim starts at the camera's pitch. Called from the camera's aiming branch (hooks.s) before it
+ * reads the aim pitch; on the first aiming frame the free yaw is moved onto Leon (ang.y and, for
+ * this frame's camera, its saved matrix) and the free pitch onto the aim (m3r, Wep pitch). */
+static f32 SinS(f32 x)                         /* |x| <= pi */
+{
+    f32 x2 = x * x;
+    return x * (1.0f - x2 / 6.0f * (1.0f - x2 / 20.0f * (1.0f - x2 / 42.0f * (1.0f - x2 / 72.0f))));
+}
+static f32 Wrap(f32 a)
+{
+    while (a > 3.14159265f) a -= 6.2831853f;
+    while (a < -3.14159265f) a += 6.2831853f;
+    return a;
+}
+void AimCamEnter(u8* pl, u8* q)
+{
+    static int last = -100;
+    int first = (mod_frame - last) > 2;
+    last = mod_frame;
+    if (!first || !pl || pl != pPL || pl[0xFC] != 0 || !modvars[VB_GAMEPLAY]) return;
+    {
+        f32 yaw = *(f32*)(q + 0x204), dep = *(f32*)(q + 0x200);
+        u8* wep = *(u8**)(pl + 0x788);
+        f32* m3 = (f32*)0x8021D970;
+        if (yaw > 0.02f || yaw < -0.02f) {
+            f32* m = (f32*)(q + 0x174);
+            f32 sn = SinS(Wrap(yaw)), cs = SinS(Wrap(yaw + 1.5707963f));
+            int r;
+            *(f32*)(pl + 0xA4) = Wrap(*(f32*)(pl + 0xA4) + yaw);
+            for (r = 0; r < 3; r++) {                  /* m = m * Ry(yaw) */
+                f32 a = m[r * 4 + 0], b = m[r * 4 + 2];
+                m[r * 4 + 0] = a * cs - b * sn;
+                m[r * 4 + 2] = a * sn + b * cs;
+            }
+        }
+        if (dep > 0.6f) dep = 0.6f;
+        if (dep < -0.6f) dep = -0.6f;
+        if (wep) {
+            m3[0] = m3[1] = dep;
+            *(f32*)(wep + 0x28) = dep * 1.5707963f;
+        }
+    }
+}
+
 void SpreadShot2(u8* pl, f32* p0, f32* p1) { SpreadShot(pl, p0, p1); }
 const f32 sway_k = 0.35f;                     /* share of the game's weapon sway kept */
 static f32 fabsf_(f32 x) { return x < 0.0f ? -x : x; }
