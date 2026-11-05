@@ -80,7 +80,7 @@ SQRTF              = 0x80128A50;
 examInfo           = 0x80112E84;
 ModelTrans         = 0x8016876C;
 SECTIONS {
-  . = 0x802be2c0;
+  . = 0x802be2e0;
   .text : { *(.text.hooks) *(.text*) *(.rodata*) . = ALIGN(32); *(.data*) *(.sdata*) *(.sbss*) *(.bss*) *(COMMON) . = ALIGN(32); }
   /DISCARD/ : { *(.comment) *(.eh_frame) *(.note*) }
 }

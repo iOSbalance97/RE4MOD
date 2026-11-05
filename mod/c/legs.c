@@ -93,7 +93,7 @@ static void LegsPhase(f32 dist)
 
 /* Crouched (the game's cover routine, step 0xA): stick forward / back walks crouched, the side keys
    keep turning as the game does. Facing = model yaw + part 0 yaw (the routine turns both). */
-static int CrouchWalk(u8* pl)
+static __attribute__((unused)) int CrouchWalk(u8* pl)
 {
     u8* p0;
     f32 y, a, sp;
@@ -120,7 +120,6 @@ void LegsFrame(void)
     f32 x, z, dx, dz, dist, s, c, lx, lz;
     int clip, aiming;
     if (!pl) { have_last = 0; leg_on = 0; return; }
-    if (CrouchWalk(pl)) return;
     x = PL_F(pl, 0x94); z = PL_F(pl, 0x9C);
     dx = x - last_x; dz = z - last_z;
     last_x = x; last_z = z;
@@ -152,7 +151,7 @@ void LegsFrame(void)
    through the routine's own A/B check (one B press is fed to the pad). */
 static int crouch_req;
 int crouch_stand;                                /* pad.c: feed one B */
-void CrouchPress(void) { crouch_req = 1; }
+void CrouchPress(void) { crouch_req = 0; }   /* crouch disabled until it is redone (B39 looked wrong) */
 void CrouchFrame(void)
 {
     u8* pl = pPL;
