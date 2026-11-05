@@ -7,9 +7,9 @@
 #define W32(w,o) (*(u32*)((u8*)(w)+(o)))
 
 #define MES_RX  446      /* right edge of the notice (message screen 512 x 384), remake style: top right */
-#define MES_Y   70       /* its top; the 3D icon spins right of it */
+#define MES_Y   64       /* its top; the 3D icon spins right of it */
 #define MES_VIS 105      /* notice time in VIs: 1.75 s at 60 Hz */
-#define MES_SCALE 0.7f   /* notice text size relative to the normal message font */
+#define MES_SCALE 0.45f   /* notice text size relative to the normal message font */
 #define MES_WK  2        /* message slot of the notice (0 is shared with other game texts) */
 #define MES_SLOT(n) (cMes + 4 + 236 * (n))
 static u32 mes_attr;
@@ -109,13 +109,18 @@ int QuickItem(u8* w)
     /* 0x11 core text + keep Stop_flg (game keeps running); 0x40 all at once; 0x20000|0x40000
        right aligned on MES_RX; 0x01000000 stays after its end: ModMesTick removes it */
     attr = 0x11 | 0x40 | 0x20000 | 0x40000 | 0x01000000;
-    MesSet(cMes, 0x15, MES_RX, MES_Y, attr, MES_WK, 0, 4);
     {
+        /* MesSet derives the glyph scale from the slot's font size (+0x18/+0x19), which init()
+           never resets: shrink it only for this MesSet and put the game's size back, so the
+           notice does not get smaller on every pickup */
         u8* m = MES_SLOT(MES_WK);
-        *(f32*)(m + 0x10) *= MES_SCALE;                 /* smaller text (Message 0x10..0x19) */
-        *(f32*)(m + 0x14) *= MES_SCALE;
-        *(s8*)(m + 0x18) = (s8)(*(s8*)(m + 0x18) * MES_SCALE);
-        *(s8*)(m + 0x19) = (s8)(*(s8*)(m + 0x19) * MES_SCALE);
+        static s8 fw, fh;
+        if (!fw) { fw = *(s8*)(m + 0x18); fh = *(s8*)(m + 0x19); }
+        *(s8*)(m + 0x18) = (s8)(fw * MES_SCALE);
+        *(s8*)(m + 0x19) = (s8)(fh * MES_SCALE);
+        MesSet(cMes, 0x15, MES_RX, MES_Y, attr, MES_WK, 0, 4);
+        *(s8*)(m + 0x18) = fw;
+        *(s8*)(m + 0x19) = fh;
         *(u16*)(m + 0x1A) = id;                         /* item name for code 10 */
         *(u16**)(m + 0x98) = txt;                       /* our text instead of message 0x15 */
     }
