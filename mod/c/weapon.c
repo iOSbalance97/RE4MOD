@@ -99,12 +99,18 @@ static void DummyWep(u8* pl, int on)
 /* ---- swap timing (test builds): shown at the top left for 4 s after a swap ----
    [frames holding the holster pose while loading] [ms weaponRelease] [ms load: read+link, wall]
    [ms weaponInit]. Time base: bus clock / 4 = 40.5 MHz. */
-#define SWAP_DIAG 0
+#define SWAP_DIAG 1
 static u32 Tb(void) { u32 t; __asm__ volatile("mftbl %0" : "=r"(t)); return t; }
 static int diag[4], diag_left;
 static void DiagShow(void) { diag_left = 240; }
 int SwapDiag(int i) { return i < 0 ? diag_left : diag[i]; }
 void SwapDiagTick(void) { if (diag_left) diag_left--; }
+
+int PrefetchStart(u32 id);
+int PrefetchPoll(void);
+void PrefetchEnd(void);
+int PrefetchBusy(void);
+int PrefetchHits(void);
 
 static void SwapTask(int unused)
 {
@@ -115,8 +121,11 @@ static void SwapTask(int unused)
     u32 id;
     int no, type, lv, i;
     u32 t0, t1, t2, t3, v0, v1;
+    int hits0;
     (void)unused;
     TaskSleep(HOLSTER_FRAMES);
+    for (i = 0; i < 90 && PrefetchPoll() == 0; i++) TaskSleep(1);   /* archive still coming */
+    hits0 = PrefetchHits();
     pl = pPL;
     if (pl && ItemMgr_arm(ItemMgr, it)) {
         id = *(u16*)((u8*)ItemMgr + 0x10);
@@ -142,7 +151,7 @@ static void SwapTask(int unused)
             DummyWep(pl, 0);
             weaponInit(pl);
             t3 = Tb();
-            diag[0] = (t2 - t1) / (40500 * 33);   /* ~frames the load took */ (void)v0; (void)v1; diag[1] = (t1 - t0) / 40500; diag[2] = (t2 - t1) / 40500; diag[3] = (t3 - t2) / 40500;
+            diag[0] = PrefetchHits() - hits0;    /* reads answered from memory (0 = disc) */ (void)v0; (void)v1; diag[1] = (t1 - t0) / 40500; diag[2] = (t2 - t1) / 40500; diag[3] = (t3 - t2) / 40500;
             if (SWAP_DIAG) DiagShow();
             /* the neck keeps its mode (B20 switched it off and the layer then stayed at full
                weight); with its motions cleared it waits for footwork's Neck->init below */
@@ -155,6 +164,8 @@ static void SwapTask(int unused)
         pl[0xFF] |= 1;
         pl[0xFE] = 0;
     }
+    for (i = 0; i < 300 && PrefetchBusy(); i++) { PrefetchPoll(); TaskSleep(1); }
+    PrefetchEnd();
     swap_busy = 0;
     TaskExit();
 }
@@ -167,6 +178,7 @@ static void SwapStart(cItem* it)
     swap_busy = 1;
     if (SWAP_DIAG) { diag[0] = diag[1] = diag[2] = diag[3] = 0; diag_left = 600; }  /* box at once: 0 0 0 0 */
     if (!TaskExec(1, SwapTask, 0)) { swap_busy = 0; Equip(it); return; }
+    PrefetchStart(it->id);                               /* old weapon intact meanwhile */
     MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, HOLSTER_FRAMES, 5, 0);
     pl[0xFD] = 0;                                        /* footwork, motion already set */
     pl[0xFE] = 1;

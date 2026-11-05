@@ -74,3 +74,7 @@ SECTIONS {
   .text : { *(.text.hooks) *(.text*) *(.rodata*) . = ALIGN(32); *(.data*) *(.sdata*) *(.sbss*) *(.bss*) *(COMMON) . = ALIGN(32); }
   /DISCARD/ : { *(.comment) *(.eh_frame) *(.note*) }
 }
+DvdReadN           = 0x800C4A70;
+DvdReadCheck       = 0x800C6D80;
+DvdFileExistCheck  = 0x800C66EC;
+mem_alloc          = 0x80125BC4;

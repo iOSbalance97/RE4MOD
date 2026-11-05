@@ -6,6 +6,7 @@ ret_pzl_init       = 0x80148D68;
 ret_pzl_quit       = 0x8014905C;
 ret_frame          = 0x801249BC;
 ret_draw           = 0x80124A48;
+ret_dvdread        = 0x800C5E88;
 itemInfo           = 0x80019C90;
 ItemMgr_get        = 0x8001A934;
 PutInCase          = 0x8014A928;
@@ -82,3 +83,7 @@ SECTIONS {
   .text : { *(.text.hooks) *(.text*) *(.rodata*) . = ALIGN(32); *(.data*) *(.sdata*) *(.sbss*) *(.bss*) *(COMMON) . = ALIGN(32); }
   /DISCARD/ : { *(.comment) *(.eh_frame) *(.note*) }
 }
+DvdReadN           = 0x800C4A70;
+DvdReadCheck       = 0x800C6D80;
+DvdFileExistCheck  = 0x800C66EC;
+mem_alloc          = 0x80125BC4;

@@ -48,3 +48,30 @@ hook_draw:
     bl    ModDraw
     bl    CinescoMove         # original instruction
     b     ret_draw
+
+# cDvdQueue::fileReadAsync (0x800C5E84): answer from the prefetched weapon archive when it is the
+# file being read (PrefetchRead returns 1), else the original DVDReadAsyncPrio path.
+    .globl hook_dvdread
+hook_dvdread:
+    stwu  r1,-32(r1)
+    mflr  r0
+    stw   r0,36(r1)
+    stw   r3,8(r1)
+    stw   r4,12(r1)
+    stw   r5,16(r1)
+    stw   r6,20(r1)
+    bl    PrefetchRead
+    lwz   r0,36(r1)
+    mtlr  r0
+    cmpwi r3,0
+    bne   1f
+    lwz   r3,8(r1)
+    lwz   r4,12(r1)
+    lwz   r5,16(r1)
+    lwz   r6,20(r1)
+    addi  r1,r1,32
+    stwu  r1,-8(r1)           # original instruction
+    b     ret_dvdread
+1:  addi  r1,r1,32
+    li    r3,1                # DVDReadAsyncPrio's TRUE
+    blr
