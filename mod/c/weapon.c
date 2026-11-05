@@ -136,6 +136,10 @@ static void DoSwap(u8* pl, cItem* it)
    is needed (B32 used slot 1, sometimes busy -> fallback with the full disc stall). DoSwap then
    runs in one go: the load is answered from the prefetched copy, so nothing ever sleeps. */
 static int sw_on, sw_vi, sw_gesture, sw_cleanup;
+/* aiming: the new weapon's ready step 0 resets the aim (Wep->pitch from the camera, the aim yaw
+   m_Fwork0 = 0); put back where Leon was aiming for a few frames after it ran */
+static int aim_restore;
+static f32 aim_pitch, aim_yaw;
 #define HOLSTER_VI (2 * HOLSTER_FRAMES - 2)          /* earliest swap: the hand is almost there */
 
 void SwapFrame(void)
@@ -143,6 +147,14 @@ void SwapFrame(void)
     u8* pl;
     int pr, st;
     if (sw_cleanup && PrefetchPoll() != 0) { PrefetchEnd(); sw_cleanup = 0; }
+    if (aim_restore) {
+        pl = pPL;
+        if (pl && pl[0xFD] == 6 && *(u8**)(pl + 0x788)) {
+            *(f32*)(*(u8**)(pl + 0x788) + 0x28) = aim_pitch;
+            *(f32*)(pl + 0x400) = aim_yaw;
+            aim_restore--;
+        } else aim_restore = 0;
+    }
     if (!sw_on) return;
     sw_vi += GetSystemVcnt();
     if (!modvars[VB_GAMEPLAY]) return;               /* paused / menu: wait */
@@ -156,6 +168,10 @@ void SwapFrame(void)
         pl = 0;
     }
     if (pl) {
+        if (st == 6 && *(u8**)(pl + 0x788)) {
+            aim_pitch = *(f32*)(*(u8**)(pl + 0x788) + 0x28);
+            aim_yaw = *(f32*)(pl + 0x400);
+        }
         DoSwap(pl, swap_item);
         st = SwapState(pl);
         if (sw_gesture || st == 0) {                     /* footwork: restart the idle, blended */
@@ -169,6 +185,7 @@ void SwapFrame(void)
             MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, 0, 5, 0);
             pl[0xFE] = 0;
             pl[0xFF] = 0;          /* r_no_3: the handgun's ready step table has 4 entries */
+            if (st == 6) aim_restore = 6;
         }
     }
     sw_on = 0;
