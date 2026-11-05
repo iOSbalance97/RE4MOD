@@ -116,7 +116,7 @@ static void SwapTask(int unused)
     int no, type, lv, i;
     u32 t0, t1, t2, t3, v0, v1;
     (void)unused;
-    TaskSleep(HOLSTER_FRAMES);
+    TaskSleep(HOLSTER_FRAMES - 3);                      /* hand almost at the holster: start */
     pl = pPL;
     if (pl && ItemMgr_arm(ItemMgr, it)) {
         id = *(u16*)((u8*)ItemMgr + 0x10);
@@ -142,7 +142,7 @@ static void SwapTask(int unused)
             DummyWep(pl, 0);
             weaponInit(pl);
             t3 = Tb();
-            diag[0] = (v1 - v0) / 2; diag[1] = (t1 - t0) / 40500; diag[2] = (t2 - t1) / 40500; diag[3] = (t3 - t2) / 40500;
+            diag[0] = (t2 - t1) / (40500 * 33);   /* ~frames the load took */ (void)v0; (void)v1; diag[1] = (t1 - t0) / 40500; diag[2] = (t2 - t1) / 40500; diag[3] = (t3 - t2) / 40500;
             if (SWAP_DIAG) DiagShow();
             /* the neck keeps its mode (B20 switched it off and the layer then stayed at full
                weight); with its motions cleared it waits for footwork's Neck->init below */
