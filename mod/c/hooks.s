@@ -83,3 +83,14 @@ hook_mesbar:
     bl    NoticeBarDraw
     lwz   r9,-29912(r13)      # original instruction
     b     ret_mesbar
+
+# drawLaserSight (0x8003EB6C, after the hit switch): r31 = hit result, r29 = draw. The reticle
+# (hud.c) takes the hit point; the beam is no longer drawn (draw flag cleared).
+    .globl hook_laser
+hook_laser:
+    mr    r3,r31
+    mr    r4,r29
+    bl    LaserHook
+    li    r29,0
+    lis   r9,-32738           # original instruction
+    b     ret_laser

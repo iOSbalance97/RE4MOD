@@ -7,3 +7,4 @@ ret_frame          = 0x801249BC;
 ret_draw           = 0x80124A48;
 ret_dvdread        = 0x800C5E88;
 ret_mesbar         = 0x8016971C;
+ret_laser          = 0x8003EB70;

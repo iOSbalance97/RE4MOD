@@ -153,11 +153,111 @@ int NoticeLeft(void);
 #define BAR_X1 612.0f
 #define BAR_Y  74.0f
 #define BAR_H  26.0f
+
+/* ---------------------------------------------------------------------------------------------
+ * Remake-style reticle in place of the laser. drawLaserSight no longer draws the beam / dot
+ * (LaserHook clears its draw flag); each frame it runs, its hit point (lcross) is projected with
+ * the game camera and the reticle is drawn there: a centre dot and four ticks that open while Leon
+ * walks, turns or fires and close again (focus) when he holds still. During the shot / pump the
+ * laser is not updated, so the last position is held for a while.
+ * ------------------------------------------------------------------------------------------- */
+int SwapLock(void);
+#define LCROSS ((f32*)0x8021D82C)
+static int ret_seen, ret_hit, ret_hold, ret_r2, ret_a, ret_have;
+static f32 ret_x, ret_y, ret_spread, ret_px, ret_pz, ret_ang, ret_pitch;
+void LaserHook(int res, int draw)
+{
+    (void)draw;
+    ret_seen = 1; ret_hit = res;
+}
+static f32 fabsf_(f32 x) { return x < 0.0f ? -x : x; }
+static void RetTicks(f32 cx, f32 cy, f32 g, f32 len, f32 t, u32 c)
+{
+    Quad(cx - t * 0.5f, cy - g - len, t, len, c, 0);          /* top */
+    Quad(cx - t * 0.5f, cy + g, t, len, c, 0);                /* bottom */
+    Quad(cx - g - len, cy - t * 0.5f, len, t, c, 0);          /* left */
+    Quad(cx + g, cy - t * 0.5f, len, t, c, 0);                /* right */
+    Quad(cx - t * 0.5f, cy - t * 0.5f, t, t, c, 0);           /* dot */
+}
+static void ReticleDraw(void)
+{
+    static const u32 black = 0;
+    u8* pl = pPL;
+    int aiming = pl && pl[0xFC] == 0 && pl[0xFD] == 6 && modvars[VB_GAMEPLAY] && !SwapLock();
+    int seen = ret_seen;
+    ret_seen = 0;
+    if (!aiming) { ret_hold = 0; ret_a = 0; ret_have = 0; ret_r2 = 0; return; }
+
+    if (seen) {   /* project the laser hit point with the game camera (pG->Camera, at pG + 0x74) */
+        f32* v = (f32*)(pG + 0x74 + 0x30);
+        f32* p = (f32*)(pG + 0x74 + 0x64);
+        f32 x = LCROSS[0], y = LCROSS[1], z = LCROSS[2];
+        f32 vx = v[0] * x + v[1] * y + v[2] * z + v[3];
+        f32 vy = v[4] * x + v[5] * y + v[6] * z + v[7];
+        f32 vz = v[8] * x + v[9] * y + v[10] * z + v[11];
+        f32 cx = p[0] * vx + p[1] * vy + p[2] * vz + p[3];
+        f32 cy = p[4] * vx + p[5] * vy + p[6] * vz + p[7];
+        f32 cw = p[12] * vx + p[13] * vy + p[14] * vz + p[15];
+        if (cw > 1.0f) {
+            f32 nx = 320.0f * (1.0f + cx / cw), ny = 240.0f * (1.0f - cy / cw);
+            if (!ret_hold) { ret_x = nx; ret_y = ny; }
+            else { ret_x += (nx - ret_x) * 0.6f; ret_y += (ny - ret_y) * 0.6f; }   /* no 1-px jitter */
+            ret_hold = 45;
+        }
+    } else if (ret_hold > 0) ret_hold--;
+
+    {   /* spread: walking / turning open it, a shot kicks it fully open, standing still focuses it */
+        u8* wep = *(u8**)(pl + 0x788);
+        f32 px = *(f32*)(pl + 0x94), pz = *(f32*)(pl + 0x9C), ang = *(f32*)(pl + 0xA4);
+        f32 pitch = wep ? *(f32*)(wep + 0x28) : 0.0f;
+        f32 tgt = 0.0f, mv, tn, da;
+        if (ret_have) {
+            mv = (px - ret_px) * (px - ret_px) + (pz - ret_pz) * (pz - ret_pz);
+            mv = mv > 1600.0f ? 1.0f : mv / 1600.0f;              /* 40 units / frame = full */
+            da = ang - ret_ang;
+            if (da > 3.14159f) da -= 6.28318f;
+            if (da < -3.14159f) da += 6.28318f;
+            tn = (fabsf_(da) + fabsf_(pitch - ret_pitch)) / 0.04f;
+            if (tn > 1.0f) tn = 1.0f;
+            tgt = mv * 0.55f;
+            if (tn * 0.5f > tgt) tgt = tn * 0.5f;
+        }
+        ret_px = px; ret_pz = pz; ret_ang = ang; ret_pitch = pitch; ret_have = 1;
+        if (pl[0xFE] == 2 && ret_r2 != 2) ret_spread = 1.0f;     /* shot */
+        ret_r2 = pl[0xFE];
+        if (tgt > ret_spread) ret_spread += (tgt - ret_spread) * 0.3f;
+        else ret_spread += (tgt - ret_spread) * 0.07f;
+    }
+    if (ret_hold <= 0) { ret_a = 0; return; }
+    if (ret_a < 8) ret_a++;
+
+    {
+        Mtx44 pm; Mtx m;
+        f32 g = 4.0f + 15.0f * ret_spread;
+        int a = 230 * ret_a / 8;
+        u32 col = (ret_hit == 2 ? 0xFF505000 : 0xFFFFFF00);
+        GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);
+        ViewportOn();
+        GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
+        C_MTXOrtho(pm, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(pm, 1);
+        PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
+        GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
+        GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
+        ModeFlat();
+        RetTicks(ret_x, ret_y, g - 0.75f, 7.5f, 3.2f, (u32)(a * 2 / 5));     /* dark outline */
+        RetTicks(ret_x, ret_y, g, 6.0f, 1.7f, col | (u32)a);
+        GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
+        ViewportOff();
+        GXSetProjection((f32(*)[4])(0x80284420 + 0x64), 0);
+    }
+}
+
 void NoticeBarDraw(void)
 {
     static const u32 black = 0;
     Mtx44 p; Mtx m;
     int left = NoticeLeft(), a = 150;
+    ReticleDraw();
     if (left <= 0 || !modvars[VB_GAMEPLAY]) return;
     if (left < 12) a = a * left / 12;
     GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);

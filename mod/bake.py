@@ -20,7 +20,7 @@ def asm(src,name):
 P_move=dict(KTURN=0.35,WALK_K=48.0/72,STRAFE_K=-42.0/72,EASE=0.15,MAXTURN=0.12,FOLLOW=0.97,RELOAD_K=-0.0012,QUICK=2.6,
        BACKANG=1.75,BACKLIM=0.8,WAISTMAX=1.0,WAISTRATE=0.25,STRAFE_SMOOTH=0.55)
 P_cf={'YAW_K':-0.0012,'PITCH_K':0.0016}
-P_cam={'CAM_BACK':0.25,'CAM_FOV':1.10,'DEASE':0.12,'DMIN':1500.0,'WSTEP':0.15,'AEASE':0.25}
+P_cam={'CAM_BACK':0.25,'CAM_FOV':1.10,'DEASE':0.12,'DMIN':1500.0,'WSTEP':0.15,'AEASE':0.15}
 P_pr={'RANGE2':2200.0**2}
 LOW=0.3; P_aim={'YAWK':1.05,'PITCHK':0.7,'LOWK':LOW,'CURVEK':(1-LOW)/59.0}
 def addrs(src,PB,VB):
@@ -53,7 +53,7 @@ srcs,pool2=build(PB,VB); assert pool2==pool
 for k,s in srcs.items(): assert '0x8000\n' not in s and 'VB' not in re.sub(r'#.*','',s), k
 DATA=b''.join(struct.pack('>I',x) for x in pool)+b'\0'*VARS_SIZE
 TEXT_ADDR=(VB+VARS_SIZE+0x1F)&~0x1F
-HOOKS=[('mv',0x80051F30),('cf',0x800BCD6C),('cm',0x800BDAE4),('pr',0x800D0478),('am',0x80146D50),('dot',0x8003EB6C),('ns',0x800BEE88),
+HOOKS=[('mv',0x80051F30),('cf',0x800BCD6C),('cm',0x800BDAE4),('pr',0x800D0478),('am',0x80146D50),('ns',0x800BEE88),
        ('dA',0x800DF888),('dB',0x800DF940),('dC',0x800DF918),('dD',0x800DBAC4)]
 def bran(src,dst):
     d=dst-src; assert -0x2000000<=d<0x2000000 and d%4==0
@@ -69,7 +69,7 @@ for k,a in HOOKS:
 # ---- C part (clang for the 750 + binutils ld), linked right after the asm blocks
 CMOD=TEXT_ADDR+len(text)
 C_SRCS=['c/item.c','c/pad.c','c/weapon.c','c/hud.c','c/icon.c','c/sil_data.c','c/mot_data.c','c/prefetch.c','c/legs.c']; C_ASM=['c/hooks.s']
-C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame'),(0x80124A44,'hook_draw'),(0x800C5E84,'hook_dvdread'),(0x80169718,'hook_mesbar')]
+C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame'),(0x80124A44,'hook_draw'),(0x800C5E84,'hook_dvdread'),(0x80169718,'hook_mesbar'),(0x8003EB6C,'hook_laser')]
 def build_c(addr):
     objs=[]
     for f in C_SRCS:
@@ -96,7 +96,8 @@ END=(TEXT_ADDR+len(text)+0x1F)&~0x1F
 assert END<0x80300000 and VB+VARS_SIZE<=(HI+1)<<16
 W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x80147004:0x881ED0D2,0x801470AC:0x881ED0D2,0x8014713C:0x881ED0D2,
      0x80146E04:0x38000000,0x80146EA0:0x38000000,0x80146FD8:0x38000000,0x80147070:0x38000000,0x80147104:0x38000000,
-     0x80146D8C:0xC0091FA8,0x800BCD5C:0x813E0788,0x800BCD64:0xC0090030,0x80157A20:0x60000000,0x80157A2C:0x48000060}
+     0x80146D8C:0xC0091FA8,0x800BCD5C:0x813E0788,0x800BCD64:0xC0090030,0x80157A20:0x60000000,0x80157A2C:0x48000060,
+     0x8003EB68:0x60000000}   # no laser dot on enemies (reticle instead)
 # __ArenaLo: lis r3,hi / addi r3,r3,lo at both sites
 ha=(END+0x8000)>>16; lo=END-(ha<<16)
 W04[0x80069160]=0x3C600000|ha; W04[0x80069164]=0x38630000|(lo&0xFFFF)
