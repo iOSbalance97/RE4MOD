@@ -415,6 +415,8 @@ aimwalk:
     lbz   r0,0xFE(r31)          # r_no_2
     cmpwi r28,6
     bne   L_knf
+    cmpwi r0,2                  # firing (shotgun pump...): the shoulder camera holds still, so
+    beq   done                  # Leon holds still too (B38: he slid out of the picture)
     cmpwi r0,0                  # weapon: 0 = draw, 4 = reload -> right stick turns Leon
     beq   L_rot
     lwz   r10,0x788(r31)        # past the draw: no pending turn, the kamae camera sits behind Leon

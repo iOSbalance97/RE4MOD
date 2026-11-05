@@ -147,6 +147,8 @@ void IconFrame(void);
    icon, drawn before the item camera pass and the messages, so icon and text land on top. Notice: right edge 446, top 64 of
    the 512 x 384 message screen = 557, 80 here. */
 int NoticeLeft(void);
+#define ICON_X 0.785f                 /* icon.c ICON_NDC_X / _Y */
+#define ICON_Y 0.685f
 #define BAR_X0 330.0f
 #define BAR_X1 612.0f
 #define BAR_Y  74.0f
@@ -168,6 +170,18 @@ void NoticeBarDraw(void)
     ModeFlat();
     QuadH(BAR_X0, BAR_Y, 120.0f, BAR_H, 0x00000000, (u32)a);
     Quad(BAR_X0 + 120.0f, BAR_Y, BAR_X1 - BAR_X0 - 120.0f, BAR_H, (u32)a, 0);
+    {   /* soft light behind the 3D icon so it stands out on the dark band (triangle fan) */
+        static const f32 ox[9] = { 1.0f, 0.707f, 0.0f, -0.707f, -1.0f, -0.707f, 0.0f, 0.707f, 1.0f };
+        static const f32 oy[9] = { 0.0f, 0.707f, 1.0f, 0.707f, 0.0f, -0.707f, -1.0f, -0.707f, 0.0f };
+        const f32 cx = 320.0f * (1.0f + ICON_X), cy = 240.0f * (1.0f - ICON_Y), rx = 24.0f, ry = 20.0f;
+        u32 cc = 0xB0B0A000 | (u32)(a * 2 / 3), ce = 0xB0B0A000;
+        int k;
+        GXBegin(0xA0, 0, 10);
+        GXFIFO_F32 = cx; GXFIFO_F32 = cy; GXFIFO_F32 = 0.0f; GXFIFO_U32 = cc;
+        for (k = 0; k < 9; k++) {
+            GXFIFO_F32 = cx + ox[k] * rx; GXFIFO_F32 = cy + oy[k] * ry; GXFIFO_F32 = 0.0f; GXFIFO_U32 = ce;
+        }
+    }
     GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
     ViewportOff();
     GXSetProjection((f32(*)[4])(0x80284420 + 0x64), 0);   /* the item camera pass comes next */

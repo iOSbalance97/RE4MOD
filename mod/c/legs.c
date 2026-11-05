@@ -10,9 +10,13 @@
  * Runs once a frame from ModFrame (after the game update), for the next frame. */
 #include "game.h"
 
-extern unsigned char leg_fwd[], leg_back[], leg_left[], leg_right[];
-extern const short leg_cycle[4][2];
-static unsigned char* const leg_mot[4] = { leg_fwd, leg_back, leg_left, leg_right };
+extern unsigned char leg_fwd[], leg_back[], leg_left[], leg_right[], leg_crouch[];
+extern const short leg_cycle[5][2];
+static unsigned char* const leg_mot[5] = { leg_fwd, leg_back, leg_left, leg_right, leg_crouch };
+#define JOY_X (*(s8*)0x8028D0D0)                     /* Joy[0] stick */
+#define JOY_Y (*(s8*)0x8028D0D1)
+#define CROUCH_FWD  20.0f                            /* mm per frame at full stick */
+#define CROUCH_BACK 14.0f
 
 static u32 leg_work[0xD0 / 4];               /* MOTION_INFO */
 static int leg_clip = -1, leg_on, still, have_last;
@@ -57,12 +61,66 @@ static void LegsOff(u8* pl)
     LegIK(pl, 0);
 }
 
+static void LegsSet(u8* pl, int clip)
+{
+    if (clip != leg_clip) {
+        f32 frac = leg_clip >= 0 ? phase / (f32)leg_cycle[leg_clip][0] : 0.0f;
+        MI(0x44, u32) |= 0x30000000;             /* no IKInit (the base chains stay), keep blend */
+        MotionSetCore(pl, leg_work, leg_mot[clip], 0, 0, 5, 0);
+        MI(0x44, u32) &= ~0x10000000u;
+        leg_clip = clip;
+        phase = frac * (f32)leg_cycle[clip][0];
+    }
+    if (!leg_on) {
+        leg_on = 1;
+        *(u32*)(pl + 0x1D8 + 0x44) |= 0x20000000;   /* Motion: MotionSetCore keeps pMotionB */
+    }
+    *(void**)(pl + 0x2A8) = leg_work;
+    MI(0xC8, f32) = 1.0f;                        /* Brate */
+    LegIK(pl, 1);
+}
+
+static void LegsPhase(f32 dist)
+{
+    int n = leg_cycle[leg_clip][0];
+    phase += dist * (f32)n / (f32)leg_cycle[leg_clip][1];
+    while (phase >= (f32)n) phase -= (f32)n;
+    while (phase < 0.0f) phase += (f32)n;
+    MI(0xB8, f32) = phase;                       /* Seq_frame */
+    MI(0xAC, u16) = (u16)(phase * 64.0f);        /* Seq.Frame (10.6) */
+    MI(0x24, f32) = phase;                       /* Mot_frame */
+}
+
+/* Crouched (the game's cover routine, step 0xA): stick forward / back walks crouched, the side keys
+   keep turning as the game does. Facing = model yaw + part 0 yaw (the routine turns both). */
+static int CrouchWalk(u8* pl)
+{
+    u8* p0;
+    f32 y, a, sp;
+    if (pl[0xFC] != 0 || pl[0xFD] != 0x11 || pl[0xFE] != 0xA || !modvars[VB_GAMEPLAY]) return 0;
+    y = (f32)JOY_Y;
+    if (y > -12.0f && y < 12.0f) { if (++still >= 2) LegsOff(pl); return 1; }
+    still = 0;
+    if (y > 72.0f) y = 72.0f;
+    if (y < -72.0f) y = -72.0f;
+    sp = y > 0 ? y / 72.0f * CROUCH_FWD : y / 72.0f * CROUCH_BACK;
+    p0 = (u8*)getPartsPtr(pl, 0);
+    a = PL_F(pl, 0xA4) + (p0 ? PL_F(p0, 0xA4) : 0.0f);
+    PL_F(pl, 0x94) += Sin(a) * sp;
+    PL_F(pl, 0x9C) += Cos(a) * sp;
+    last_x = PL_F(pl, 0x94); last_z = PL_F(pl, 0x9C);
+    LegsSet(pl, 4);
+    LegsPhase(sp);                               /* backwards: the cycle runs in reverse */
+    return 1;
+}
+
 void LegsFrame(void)
 {
     u8* pl = pPL;
     f32 x, z, dx, dz, dist, s, c, lx, lz;
-    int clip, aiming, n;
+    int clip, aiming;
     if (!pl) { have_last = 0; leg_on = 0; return; }
+    if (CrouchWalk(pl)) return;
     x = PL_F(pl, 0x94); z = PL_F(pl, 0x9C);
     dx = x - last_x; dz = z - last_z;
     last_x = x; last_z = z;
@@ -84,29 +142,9 @@ void LegsFrame(void)
     else if (lz >= (lx < 0 ? -lx : lx)) clip = 0;
     else if (-lz >= (lx < 0 ? -lx : lx)) clip = 1;
     else clip = lx > 0 ? 2 : 3;                   /* +x = Leon's left */
-    if (clip < 0) return;
-    if (clip != leg_clip) {
-        f32 frac = leg_clip >= 0 ? phase / (f32)leg_cycle[leg_clip][0] : 0.0f;
-        MI(0x44, u32) |= 0x30000000;             /* no IKInit (the aim chains stay), keep blend */
-        MotionSetCore(pl, leg_work, leg_mot[clip], 0, 0, 5, 0);
-        MI(0x44, u32) &= ~0x10000000u;
-        leg_clip = clip;
-        phase = frac * (f32)leg_cycle[clip][0];
-    }
-    if (!leg_on) {
-        leg_on = 1;
-        *(u32*)(pl + 0x1D8 + 0x44) |= 0x20000000;   /* Motion: MotionSetCore keeps pMotionB */
-    }
-    *(void**)(pl + 0x2A8) = leg_work;
-    MI(0xC8, f32) = 1.0f;                        /* Brate */
-    LegIK(pl, 1);
-    /* phase: one cycle per leg_cycle[1] millimetres actually covered */
-    n = leg_cycle[clip][0];
-    phase += dist * (f32)n / (f32)leg_cycle[clip][1];
-    while (phase >= (f32)n) phase -= (f32)n;
-    MI(0xB8, f32) = phase;                       /* Seq_frame */
-    MI(0xAC, u16) = (u16)(phase * 64.0f);        /* Seq.Frame (10.6) */
-    MI(0x24, f32) = phase;                       /* Mot_frame */
+    if (clip < 0 || clip > 3) return;
+    LegsSet(pl, clip);
+    LegsPhase(dist);
 }
 
 /* ---- Crouch on Circle: the game's own cover crouch (pl_R1_Crouch, routine 0x11: crouch, look
