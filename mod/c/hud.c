@@ -163,6 +163,9 @@ int NoticeLeft(void);
  * ------------------------------------------------------------------------------------------- */
 int SwapLock(void);
 #define LCROSS ((f32*)0x8021D82C)
+#define RET_GAP0  3.0f        /* tick gap when focused (px of the 640 x 480 frame) */
+#define RET_GAPK 12.0f        /* extra gap at full bloom: shots spread inside this radius */
+#define RET_LEN   4.0f
 static int ret_seen, ret_hit, ret_hold, ret_r2, ret_a, ret_have;
 static f32 ret_x, ret_y, ret_spread, ret_px, ret_pz, ret_ang, ret_pitch;
 void LaserHook(int res, int draw)
@@ -170,20 +173,66 @@ void LaserHook(int res, int draw)
     (void)draw;
     ret_seen = 1; ret_hit = res;
 }
-static f32 fabsf_(f32 x) { return x < 0.0f ? -x : x; }
 #define RN 32
 static const f32 rc[RN + 1] = { 1.00000f, 0.98079f, 0.92388f, 0.83147f, 0.70711f, 0.55557f, 0.38268f, 0.19509f, 0.00000f, -0.19509f, -0.38268f, -0.55557f, -0.70711f, -0.83147f, -0.92388f, -0.98079f, -1.00000f, -0.98079f, -0.92388f, -0.83147f, -0.70711f, -0.55557f, -0.38268f, -0.19509f, -0.00000f, 0.19509f, 0.38268f, 0.55557f, 0.70711f, 0.83147f, 0.92388f, 0.98079f, 1.00000f };
 static const f32 rs[RN + 1] = { 0.00000f, 0.19509f, 0.38268f, 0.55557f, 0.70711f, 0.83147f, 0.92388f, 0.98079f, 1.00000f, 0.98079f, 0.92388f, 0.83147f, 0.70711f, 0.55557f, 0.38268f, 0.19509f, 0.00000f, -0.19509f, -0.38268f, -0.55557f, -0.70711f, -0.83147f, -0.92388f, -0.98079f, -1.00000f, -0.98079f, -0.92388f, -0.83147f, -0.70711f, -0.55557f, -0.38268f, -0.19509f, -0.00000f };
-static void Ring(f32 cx, f32 cy, f32 r, f32 t, u32 c)        /* thin ring: triangle strip */
+static int mod_frame;
+static u32 rng = 0x2F6B1D35u;
+static f32 Rnd(void) { rng = rng * 1664525u + 1013904223u; return (f32)(rng >> 8) * (1.0f / 16777216.0f); }
+
+/* PlWepHitCheck2 entry (hooks.s): moves the shot's end point inside the reticle's open radius,
+ * one random offset per frame (the shotgun's pellets keep their pattern and move together).
+ * Focused (closed reticle) the shot goes where the reticle points. */
+void SpreadShot(u8* pl, f32* p0, f32* p1)
 {
-    f32 ri = r - t * 0.5f, ro = r + t * 0.5f;
-    int k;
-    if (ri < 0.0f) ri = 0.0f;
-    GXBegin(0x98, 0, (RN + 1) * 2);
-    for (k = 0; k <= RN; k++) {
-        GXFIFO_F32 = cx + rc[k] * ro; GXFIFO_F32 = cy + rs[k] * ro; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
-        GXFIFO_F32 = cx + rc[k] * ri; GXFIFO_F32 = cy + rs[k] * ri; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+    static int frame = -1;
+    static f32 dx, dy;
+    f32* v = (f32*)(pG + 0x74 + 0x30);
+    f32 p00 = *(f32*)(pG + 0x74 + 0x64), l2, l, k;
+    int i;
+    if (!pl || pl != pPL || pl[0xFD] != 6 || !modvars[VB_GAMEPLAY] || p00 <= 0.0f) return;
+    if (frame != mod_frame) {
+        f32 r = Rnd(), r2 = Rnd(), R = RET_GAPK * ret_spread / (320.0f * p00);
+        int j = (int)(Rnd() * (f32)RN) % RN;
+        if (r2 > r) r = r2;                                    /* denser towards the centre */
+        frame = mod_frame;
+        dx = rc[j] * r * R; dy = rs[j] * r * R;
     }
+    l2 = (p1[0] - p0[0]) * (p1[0] - p0[0]) + (p1[1] - p0[1]) * (p1[1] - p0[1]) + (p1[2] - p0[2]) * (p1[2] - p0[2]);
+    if (l2 < 1.0f) return;
+    l = l2; k = 1.0f;                                          /* sqrt: a few Newton steps */
+    for (i = 0; i < 12; i++) k = 0.5f * (k + l / k);
+    for (i = 0; i < 3; i++) p1[i] += (v[i] * dx + v[4 + i] * dy) * k;
+}
+
+/* Recoil: each shot raises the camera's aim point (the one c12 keeps in Leon's frame during the
+ * shot, VB+0x28); when the shot / pump ends the camera eases back down by itself. */
+static int rc_prev;
+static void RecoilFrame(void)
+{
+    u8* pl = pPL;
+    int fire = pl && pl[0xFC] == 0 && pl[0xFD] == 6 && pl[0xFE] == 2 && modvars[VB_GAMEPLAY];
+    if (fire && !rc_prev && *(u32*)(modvars + 0x34)) {
+        f32* a = (f32*)(modvars + 0x28);
+        u8 w = pG[0x4FBC];                     /* weapon_no (PAL: NTSC 0x4FB0 + 0xC) */
+        f32 t = (w == 7 || w == 8 || w == 0x21) ? 0.060f : 0.028f;   /* tan 3.4 / 1.6 degrees */
+        f32 l2 = a[0] * a[0] + a[1] * a[1] + a[2] * a[2], k = 1.0f;
+        int i;
+        for (i = 0; i < 12; i++) k = 0.5f * (k + l2 / k);
+        a[1] += k * t;
+    }
+    rc_prev = fire;
+}
+
+void SpreadShot2(u8* pl, f32* p0, f32* p1) { SpreadShot(pl, p0, p1); }
+const f32 sway_k = 0.35f;                     /* share of the game's weapon sway kept */
+static f32 fabsf_(f32 x) { return x < 0.0f ? -x : x; }
+static void RetTicks(f32 cx, f32 cy, f32 g, f32 len, f32 t, u32 c)
+{
+    Quad(cx - t * 0.5f, cy - g - len, t, len, c, 0);          /* top */
+    Quad(cx - t * 0.5f, cy + g, t, len, c, 0);                /* bottom */
+    Quad(cx - g - len, cy - t * 0.5f, len, t, c, 0);          /* left */
+    Quad(cx + g, cy - t * 0.5f, len, t, c, 0);                /* right */
 }
 static void Disc(f32 cx, f32 cy, f32 r, u32 c)               /* filled circle: triangle fan */
 {
@@ -248,7 +297,7 @@ static void ReticleDraw(void)
 
     {
         Mtx44 pm; Mtx m;
-        f32 g = 5.0f + 17.0f * ret_spread;
+        f32 g = RET_GAP0 + RET_GAPK * ret_spread;
         int a = 230 * ret_a / 8;
         u32 col = (ret_hit == 2 ? 0xFF484000 : 0xFFFFFF00);
         GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);
@@ -259,12 +308,11 @@ static void ReticleDraw(void)
         GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
         GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
         ModeFlat();
-        /* remake style: a centre dot and a thin ring that blooms open and focuses down to the dot,
-           both with a soft dark edge so they read on any background */
-        Ring(ret_x, ret_y, g, 3.4f, (u32)(a / 3));
-        Ring(ret_x, ret_y, g, 1.3f, col | (u32)(a * 4 / 5));
-        Disc(ret_x, ret_y, 2.4f, (u32)(a / 3));
-        Disc(ret_x, ret_y, 1.4f, col | (u32)a);
+        /* four thin ticks around a round dot; a soft dark edge so it reads on any background */
+        RetTicks(ret_x, ret_y, g - 0.6f, RET_LEN + 1.2f, 2.2f, (u32)(a / 3));
+        Disc(ret_x, ret_y, 1.7f, (u32)(a / 3));
+        RetTicks(ret_x, ret_y, g, RET_LEN, 1.0f, col | (u32)a);
+        Disc(ret_x, ret_y, 0.95f, col | (u32)a);
         GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
         ViewportOff();
         GXSetProjection((f32(*)[4])(0x80284420 + 0x64), 0);
@@ -311,6 +359,8 @@ void LegsFrame(void);
 void CrouchFrame(void);
 void ModFrame(void)
 {
+    mod_frame++;
+    RecoilFrame();
     SwapFrame();
     LegsFrame();
     CrouchFrame();

@@ -8,3 +8,6 @@ ret_draw           = 0x80124A48;
 ret_dvdread        = 0x800C5E88;
 ret_mesbar         = 0x8016971C;
 ret_laser          = 0x8003EB70;
+ret_hitchk         = 0x80145A10;
+ret_sway_rand      = 0x801472F0;
+ret_sway_recentre  = 0x801472E0;

@@ -94,3 +94,43 @@ hook_laser:
     li    r29,0
     lis   r9,-32738           # original instruction
     b     ret_laser
+
+# PlWepHitCheck2 entry (0x80145A0C): r3 = player, r4 = from, r5 = to, r6 weapon, r7 flag, f1 radius.
+# SpreadShot (hud.c) moves the end point inside the reticle; then the original prologue.
+    .globl hook_hitchk
+hook_hitchk:
+    stwu  r1,-48(r1)
+    mflr  r0
+    stw   r0,52(r1)
+    stw   r3,8(r1)
+    stw   r4,12(r1)
+    stw   r5,16(r1)
+    stw   r6,20(r1)
+    stw   r7,24(r1)
+    stfs  f1,28(r1)
+    bl    SpreadShot2
+    lwz   r3,8(r1)
+    lwz   r4,12(r1)
+    lwz   r5,16(r1)
+    lwz   r6,20(r1)
+    lwz   r7,24(r1)
+    lfs   f1,28(r1)
+    lwz   r0,52(r1)
+    mtlr  r0
+    addi  r1,r1,48
+    stwu  r1,-272(r1)         # original instruction
+    b     ret_hitchk
+
+# PlWepLockRand (0x801472DC, the mflag bit0 test): the random weapon sway kept, but scaled down
+# (sway_k) - range and steps.
+    .globl hook_sway
+hook_sway:
+    lis   r12,sway_k@ha
+    lfs   f12,sway_k@l(r12)
+    fmuls f28,f28,f12
+    fmuls f29,f29,f12
+    fmuls f30,f30,f12
+    fmuls f31,f31,f12
+    bne   1f
+    b     ret_sway_rand
+1:  b     ret_sway_recentre
