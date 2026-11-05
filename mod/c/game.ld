@@ -54,6 +54,16 @@ GXSetVtxAttrFmt    = 0x80090CB8;
 GXBegin            = 0x800918A0;
 AddOtDirect        = 0x801725C0;
 pzlBoard_getPiece  = 0x8014895C;
+C_MTXPerspective   = 0x80074B10;
+C_MTXLookAt        = 0x80074774;
+LightMgr_setModel2 = 0x801219F0;
+MtxRotAxisPosRad   = 0x801278F4;
+PSMTXConcat        = 0x800741D4;
+partsMatCalc       = 0x80129278;
+partsWorldCalc     = 0x80129624;
+getPartsPtr        = 0x8012B158;
+SQRTF              = 0x80128A50;
+examInfo           = 0x80112E84;
 SECTIONS {
   . = CMOD_ADDR;
   .text : { *(.text.hooks) *(.text*) *(.rodata*) . = ALIGN(32); *(.data*) *(.sdata*) *(.sbss*) *(.bss*) *(COMMON) . = ALIGN(32); }

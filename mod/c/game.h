@@ -96,3 +96,20 @@ int  AddOtDirect(int ot, void* data, void (*func)(void*), u32 no, u16 flag, void
 void* pzlBoard_getPiece(void* board, int x, int y);
 #define GXFIFO_F32 (*(volatile f32*)0xCC008000)
 #define GXFIFO_U32 (*(volatile u32*)0xCC008000)
+
+/* ---- models / item camera ---- */
+#define itemCamera ((u8*)0x80284420)     /* CAMERA: v_mat +0x30, ProjMat +0x64, Campos +0xA4, Target +0xB0, Fovy +0xC0, Up +0xC4 */
+#define LightMgr   ((void*)0x8028486C)
+#define ZNEAR (*(f32*)0x802B83EC)
+#define ZFAR  (*(f32*)0x802B83F0)
+typedef struct { f32 x, y, z; } Vec;
+void C_MTXPerspective(Mtx44 m, f32 fovy, f32 aspect, f32 n, f32 f);
+void C_MTXLookAt(Mtx m, Vec* pos, Vec* up, Vec* target);
+void LightMgr_setModel2(void* mgr, void* model);
+void MtxRotAxisPosRad(Mtx m, Vec* axis, Vec* pos, f32 rad);
+void PSMTXConcat(Mtx a, Mtx b, Mtx ab);
+void partsMatCalc(void* model);
+void partsWorldCalc(void* model);
+void* getPartsPtr(void* model, int no);
+f32  SQRTF(f32 x);
+void* examInfo(int id, int ext);

@@ -132,8 +132,10 @@ static int dbg_frame, dbg_play, dbg_hud, dbg_vis;   /* DIAG: what ModFrame saw *
 #define DIAG 0
 
 /* Main loop, after the task scheduler: decides whether the panel is drawn this frame. */
+void IconFrame(void);
 void ModFrame(void)
 {
+    IconFrame();
     draw_now = 0;
     dbg_frame = 1; dbg_play = modvars[VB_GAMEPLAY] != 0; dbg_hud = (*(u32*)(pG + 88) & 0x10000) != 0; dbg_vis = panel_t > 0;
     if (panel_t <= 0) return;

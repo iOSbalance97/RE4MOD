@@ -6,7 +6,7 @@
 #define W16(w,o) (*(u16*)((u8*)(w)+(o)))
 #define W32(w,o) (*(u32*)((u8*)(w)+(o)))
 
-#define MES_X   32       /* left edge of the notice (message screen units) */
+#define MES_X   84       /* left edge of the notice (message screen units); the 3D icon sits left of it */
 #define MES_VIS 105      /* notice time in VIs: 1.75 s at 60 Hz */
 #define MES_SCALE 0.7f   /* notice text size relative to the normal message font */
 #define MES_WK  2        /* message slot of the notice (0 is shared with other game texts) */
@@ -58,6 +58,8 @@ void ModMesTick(void)
     if (*(u32*)(MES_SLOT(MES_WK) + 0x80) == mes_attr) MesDelete(cMes, MES_WK);
 }
 
+int IconStart(u8* m, int kind, u32 id, int vis);
+
 int QuickItem(u8* w)
 {
     u8* it = w + 92;
@@ -68,6 +70,7 @@ int QuickItem(u8* w)
     u32 attr = 0x11;      /* core text, keep Stop_flg */
     void* model;
 
+    IconStart(0, 0, 0, 0);                              /* a running icon ends (frees the item camera) */
     if (id >= 512) return 0;
     seen = pG + MOD_SEEN_OFS;
     if (!(seen[id >> 3] & (1 << (id & 7)))) {      /* first time: the full presentation */
@@ -120,7 +123,8 @@ int QuickItem(u8* w)
     EffectEfmDelete(1, 59, model, 0);
     if (model) {
         u8 kind = W8(model, 302);
-        if (kind == 0) { ObjMgr_destroy(ObjMgr, model); W32(w, 104) = 0; }
+        if (IconStart(model, kind, id, MES_VIS)) W32(w, 104) = 0;   /* the floor model becomes the icon */
+        else if (kind == 0) { ObjMgr_destroy(ObjMgr, model); W32(w, 104) = 0; }
         else if (kind == 1) { EmMgr_destroy(EmMgr, model); W32(w, 104) = 0; }
     }
     if ((W8(w, 132) & 8) && (s16)W16(w, 134) >= 0)
