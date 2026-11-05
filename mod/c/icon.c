@@ -4,8 +4,8 @@
  * notice. Set up like ItemExamine::init, spun like ItemExamine::move; destroyed when it ends. */
 #include "game.h"
 
-#define ICON_NDC_X (-0.745f)      /* icon centre, normalised screen coordinates */
-#define ICON_NDC_Y (-0.46f)
+#define ICON_NDC_X (0.83f)      /* icon centre, normalised screen coordinates */
+#define ICON_NDC_Y (0.575f)
 #define ICON_SCALE 0.075f         /* relative to a model filling the screen height */
 #define ICON_DIAG 0              /* 1: plain centred projection, 5 s (test) */
 

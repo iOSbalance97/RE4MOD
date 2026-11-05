@@ -6,7 +6,8 @@
 #define W16(w,o) (*(u16*)((u8*)(w)+(o)))
 #define W32(w,o) (*(u32*)((u8*)(w)+(o)))
 
-#define MES_X   84       /* left edge of the notice (message screen units); the 3D icon sits left of it */
+#define MES_RX  446      /* right edge of the notice (message screen 512 x 384), remake style: top right */
+#define MES_Y   70       /* its top; the 3D icon spins right of it */
 #define MES_VIS 105      /* notice time in VIs: 1.75 s at 60 Hz */
 #define MES_SCALE 0.7f   /* notice text size relative to the normal message font */
 #define MES_WK  2        /* message slot of the notice (0 is shared with other game texts) */
@@ -66,8 +67,9 @@ int QuickItem(u8* w)
     u32 id = W16(it, 28), num = W16(it, 32);
     u8* seen;
     ITEM_INFO info;
-    int put, y, money = 0, mes = 0x15;
-    u32 attr = 0x11;      /* core text, keep Stop_flg */
+    int put, money = 0, cnt;
+    u32 attr;
+    static u16 txt[6];    /* our message: <item name> x<count>, built from the game's own codes */
     void* model;
 
     IconStart(0, 0, 0, 0);                              /* a running icon ends (frees the item camera) */
@@ -92,27 +94,31 @@ int QuickItem(u8* w)
         if (id == 0x73 || id == 0x75) return 0;
         money = (s32)G32(0x4FA4);
         ItemMgr_get(ItemMgr, id, num);
-        if (money < (s32)G32(0x4FA4)) MesSetNumber(MES_SLOT(MES_WK), (s32)G32(0x4FA4) - money, 0);
-        mes = 0x14; attr = 0x10000011;
+        money = (s32)G32(0x4FA4) - money;
         SndCall(0, 0x10, 0, 0, 0, 0);
         break;
     default:
         return 0;                                    /* weapons, parts, files, special: as before */
     }
-    y = 297 - (s8)cMes[4 + 119] - (int)((s8)cMes[4 + 25] * MES_SCALE);
-    /* attr 0x10 (already set): the game keeps running; 0x40 whole text at once; 0x20000 left
-       aligned; 0x01000000 stays on screen after its end: ModMesTick removes it after MES_VIS.
-       (0x80 would also skip the text's timed waits.) */
-    attr |= 0x40 | 0x20000 | 0x01000000;
-    MesSet(cMes, mes, MES_X, y, attr, MES_WK, 0, 4);
-    {   /* smaller text: glyph size and the scale used for widths (Message 0x10..0x19) */
+    /* "Munición de pistola x10": code 00 page, 10 item name (type 3 text, ends with a space),
+       glyph 'x' (0x78 + 0x60 in the European fonts), 0A number, 01 end */
+    cnt = info.type == 8 ? money : (num ? (int)num : info.defNum);
+    txt[0] = 0x00; txt[1] = 0x10;
+    if (cnt > 1) { txt[2] = 0xD8; txt[3] = 0x0A; txt[4] = 0x01; MesSetNumber(MES_SLOT(MES_WK), cnt, 0); }
+    else txt[2] = 0x01;
+    /* 0x11 core text + keep Stop_flg (game keeps running); 0x40 all at once; 0x20000|0x40000
+       right aligned on MES_RX; 0x01000000 stays after its end: ModMesTick removes it */
+    attr = 0x11 | 0x40 | 0x20000 | 0x40000 | 0x01000000;
+    MesSet(cMes, 0x15, MES_RX, MES_Y, attr, MES_WK, 0, 4);
+    {
         u8* m = MES_SLOT(MES_WK);
-        *(f32*)(m + 0x10) *= MES_SCALE;
+        *(f32*)(m + 0x10) *= MES_SCALE;                 /* smaller text (Message 0x10..0x19) */
         *(f32*)(m + 0x14) *= MES_SCALE;
         *(s8*)(m + 0x18) = (s8)(*(s8*)(m + 0x18) * MES_SCALE);
         *(s8*)(m + 0x19) = (s8)(*(s8*)(m + 0x19) * MES_SCALE);
+        *(u16*)(m + 0x1A) = id;                         /* item name for code 10 */
+        *(u16**)(m + 0x98) = txt;                       /* our text instead of message 0x15 */
     }
-    if (mes == 0x15) *(u16*)(MES_SLOT(MES_WK) + 0x1A) = id;   /* item name (code 10) */
     mes_attr = attr; mes_left = MES_VIS;
 
     model = (void*)W32(w, 104);
