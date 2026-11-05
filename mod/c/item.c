@@ -7,7 +7,8 @@
 #define W32(w,o) (*(u32*)((u8*)(w)+(o)))
 
 #define MES_X   32       /* left edge of the notice (message screen units) */
-#define MES_VIS 210      /* notice time in VIs: 3.5 s at 60 Hz */
+#define MES_VIS 105      /* notice time in VIs: 1.75 s at 60 Hz */
+#define MES_SCALE 0.7f   /* notice text size relative to the normal message font */
 #define MES_WK  2        /* message slot of the notice (0 is shared with other game texts) */
 #define MES_SLOT(n) (cMes + 4 + 236 * (n))
 static u32 mes_attr;
@@ -95,12 +96,19 @@ int QuickItem(u8* w)
     default:
         return 0;                                    /* weapons, parts, files, special: as before */
     }
-    y = 297 - (s8)cMes[4 + 119] - (s8)cMes[4 + 25];
+    y = 297 - (s8)cMes[4 + 119] - (int)((s8)cMes[4 + 25] * MES_SCALE);
     /* attr 0x10 (already set): the game keeps running; 0x40 whole text at once; 0x20000 left
        aligned; 0x01000000 stays on screen after its end: ModMesTick removes it after MES_VIS.
        (0x80 would also skip the text's timed waits.) */
     attr |= 0x40 | 0x20000 | 0x01000000;
     MesSet(cMes, mes, MES_X, y, attr, MES_WK, 0, 4);
+    {   /* smaller text: glyph size and the scale used for widths (Message 0x10..0x19) */
+        u8* m = MES_SLOT(MES_WK);
+        *(f32*)(m + 0x10) *= MES_SCALE;
+        *(f32*)(m + 0x14) *= MES_SCALE;
+        *(s8*)(m + 0x18) = (s8)(*(s8*)(m + 0x18) * MES_SCALE);
+        *(s8*)(m + 0x19) = (s8)(*(s8*)(m + 0x19) * MES_SCALE);
+    }
     if (mes == 0x15) *(u16*)(MES_SLOT(MES_WK) + 0x1A) = id;   /* item name (code 10) */
     mes_attr = attr; mes_left = MES_VIS;
 
