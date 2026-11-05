@@ -7,14 +7,50 @@
 #define W32(w,o) (*(u32*)((u8*)(w)+(o)))
 
 #define MES_X   32       /* left edge of the notice (message screen units) */
-#define MES_VIS 90       /* notice time in VIs: 1.5 s at 60 Hz */
+#define MES_VIS 210      /* notice time in VIs: 3.5 s at 60 Hz */
 static u32 mes_attr;
 static int mes_left;
+
+/* Run-time item areas (enemy drops: be_flg & 4) are freed and unlinked from the scenario list
+   (pS->ot[15]) at the start of the next frame: QuickItem runs from inside the loop that walks
+   that list, and unlinking the current entry there breaks the walk (crash in DelPrim). */
+#define FREE_MAX 8
+static u8* free_q[FREE_MAX];
+static int free_n;
+
+static void FreeTick(void)
+{
+    while (free_n > 0) {
+        u8* w = free_q[--free_n];
+        Mem_free(w);
+        DelPrim(pS + 140, w);
+    }
+}
+
+/* Leon's waist twist (walk-mode strafing, set by the move hook) must not carry over into other
+   actions (ladders, events, damage): reset it once when leaving the routines that drive it. */
+static int prev_ctrl;
+static void WaistTick(void)
+{
+    u8* pl = *(u8**)0x802B8344;          /* pPL */
+    int r1, ctrl;
+    u8* w;
+    if (!pl) { prev_ctrl = 0; return; }
+    r1 = pl[0xFD];
+    ctrl = pl[0xFC] == 0 && (r1 <= 3 || r1 == 6 || r1 == 0xB);
+    if (prev_ctrl && !ctrl) {
+        w = *(u8**)(pl + 0x790);
+        if (w) *(f32*)(w + 4) = 0.0f;
+    }
+    prev_ctrl = ctrl;
+}
 
 /* Called every frame from PadRemap: removes the notice when its time is up, unless the slot
    has been taken by another message in the meantime. */
 void ModMesTick(void)
 {
+    FreeTick();
+    WaistTick();
     if (mes_left <= 0) return;
     mes_left -= GetSystemVcnt();
     if (mes_left > 0) return;
@@ -81,8 +117,7 @@ int QuickItem(u8* w)
     if ((W8(w, 132) & 8) && (s16)W16(w, 134) >= 0)
         memclr_asm(pG + 29428 + ((s16)W16(w, 134) << 4), 16);
     if (W8(w, 52) & 4) {
-        Mem_free(w);
-        DelPrim(pS + 140, w);
+        if (free_n < FREE_MAX) free_q[free_n++] = w;   /* freed next frame (FreeTick) */
     }
     return 1;
 }
