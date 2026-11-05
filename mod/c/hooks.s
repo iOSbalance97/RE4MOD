@@ -134,3 +134,11 @@ hook_sway:
     bne   1f
     b     ret_sway_rand
 1:  b     ret_sway_recentre
+
+# drawLaserSight 0x8003EA48 (after getMarkerPos, before GetWepTargetPos): LaserRay (hud.c) moves the
+# ray onto the camera's centre line.
+    .globl hook_laserray
+hook_laserray:
+    bl    LaserRay
+    lwz   r9,-29912(r13)      # original instruction
+    b     ret_laserray

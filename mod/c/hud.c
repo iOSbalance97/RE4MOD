@@ -185,6 +185,8 @@ static f32 Sqrt(f32 x)                         /* frsqrte + 3 Newton steps */
     for (i = 0; i < 3; i++) y = y * (1.5f - 0.5f * x * y * y);
     return x * y;
 }
+static f32 gun_dir[3];
+static int gun_ok;
 static int mod_frame;
 static u32 rng = 0x2F6B1D35u;
 static f32 Rnd(void) { rng = rng * 1664525u + 1013904223u; return (f32)(rng >> 8) * (1.0f / 16777216.0f); }
@@ -210,18 +212,17 @@ void SpreadShot(u8* pl, f32* p0, f32* p1)
     l2 = (p1[0] - p0[0]) * (p1[0] - p0[0]) + (p1[1] - p0[1]) * (p1[1] - p0[1]) + (p1[2] - p0[2]) * (p1[2] - p0[2]);
     if (l2 < 1.0f) return;
     k = Sqrt(l2);
-    {   /* bend the shot onto the camera's centre line: aim at the point on that line as far from the
-         * camera as the laser's hit, keeping each pellet's own deviation */
-        f32 c[3], q[3], g[3], dc2 = 0.0f, dc, gl2 = 0.0f, gl, ql2 = 0.0f, ql;
-        for (i = 0; i < 3; i++)          /* camera position = -R^T t */
-            c[i] = -(v[i] * v[3] + v[4 + i] * v[7] + v[8 + i] * v[11]);
-        for (i = 0; i < 3; i++) { f32 d = LCROSS[i] - c[i]; dc2 += d * d; }
-        dc = Sqrt(dc2);
-        for (i = 0; i < 3; i++) { q[i] = c[i] - v[8 + i] * dc - p0[i]; ql2 += q[i] * q[i]; }
-        for (i = 0; i < 3; i++) { g[i] = LCROSS[i] - ((f32*)0x8021D820)[i]; gl2 += g[i] * g[i]; }
-        if (ql2 > 1.0f && gl2 > 1.0f) {
-            ql = Sqrt(ql2); gl = Sqrt(gl2);
-            for (i = 0; i < 3; i++) p1[i] += (q[i] / ql - g[i] / gl) * k;
+    if (gun_ok) {   /* bend the shot onto the point the reticle is on (the camera-line hit, lcross),
+                     * keeping each pellet's own deviation from the gun's direction */
+        f32 q[3], ql;
+        for (i = 0; i < 3; i++) q[i] = LCROSS[i] - p0[i];
+        ql = Sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2]);
+        if (ql > 1.0f) {
+            u8 w = pG[0x4FBC];
+            if (w == 7 || w == 8 || w == 0x21)          /* shotgun pellets: keep their pattern */
+                for (i = 0; i < 3; i++) p1[i] += (q[i] / ql - gun_dir[i]) * k;
+            else                                         /* one bullet: straight at it */
+                for (i = 0; i < 3; i++) p1[i] = p0[i] + q[i] / ql * k;
         }
     }
     for (i = 0; i < 3; i++) p1[i] += (v[i] * dx + v[4 + i] * dy) * k;
@@ -245,9 +246,40 @@ static void RecoilFrame(void)
     }
     rc_prev = fire;
     if (!pl || pl[0xFD] != 6) rc_k = 0.0f;
-    *(f32*)(modvars + 0x40) = rc_k * 5000.0f;  /* at the convergence distance (DMIN) */
+    *(f32*)(modvars + 0x40) = rc_k;            /* c12: target raised by tan(kick) * distance */
     rc_k *= 0.84f;
     if (rc_k < 0.0005f) rc_k = 0.0f;
+}
+
+/* drawLaserSight, between getMarkerPos and the hit search (hooks.s): the gun's marker ray
+ * (lpos -> lcross) is kept as the gun direction, and the search is done along the camera's centre
+ * line instead, from the point level with the gun: lcross becomes what the reticle is on (enemy
+ * test included), and the shots are bent onto it (SpreadShot). */
+void LaserRay(void)
+{
+    f32* lp = (f32*)0x8021D820;
+    f32* lc = LCROSS;
+    f32* v = (f32*)(pG + 0x74 + 0x30);
+    f32 c[3], f[3], g[3], gl, s = 0.0f;
+    u8* pl = pPL;
+    int i;
+    for (i = 0; i < 3; i++) g[i] = lc[i] - lp[i];
+    gl = Sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+    gun_ok = 0;
+    if (gl < 1.0f) return;
+    for (i = 0; i < 3; i++) gun_dir[i] = g[i] / gl;
+    gun_ok = 1;
+    if (!pl || pl[0xFC] != 0 || pl[0xFD] != 6 || !modvars[VB_GAMEPLAY]) { gun_ok = 0; return; }
+    for (i = 0; i < 3; i++) {
+        c[i] = -(v[i] * v[3] + v[4 + i] * v[7] + v[8 + i] * v[11]);   /* camera position */
+        f[i] = -v[8 + i];                                             /* looks down -z */
+    }
+    for (i = 0; i < 3; i++) s += (lp[i] - c[i]) * f[i];
+    if (s < 0.0f) s = 0.0f;
+    for (i = 0; i < 3; i++) {
+        lp[i] = c[i] + f[i] * s;
+        lc[i] = lp[i] + f[i] * gl;
+    }
 }
 
 void SpreadShot2(u8* pl, f32* p0, f32* p1) { SpreadShot(pl, p0, p1); }
