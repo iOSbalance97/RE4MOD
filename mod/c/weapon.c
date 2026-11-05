@@ -75,6 +75,27 @@ static cItem* swap_item;
 static void* safe_tbl[0x100];
 int SwapBusy(void) { return swap_busy; }
 
+/* While no weapon exists, the player code still asks it things through its vtable every frame
+   (e.g. 0x80144CD4: Wep->m_pWep->vtbl[0x98]) and m_pWep is NULL: stand a dummy object in its
+   place whose every virtual returns 0. Vtable entries: s16 this-delta, s16 pad, function. */
+static int DummyRet0(void) { return 0; }
+static u32 dummy_vtbl[2 * 0x80];
+static u32 dummy_wep[0x100];
+static void DummyWep(u8* pl, int on)
+{
+    u8* wep = *(u8**)(pl + 0x788);
+    int i;
+    if (!wep) return;
+    if (on) {
+        for (i = 0; i < 0x80; i++) { dummy_vtbl[2 * i] = 0; dummy_vtbl[2 * i + 1] = (u32)DummyRet0; }
+        for (i = 0; i < 0x100; i++) dummy_wep[i] = 0;
+        dummy_wep[2] = (u32)dummy_vtbl;
+        *(void**)(wep + 0x34) = dummy_wep;           /* weaponRelease left it NULL */
+    } else if (*(void**)(wep + 0x34) == dummy_wep) {
+        *(void**)(wep + 0x34) = 0;
+    }
+}
+
 static void SwapTask(int unused)
 {
     u8* pl = pPL;
@@ -100,10 +121,12 @@ static void SwapTask(int unused)
             neck = *(u8**)(pl + 0x78C);
             if (neck) { *(void**)(neck + 0x14) = 0; *(void**)(neck + 0x18) = 0; }  /* cPlNeck::clear */
             weaponRelease(pl);
+            DummyWep(pl, 1);
             TaskSleep(1);                                /* spread the heavy steps over frames */
             weaponLoad(pl, no, type);                    /* sleeps a frame per poll: no freeze */
             G8(0x4FBE) = lv;
             *(void***)(pl + 0x424) = tbl;
+            DummyWep(pl, 0);
             weaponInit(pl);
             /* the neck keeps its mode (B20 switched it off and the layer then stayed at full
                weight); with its motions cleared it waits for footwork's Neck->init below */
