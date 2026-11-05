@@ -233,6 +233,7 @@ void SpreadShot(u8* pl, f32* p0, f32* p1)
 /* Recoil: each shot raises the camera's aim point (c12 adds VB+0x40 to it); the kick decays by
  * itself in a few frames, also during the shotgun's pump. Shots follow the camera centre, so the
  * kick is real until it settles. */
+#define AIM_SMOOTH 0.5f     /* camera smoothing while aiming */
 #define RAISE_LONG 90.0f    /* units the aim camera goes up with a shotgun */
 static int rc_prev;
 static f32 rc_k;
@@ -246,6 +247,12 @@ static void RecoilFrame(void)
         if (rc_k > 0.09f) rc_k = 0.09f;
     }
     rc_prev = fire;
+    if (pl && pl[0xFC] == 0 && pl[0xFD] == 6 && modvars[VB_GAMEPLAY]) {
+        /* the reticle is the camera centre, so the camera's smoothing is the aim's lag: while
+         * aiming the same light smoothing moving or not (walking left the walk ratio, very slow) */
+        *(f32*)(0x80217948 + 0xFC) = AIM_SMOOTH;      /* CamSmth.m_ratio */
+        *(f32*)(0x80217104 + 0x1AC) = AIM_SMOOTH;     /* CamCtrl.m_QuasiFPS.m_walk_ratio */
+    }
     {   /* camera raise while aiming a long gun (c12, VB+0x44) */
         static f32 raise;
         u8 w = pG[0x4FBC];
