@@ -165,6 +165,7 @@ static void SwapStart(cItem* it)
     if (pl[0xFD] > 3) { Equip(it); return; }            /* not standing / walking: as before */
     swap_item = it;
     swap_busy = 1;
+    if (SWAP_DIAG) { diag[0] = diag[1] = diag[2] = diag[3] = 0; diag_left = 600; }  /* box at once: 0 0 0 0 */
     if (!TaskExec(1, SwapTask, 0)) { swap_busy = 0; Equip(it); return; }
     MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, HOLSTER_FRAMES, 5, 0);
     pl[0xFD] = 0;                                        /* footwork, motion already set */

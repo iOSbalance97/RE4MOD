@@ -115,6 +115,7 @@ static void PanelDraw(void* unused)
 }
 
 static int draw_now;
+int SwapDiag(int i);
 static f32 vp_save[6];
 
 /* Full-screen viewport for the HUD (the game leaves a reduced one set at this point); the
@@ -137,10 +138,11 @@ void ModFrame(void)
 {
     IconFrame();
     draw_now = 0;
+    if (SwapDiag(-1) > 0 && modvars[VB_GAMEPLAY]) draw_now = 1;   /* swap timing box (test) */
     dbg_frame = 1; dbg_play = modvars[VB_GAMEPLAY] != 0; dbg_hud = (*(u32*)(pG + 88) & 0x10000) != 0; dbg_vis = panel_t > 0;
     if (panel_t <= 0) return;
     panel_t -= GetSystemVcnt();
-    if (panel_t <= 0) return;
+    if (panel_t <= 0) { panel_t = 0; return; }
     if (!modvars[VB_GAMEPLAY]) return;                       /* only while Leon is in control */
     draw_now = 1;
 }
@@ -211,7 +213,7 @@ void ModDraw(void)
     draw_now = 0;
     GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);            /* messages leave the room fog on */
     ViewportOn();
-    PanelDraw(0);
+    if (panel_t > 0) PanelDraw(0);
     DiagDraw();
     ViewportOff();
 }
