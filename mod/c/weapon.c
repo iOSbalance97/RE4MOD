@@ -40,7 +40,7 @@ static int CanSwap(void)
 {
     u8* pl = pPL;
     if (!pl || G8(0x4FC4) == 1) return 0;               /* no player / Ashley */
-    return pl[0xFC] == 0 && pl[0xFD] <= 3;
+    return pl[0xFC] == 0 && (pl[0xFD] <= 3 || pl[0xFD] == 6);
 }
 
 static void Equip(cItem* it)
@@ -67,8 +67,8 @@ static void Equip(cItem* it)
    frame; run from task slot 1 the game keeps drawing. Meanwhile the old archive is gone, so
    nothing may touch it: the input is held, Leon's motion table points at the holster pose and the
    neck turn motion is off. */
-#define HOLSTER_FRAMES 8       /* blend into the holster pose before the weapon goes away */
-#define DRAW_FRAMES    10      /* blend from the holster pose into the new weapon's idle */
+#define HOLSTER_FRAMES 6       /* blend into the holster pose before the weapon goes away */
+#define DRAW_FRAMES    8       /* blend from the holster pose into the new weapon's idle */
 extern unsigned char mot_holster[];
 static volatile int swap_busy;
 static cItem* swap_item;
@@ -96,15 +96,9 @@ static void DummyWep(u8* pl, int on)
     }
 }
 
-/* ---- swap timing (test builds): shown at the top left for 4 s after a swap ----
-   [frames holding the holster pose while loading] [ms weaponRelease] [ms load: read+link, wall]
-   [ms weaponInit]. Time base: bus clock / 4 = 40.5 MHz. */
-#define SWAP_DIAG 1
-static u32 Tb(void) { u32 t; __asm__ volatile("mftbl %0" : "=r"(t)); return t; }
-static int diag[4], diag_left;
-static void DiagShow(void) { diag_left = 240; }
-int SwapDiag(int i) { return i < 0 ? diag_left : diag[i]; }
-void SwapDiagTick(void) { if (diag_left) diag_left--; }
+/* swap timing box (hud.c): off in normal builds */
+int SwapDiag(int i) { (void)i; return 0; }
+void SwapDiagTick(void) { }
 
 int PrefetchStart(u32 id);
 int PrefetchPoll(void);
@@ -112,76 +106,97 @@ void PrefetchEnd(void);
 int PrefetchBusy(void);
 int PrefetchHits(void);
 
-static void SwapTask(int unused)
+/* States the swap may run in: footwork (0) gets the holster gesture; walking (1), back (2),
+   running (3) and aiming (6, the weapon's own routine) swap without stopping Leon. */
+static int SwapState(u8* pl)
 {
-    u8* pl = pPL;
-    cItem* it = swap_item;
+    if (!pl || pl[0xFC] != 0 || G8(0x4FC4) == 1) return -1;
+    if (pl[0xFD] <= 3 || pl[0xFD] == 6) return pl[0xFD];
+    return -1;
+}
+
+static volatile int swap_lock;                       /* gesture: Leon holds still meanwhile */
+int SwapLock(void) { return swap_lock; }
+
+/* release + load + init in one go. With the archive prefetched the load is a few ms and no frame
+   ever runs without a weapon; the safety nets stay for the disc fallback. */
+static void DoSwap(u8* pl, cItem* it)
+{
     void** tbl;
     u8* neck;
     u32 id;
     int no, type, lv, i;
-    u32 t0, t1, t2, t3, v0, v1;
-    int hits0;
+    if (!ItemMgr_arm(ItemMgr, it)) return;
+    id = *(u16*)((u8*)ItemMgr + 0x10);
+    no = WeaponId2WeaponNo(id);
+    type = WeaponId2WeaponType(id);
+    lv = it->bullet >> 13;
+    if (G8(0x4FBC) == no && G8(0x4FBD) == type && G8(0x4FBE) == lv) return;
+    SndBlkStop(2);
+    tbl = *(void***)(pl + 0x424);                    /* m_MotTbl: weapon archive motions */
+    for (i = 0; i < 0x100; i++) safe_tbl[i] = mot_holster;
+    *(void***)(pl + 0x424) = safe_tbl;
+    *(void**)(pl + 0x42C) = 0;                       /* m_SubMot (neck / upper layer) */
+    *(void**)(pl + 0x2A8) = 0;                       /* pMotionB */
+    neck = *(u8**)(pl + 0x78C);
+    if (neck) { *(void**)(neck + 0x14) = 0; *(void**)(neck + 0x18) = 0; }  /* cPlNeck::clear */
+    weaponRelease(pl);
+    DummyWep(pl, 1);
+    weaponLoad(pl, no, type);                        /* served from the prefetched copy */
+    G8(0x4FBE) = lv;
+    *(void***)(pl + 0x424) = tbl;
+    DummyWep(pl, 0);
+    weaponInit(pl);
+}
+
+static void SwapTask(int unused)
+{
+    u8* pl;
+    cItem* it = swap_item;
+    int i, st, gesture = swap_lock;
     (void)unused;
-    TaskSleep(HOLSTER_FRAMES);
+    if (gesture) TaskSleep(HOLSTER_FRAMES);
     for (i = 0; i < 90 && PrefetchPoll() == 0; i++) TaskSleep(1);   /* archive still coming */
-    hits0 = PrefetchHits();
+    /* moving / aiming: wait for a state that allows it (not mid-action) */
+    for (i = 0; i < 60 && (st = SwapState(pPL)) < 0; i++) TaskSleep(1);
     pl = pPL;
-    if (pl && ItemMgr_arm(ItemMgr, it)) {
-        id = *(u16*)((u8*)ItemMgr + 0x10);
-        no = WeaponId2WeaponNo(id);
-        type = WeaponId2WeaponType(id);
-        lv = it->bullet >> 13;
-        if (!(G8(0x4FBC) == no && G8(0x4FBD) == type && G8(0x4FBE) == lv)) {
-            SndBlkStop(2);
-            tbl = *(void***)(pl + 0x424);                /* m_MotTbl: weapon archive motions */
-            for (i = 0; i < 0x100; i++) safe_tbl[i] = mot_holster;
-            *(void***)(pl + 0x424) = safe_tbl;
-            *(void**)(pl + 0x42C) = 0;                   /* m_SubMot (neck turn) off */
-            neck = *(u8**)(pl + 0x78C);
-            if (neck) { *(void**)(neck + 0x14) = 0; *(void**)(neck + 0x18) = 0; }  /* cPlNeck::clear */
-            t0 = Tb(); v0 = GetSystemVcnt();
-            weaponRelease(pl);
-            DummyWep(pl, 1);
-            t1 = Tb();                                /* spread the heavy steps over frames */
-            weaponLoad(pl, no, type);                    /* sleeps a frame per poll: no freeze */
-            G8(0x4FBE) = lv;
-            t2 = Tb(); v1 = GetSystemVcnt();
-            *(void***)(pl + 0x424) = tbl;
-            DummyWep(pl, 0);
-            weaponInit(pl);
-            t3 = Tb();
-            diag[0] = PrefetchHits() - hits0;    /* reads answered from memory (0 = disc) */ (void)v0; (void)v1; diag[1] = (t1 - t0) / 40500; diag[2] = (t2 - t1) / 40500; diag[3] = (t3 - t2) / 40500;
-            if (SWAP_DIAG) DiagShow();
-            /* the neck keeps its mode (B20 switched it off and the layer then stayed at full
-               weight); with its motions cleared it waits for footwork's Neck->init below */
-            pl = pPL;
+    if (pl && (gesture || st >= 0)) {
+        DoSwap(pl, it);
+        st = SwapState(pl);
+        if (gesture || st == 0) {                        /* footwork: restart the idle, blended */
+            pl[0x4FD] = DRAW_FRAMES;                     /* m_Hokan */
+            pl[0x4FC] = 0;                               /* m_Frame */
+            pl[0xFF] |= 1;
+            pl[0xFE] = 0;
+        } else if (st > 0) {
+            /* the playing motion pointed into the old archive: hold a safe pose for this frame
+               and let the routine set its motion again (walk/run blend in; aiming raises the
+               new weapon) */
+            MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, 0, 5, 0);
+            pl[0xFE] = 0;
         }
     }
-    if (pl && pl[0xFC] == 0 && pl[0xFD] == 0) {          /* footwork: restart the idle, blended */
-        pl[0x4FD] = DRAW_FRAMES;                         /* m_Hokan */
-        pl[0x4FC] = 0;                                   /* m_Frame */
-        pl[0xFF] |= 1;
-        pl[0xFE] = 0;
-    }
+    swap_lock = 0;
+    swap_busy = 0;
     for (i = 0; i < 300 && PrefetchBusy(); i++) { PrefetchPoll(); TaskSleep(1); }
     PrefetchEnd();
-    swap_busy = 0;
     TaskExit();
 }
 
 static void SwapStart(cItem* it)
 {
     u8* pl = pPL;
-    if (pl[0xFD] > 3) { Equip(it); return; }            /* not standing / walking: as before */
+    int st = SwapState(pl);
+    if (st < 0) return;
     swap_item = it;
     swap_busy = 1;
-    if (SWAP_DIAG) { diag[0] = diag[1] = diag[2] = diag[3] = 0; diag_left = 600; }  /* box at once: 0 0 0 0 */
-    if (!TaskExec(1, SwapTask, 0)) { swap_busy = 0; Equip(it); return; }
+    swap_lock = st == 0;
+    if (!TaskExec(1, SwapTask, 0)) { swap_busy = swap_lock = 0; Equip(it); return; }
     PrefetchStart(it->id);                               /* old weapon intact meanwhile */
-    MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, HOLSTER_FRAMES, 5, 0);
-    pl[0xFD] = 0;                                        /* footwork, motion already set */
-    pl[0xFE] = 1;
+    if (st == 0) {
+        MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, HOLSTER_FRAMES, 5, 0);
+        pl[0xFE] = 1;                                    /* footwork, motion already set */
+    }
 }
 
 static void Use(int dir)
