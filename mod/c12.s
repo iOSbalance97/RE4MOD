@@ -43,6 +43,22 @@
     cmpwi r0,2
     bne   L_reset
 L_aim:
+    # fire (r_no_2 2): the laser is only updated in the set state, so lpos / lcross are stale while the
+    # shot / pump plays (the shotgun's is 40 frames). Looking at that stale world point made the camera
+    # turn away from Leon when he walked while firing. Keep the last set-state aim point in Leon's
+    # frame instead (stored at VB+0x28, valid flag VB+0x34).
+    cmpwi r0,2
+    bne   L_setaim
+    lis   r12,0x8000
+    ori   r12,r12,VB+0x14
+    lwz   r0,0x20(r12)
+    cmpwi r0,0
+    beq   L_setaim
+    lfs   f6,0x14(r12)
+    lfs   f7,0x18(r12)
+    lfs   f8,0x1C(r12)
+    b     L_blend
+L_setaim:
     # aim point = gun + laser direction * D, with D easing towards the hit distance (no jumps at edges)
     lis   r11,0x8021
     ori   r11,r11,0xD820        # lpos (gun), lcross follows at +0xC
@@ -142,6 +158,31 @@ L_dok:
     fmadds f7,f5,f1,f7
     lfs   f5,0x24(r4)
     fmadds f7,f5,f2,f7
+    # ease the aim point towards the new one (Leon's frame): the switch between the fire state's
+    # remembered point and the fresh laser point at the end of a shot no longer jumps
+    lwz   r0,0x20(r12)
+    cmpwi r0,0
+    beq   L_store
+    lis   r0,AEASE@h
+    ori   r0,r0,AEASE@l
+    stw   r0,0x24(r12)
+    lfs   f11,0x24(r12)
+    lfs   f9,0x14(r12)
+    fsubs f6,f6,f9
+    fmadds f6,f6,f11,f9
+    lfs   f9,0x18(r12)
+    fsubs f7,f7,f9
+    fmadds f7,f7,f11,f9
+    lfs   f9,0x1C(r12)
+    fsubs f8,f8,f9
+    fmadds f8,f8,f11,f9
+L_store:
+    stfs  f6,0x14(r12)          # remember it (Leon's frame) for the fire state
+    stfs  f7,0x18(r12)
+    stfs  f8,0x1C(r12)
+    li    r0,1
+    stw   r0,0x20(r12)
+L_blend:
     lfs   f9,4(r12)             # w: how much of the aim point is used (eases in over a few frames)
     lis   r0,WSTEP@h
     ori   r0,r0,WSTEP@l
@@ -173,6 +214,7 @@ L_reset:
     li    r0,0
     stw   r0,0(r11)
     stw   r0,4(r11)
+    stw   r0,0x20(r11)
 L_noaim:
     addi  r1,r1,0x10
     stwu  r1,-432(r1)        # original instruction

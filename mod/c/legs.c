@@ -4,7 +4,7 @@
  * that slot: B38/B39 did and broke the aim and the shotgun camera). Instead, once a frame from
  * ModFrame - after the game has updated Leon (motion, IK, camera) and before the frame is drawn -
  * the pelvis and leg parts get the pose of a Mixamo pistol walk cycle (forward / back / left /
- * right) and the chest a little of its sway and bob; then the world matrices are rebuilt. The
+ * right) and the chest a little of its sway and bob; then the gun is re-attached to the hand; then the world matrices are rebuilt. The
  * cycle phase follows the distance Leon really moves, so the steps match the ground. It fades in
  * and out over a few frames, and direction changes cross-fade. The next frame the game starts
  * from its own pose again (motion + IK), so nothing of this leaks into its state. */
@@ -12,8 +12,10 @@
 #include "walk_data.h"
 
 #define FADE      6.0f                   /* frames to fade the walk in / out, and to change direction */
+int SwapLock(void);
 #define SWAY_K    0.5f                   /* share of Mixamo's chest sway / bob put on Leon */
 #define BOB_K     0.5f
+#define CAMSMTH   0x80217948             /* CamSmth (PAL): m_effect.Campos +0x100, .Target +0x10C */
 
 void partsWorldCalc(void* m);
 
@@ -169,6 +171,31 @@ static void Apply(u8* pl)
         }
     }
     partsWorldCalc(pl);
+    {   /* the gun hangs from the hand, but the game placed it before this pass: rebuild it from the
+         * moved hand, or it stays where the hand was (B41: "parece que no la tiene agarrada") */
+        u8* wep = *(u8**)(pl + 0x788);
+        u8* m = wep ? *(u8**)(wep + 0x34) : 0;
+        if (!SwapLock() && m && *(u32*)(m + 0xF4) >= 0x80000000u && *(u32*)(m + 0xF4) < 0x81800000u)
+            partsWorldCalc(m);
+    }
+}
+
+/* While aiming, the camera's smoothing (CamSmth: effect = effect * r + new * (1 - r)) trails Leon
+ * when he walks, so he drifted towards the screen edge (most visible strafing left, he already sits
+ * left of centre). The smoothed camera is carried along by Leon's own step each frame: turning and
+ * pitch stay smoothed, the walk no longer lags. */
+static int cam_have;
+static f32 cam_p[3];
+static void CamFollow(u8* pl, int aiming)
+{
+    f32* e = (f32*)(CAMSMTH + 0x100);
+    f32 d[3];
+    int i;
+    for (i = 0; i < 3; i++) { d[i] = *(f32*)(pl + 0x94 + 4 * i) - cam_p[i]; cam_p[i] += d[i]; }
+    if (!cam_have) { cam_have = 1; return; }
+    if (!aiming) return;
+    if (d[0] * d[0] + d[1] * d[1] + d[2] * d[2] > 200.0f * 200.0f) return;   /* warp */
+    for (i = 0; i < 3; i++) { e[i] += d[i]; e[3 + i] += d[i]; }
 }
 
 void LegsFrame(void)
@@ -176,7 +203,8 @@ void LegsFrame(void)
     u8* pl = pPL;
     f32 x, z, dx, dz, dist, s, c, lx, lz, ax;
     int clip, aiming, n;
-    if (!pl) { have_last = 0; w = 0.0f; cur = -1; return; }
+    if (!pl) { have_last = 0; cam_have = 0; w = 0.0f; cur = -1; return; }
+    CamFollow(pl, pl[0xFC] == 0 && (pl[0xFD] == 6 || pl[0xFD] == 0xB) && modvars[VB_GAMEPLAY]);
     x = *(f32*)(pl + 0x94); z = *(f32*)(pl + 0x9C);
     dx = x - last_x; dz = z - last_z;
     last_x = x; last_z = z;
