@@ -81,6 +81,7 @@ static void SwapTask(int unused)
     cItem* it = swap_item;
     void** tbl;
     u8* neck;
+    u8 neck_mode = 1;
     u32 id;
     int no, type, lv, i;
     (void)unused;
@@ -98,12 +99,19 @@ static void SwapTask(int unused)
             *(void***)(pl + 0x424) = safe_tbl;
             *(void**)(pl + 0x42C) = 0;                   /* m_SubMot (neck turn) off */
             neck = *(u8**)(pl + 0x78C);
-            if (neck) neck[0xE] = 0;
+            if (neck) { neck_mode = neck[0xE]; neck[0xE] = 0; }
             weaponRelease(pl);
+            TaskSleep(1);                                /* spread the heavy steps over frames */
             weaponLoad(pl, no, type);                    /* sleeps a frame per poll: no freeze */
             G8(0x4FBE) = lv;
+            TaskSleep(1);
             *(void***)(pl + 0x424) = tbl;
             weaponInit(pl);
+            /* cPlNeck::move sets the blend rate of the neck/upper body layer only while its mode
+               is on: left off, the layer stays at full weight and Leon walks in a strange pose */
+            if (neck) neck[0xE] = neck_mode ? neck_mode : 1;
+            TaskSleep(1);
+            pl = pPL;
         }
     }
     if (pl && pl[0xFC] == 0 && pl[0xFD] == 0) {          /* footwork: restart the idle, blended */
