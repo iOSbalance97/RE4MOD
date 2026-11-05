@@ -13,6 +13,7 @@ u32 WeaponPad(u32 in, int sx, int sy);
 void WeaponPadIdle(void);
 void CaseAssign(int dir);
 int CaseActive(void);
+int SwapBusy(void);
 static u32 prev_raw;
 
 void PadRemap(void)
@@ -42,6 +43,7 @@ void PadRemap(void)
         if (in & PAD_Y) out |= l2 ? PAD_B : PAD_MOD_RELOAD;  /* Square: reload (aiming: R+B) */
         if (l3) out |= PAD_B;                                /* L3: run */
         if (r3) out |= PAD_Z;                                /* R3: map */
+        if (SwapBusy()) { out = 0; p->stickX = p->stickY = 0; }  /* weapon swap: Leon holds still */
     } else {
         WeaponPadIdle();
         if ((in & PAD_Z) && CaseActive()) {                 /* case: L1 + D-pad assigns */

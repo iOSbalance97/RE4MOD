@@ -43,16 +43,6 @@ static int CanSwap(void)
     return pl[0xFC] == 0 && pl[0xFD] <= 3;
 }
 
-extern unsigned char mot_draw[];
-/* Remake-style draw: when Leon stands still (routine 0/0, footwork), play the converted Mixamo
-   draw motion; footwork r_no_2 = 2 restarts its idle motion when this one ends (motionMove) */
-static void DrawMotion(u8* pl)
-{
-    if (pl[0xFC] != 0 || pl[0xFD] != 0) return;
-    MotionSetCore(pl, pl + 0x1D8, mot_draw, 0, 4, 5, 0);
-    pl[0xFE] = 2;
-}
-
 static void Equip(cItem* it)
 {
     void* pl = pPL;
@@ -69,7 +59,73 @@ static void Equip(cItem* it)
     weaponLoad(pl, no, type);
     G8(0x4FBE) = lv;
     weaponInit(pl);
-    DrawMotion(pl);
+}
+
+/* ---- Remake-style swap: holster, load while the game keeps running, draw ----
+   The weapon archive (model, REL code and Leon's motions for that weapon) is read from the disc
+   inside ReadWepData, which waits with TaskSleep(1). Run from the main task that wait freezes the
+   frame; run from task slot 1 the game keeps drawing. Meanwhile the old archive is gone, so
+   nothing may touch it: the input is held, Leon's motion table points at the holster pose and the
+   neck turn motion is off. */
+#define HOLSTER_FRAMES 10      /* blend into the holster pose before the weapon goes away */
+#define DRAW_FRAMES    12      /* blend from the holster pose into the new weapon's idle */
+extern unsigned char mot_holster[];
+static volatile int swap_busy;
+static cItem* swap_item;
+static void* safe_tbl[0x100];
+int SwapBusy(void) { return swap_busy; }
+
+static void SwapTask(int unused)
+{
+    u8* pl = pPL;
+    cItem* it = swap_item;
+    void** tbl;
+    u8* neck;
+    u32 id;
+    int no, type, lv, i;
+    (void)unused;
+    TaskSleep(HOLSTER_FRAMES);
+    pl = pPL;
+    if (pl && ItemMgr_arm(ItemMgr, it)) {
+        id = *(u16*)((u8*)ItemMgr + 0x10);
+        no = WeaponId2WeaponNo(id);
+        type = WeaponId2WeaponType(id);
+        lv = it->bullet >> 13;
+        if (!(G8(0x4FBC) == no && G8(0x4FBD) == type && G8(0x4FBE) == lv)) {
+            SndBlkStop(2);
+            tbl = *(void***)(pl + 0x424);                /* m_MotTbl: weapon archive motions */
+            for (i = 0; i < 0x100; i++) safe_tbl[i] = mot_holster;
+            *(void***)(pl + 0x424) = safe_tbl;
+            *(void**)(pl + 0x42C) = 0;                   /* m_SubMot (neck turn) off */
+            neck = *(u8**)(pl + 0x78C);
+            if (neck) neck[0xE] = 0;
+            weaponRelease(pl);
+            weaponLoad(pl, no, type);                    /* sleeps a frame per poll: no freeze */
+            G8(0x4FBE) = lv;
+            *(void***)(pl + 0x424) = tbl;
+            weaponInit(pl);
+        }
+    }
+    if (pl && pl[0xFC] == 0 && pl[0xFD] == 0) {          /* footwork: restart the idle, blended */
+        pl[0x4FD] = DRAW_FRAMES;                         /* m_Hokan */
+        pl[0x4FC] = 0;                                   /* m_Frame */
+        pl[0xFF] |= 1;
+        pl[0xFE] = 0;
+    }
+    swap_busy = 0;
+    TaskExit();
+}
+
+static void SwapStart(cItem* it)
+{
+    u8* pl = pPL;
+    if (pl[0xFD] > 3) { Equip(it); return; }            /* not standing / walking: as before */
+    swap_item = it;
+    swap_busy = 1;
+    if (!TaskExec(1, SwapTask, 0)) { swap_busy = 0; Equip(it); return; }
+    MotionSetCore(pl, pl + 0x1D8, mot_holster, 0, HOLSTER_FRAMES, 5, 0);
+    pl[0xFD] = 0;                                        /* footwork, motion already set */
+    pl[0xFE] = 1;
 }
 
 static void Use(int dir)
@@ -80,9 +136,9 @@ static void Use(int dir)
     it = FindItem(v - 1);
     if (!it) { SndCall(0, 0xA, 0, 0, 0, 0); return; }   /* no longer carried */
     if (it == IM_PWEP(ItemMgr)) return;
-    if (!CanSwap()) return;
+    if (!CanSwap() || swap_busy) return;
     SndCall(0, 0xE, 0, 0, 0, 0);
-    Equip(it);
+    SwapStart(it);
     ShowPanel();
 }
 
