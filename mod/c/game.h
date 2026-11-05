@@ -42,6 +42,7 @@ void SndBlkStop(int blk);
 void weaponRelease(void* pl);
 void weaponLoad(void* pl, int no, int type);
 void weaponInit(void* pl);
+void MotionSetCore(void* m, void* w, void* data, void* seq, int hokan, int flags, int frame);
 #define pPL (*(u8**)0x802B8344)
 int  GetSystemVcnt(void);
 

@@ -22,6 +22,7 @@ SndBlkStop         = 0x80056F64;
 weaponRelease      = 0x80145618;
 weaponLoad         = 0x8014591C;
 weaponInit         = 0x80145954;
+MotionSetCore      = 0x8012B480;
 GetSystemVcnt      = 0x80125018;
 GXSetAlphaCompare  = 0x80093BA0;
 GXSetColorUpdate   = 0x800941C0;

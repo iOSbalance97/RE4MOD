@@ -43,6 +43,16 @@ static int CanSwap(void)
     return pl[0xFC] == 0 && pl[0xFD] <= 3;
 }
 
+extern unsigned char mot_draw[];
+/* Remake-style draw: when Leon stands still (routine 0/0, footwork), play the converted Mixamo
+   draw motion; footwork r_no_2 = 2 restarts its idle motion when this one ends (motionMove) */
+static void DrawMotion(u8* pl)
+{
+    if (pl[0xFC] != 0 || pl[0xFD] != 0) return;
+    MotionSetCore(pl, pl + 0x1D8, mot_draw, 0, 4, 5, 0);
+    pl[0xFE] = 2;
+}
+
 static void Equip(cItem* it)
 {
     void* pl = pPL;
@@ -59,6 +69,7 @@ static void Equip(cItem* it)
     weaponLoad(pl, no, type);
     G8(0x4FBE) = lv;
     weaponInit(pl);
+    DrawMotion(pl);
 }
 
 static void Use(int dir)
