@@ -6,6 +6,21 @@
 #define W16(w,o) (*(u16*)((u8*)(w)+(o)))
 #define W32(w,o) (*(u32*)((u8*)(w)+(o)))
 
+#define MES_X   32       /* left edge of the notice (message screen units) */
+#define MES_VIS 90       /* notice time in VIs: 1.5 s at 60 Hz */
+static u32 mes_attr;
+static int mes_left;
+
+/* Called every frame from PadRemap: removes the notice when its time is up, unless the slot
+   has been taken by another message in the meantime. */
+void ModMesTick(void)
+{
+    if (mes_left <= 0) return;
+    mes_left -= GetSystemVcnt();
+    if (mes_left > 0) return;
+    if (*(u32*)(cMes + 4 + 0x80) == mes_attr) MesDelete(cMes, 0);
+}
+
 int QuickItem(u8* w)
 {
     u8* it = w + 92;
@@ -13,7 +28,7 @@ int QuickItem(u8* w)
     u8* seen;
     ITEM_INFO info;
     int put, y, money = 0, mes = 0x15;
-    u32 attr = 0x11;
+    u32 attr = 0x11;      /* core text, keep Stop_flg */
     void* model;
 
     if (id >= 512) return 0;
@@ -45,8 +60,12 @@ int QuickItem(u8* w)
         return 0;                                    /* weapons, parts, files, special: as before */
     }
     y = 297 - (s8)cMes[4 + 119] - (s8)cMes[4 + 25];
-    MesSet(cMes, mes, 100, y, attr | 0x80, 0, 0, 4);  /* 0x80: the game keeps running */
+    /* 0x80 game keeps running, 0x40 whole text at once, 0x20000 left aligned, 0x01000000 stays
+       on screen after its end: ModMesTick removes it after MES_VIS */
+    attr |= 0x80 | 0x40 | 0x20000 | 0x01000000;
+    MesSet(cMes, mes, MES_X, y, attr, 0, 0, 4);
     if (mes == 0x15) *(u16*)(cMes + 30) = id;        /* item name */
+    mes_attr = attr; mes_left = MES_VIS;
 
     model = (void*)W32(w, 104);
     sceAtItemFlgOn(it);

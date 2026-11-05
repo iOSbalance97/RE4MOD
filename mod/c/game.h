@@ -34,6 +34,19 @@ void EmMgr_destroy(void* mgr, void* obj);
 void memclr_asm(void* p, u32 n);
 void Mem_free(void* p);
 void DelPrim(void* ot, void* p);
+void MesDelete(void* mes, int no);
+int  GetSystemVcnt(void);
+
+/* the mod's asm variables (VB, see bake.py); +0x20: gameplay frames left (set by the move hook) */
+extern u8 modvars[];
+#define VB_GAMEPLAY 0x20
+
+/* GameCube PADStatus (Pad_data[0] is what PadRead turns into Joy[0] / Key) */
+typedef struct { u16 button; s8 stickX, stickY, substickX, substickY; u8 triggerLeft, triggerRight, analogA, analogB; s8 err; u8 pad; } PADStatus;
+#define Pad_data ((PADStatus*)0x8028E4F0)
+enum { PAD_LEFT=1, PAD_RIGHT=2, PAD_DOWN=4, PAD_UP=8, PAD_Z=0x10, PAD_R=0x20, PAD_L=0x40,
+       PAD_A=0x100, PAD_B=0x200, PAD_X=0x400, PAD_Y=0x800, PAD_START=0x1000,
+       PAD_MOD_RELOAD=0x4000, PAD_MOD_CROUCH=0x8000 };   /* free bits, no Key_type_tbl entry */
 
 /* mod storage inside the saved global block (retail pG+0x8368..0x8683 is unused, verified) */
 #define MOD_SEEN_OFS 0x8600   /* 64 bytes: item ids 0..511 already presented */

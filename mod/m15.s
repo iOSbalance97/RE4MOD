@@ -8,6 +8,8 @@
     mr    r31,r3
     lis   r30,0x8000
     ori   r30,r30,VB        # variables: +0 run toggle, +4 last yaw, +8 yaw valid (free Gecko area)
+    li    r9,3                  # the player is in control: modern pad layout (PadRemap)
+    stb   r9,0x20(r30)
     lwz   r9,0x10(r30)          # door-open speed flag still set: that open ended abnormally
     cmpwi r9,0
     beq   L_cd

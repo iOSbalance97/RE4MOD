@@ -14,8 +14,10 @@ EmMgr_destroy      = 0x8012EA88;
 memclr_asm         = 0x80128C58;
 Mem_free           = 0x80125D50;
 DelPrim            = 0x8011FF64;
+MesDelete          = 0x8002407C;
+GetSystemVcnt      = 0x80125018;
 SECTIONS {
   . = CMOD_ADDR;
-  .text : { *(.text.hooks) *(.text*) *(.rodata*) *(.data*) *(.sdata*) *(.sbss*) *(.bss*) }
+  .text : { *(.text.hooks) *(.text*) *(.rodata*) . = ALIGN(32); *(.data*) *(.sdata*) *(.sbss*) *(.bss*) *(COMMON) . = ALIGN(32); }
   /DISCARD/ : { *(.comment) *(.eh_frame) *(.note*) }
 }

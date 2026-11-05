@@ -68,8 +68,8 @@ for k,a in HOOKS:
     while len(text)%0x20: text+=b'\0'
 # ---- C part (clang for the 750 + binutils ld), linked right after the asm blocks
 CMOD=TEXT_ADDR+len(text)
-C_SRCS=['c/item.c']; C_ASM=['c/hooks.s']
-C_HOOKS=[(0x80150EAC,'hook_item')]
+C_SRCS=['c/item.c','c/pad.c']; C_ASM=['c/hooks.s']
+C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad')]
 def build_c(addr):
     objs=[]
     for f in C_SRCS:
@@ -78,7 +78,7 @@ def build_c(addr):
             '-fno-common','-fno-asynchronous-unwind-tables','-Wall','-Werror','-c',f,'-o',o]); objs.append(o)
     for f in C_ASM:
         o=f[:-2]+'.o'; subprocess.check_call([B+'as','-mgekko','-mregnames',f,'-o',o]); objs.append(o)
-    ld=open('c/hooksyms.ld').read()+open('c/game.ld').read().replace('CMOD_ADDR',hex(addr))
+    ld=f'modvars = {VB:#x};\n'+open('c/hooksyms.ld').read()+open('c/game.ld').read().replace('CMOD_ADDR',hex(addr))
     open('c/link.gen.ld','w').write(ld)
     subprocess.check_call([B+'ld','-T','c/link.gen.ld','-o','c/cmod.elf','--no-warn-execstack']+objs)
     for sec in subprocess.run([B+'readelf','-S','c/cmod.elf'],capture_output=True,text=True).stdout.splitlines():
