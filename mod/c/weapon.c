@@ -99,7 +99,7 @@ static void DummyWep(u8* pl, int on)
 /* ---- swap timing (test builds): shown at the top left for 4 s after a swap ----
    [frames holding the holster pose while loading] [ms weaponRelease] [ms load: read+link, wall]
    [ms weaponInit]. Time base: bus clock / 4 = 40.5 MHz. */
-#define SWAP_DIAG 1
+#define SWAP_DIAG 0
 static u32 Tb(void) { u32 t; __asm__ volatile("mftbl %0" : "=r"(t)); return t; }
 static int diag[4], diag_left;
 static void DiagShow(void) { diag_left = 240; }
@@ -116,7 +116,7 @@ static void SwapTask(int unused)
     int no, type, lv, i;
     u32 t0, t1, t2, t3, v0, v1;
     (void)unused;
-    TaskSleep(HOLSTER_FRAMES - 3);                      /* hand almost at the holster: start */
+    TaskSleep(HOLSTER_FRAMES);
     pl = pPL;
     if (pl && ItemMgr_arm(ItemMgr, it)) {
         id = *(u16*)((u8*)ItemMgr + 0x10);
