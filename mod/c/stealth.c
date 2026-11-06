@@ -91,28 +91,39 @@ static int kill_k = -1;
 typedef f32 (*Atan2F)(f32, f32);
 #define atan2f_ ((Atan2F)0x8005FFE8)
 
+static int dg[4];                          /* diagnostics (hud.c DiagDraw while crouched) */
+int StealthDiag(int i) { if (i < 0) return CrouchActive() ? 1 : 0; return dg[i]; }
 static u8* FindTarget(u8* pl)
 {
-    u8* e;
+    u8* arr = *(u8**)((u8*)EmMgr + 0x00);
+    u32 cnt = *(u32*)((u8*)EmMgr + 0x04), sz = *(u32*)((u8*)EmMgr + 0x08), i;
     u8* best = 0;
-    f32 bd = KILL_R * KILL_R;
-    int n = 0;
+    f32 bd = KILL_R * KILL_R, nd = 1e12f, ndot = 0.0f;
     f32 px = *(f32*)(pl + 0x94), py = *(f32*)(pl + 0x98), pz = *(f32*)(pl + 0x9C);
-    for (e = EM_ALIVE; e && n < 64; e = *(u8**)(e + 4), n++) {
-        f32 dx, dy, dz, d2, fx, fz, l;
-        if ((u32)e < 0x80000000u || (u32)e >= 0x81800000u) break;
-        if (!(*(u32*)e & 1) || e[0x100] < 0x10 || e[0x100] > 0x20) continue;   /* Ganados only */
+    dg[0] = dg[1] = 0; dg[2] = 9999; dg[3] = 0;
+    if ((u32)arr < 0x80000000u || (u32)arr >= 0x81800000u || cnt > 256 || sz < 0x400 || sz > 0x4000) return 0;
+    for (i = 0; i < cnt; i++) {
+        u8* e = arr + i * sz;
+        f32 dx, dy, dz, d2, fx, fz, l, dot;
+        if (!(*(u32*)e & 1)) continue;
+        dg[0]++;
+        if (e[0x100] < 0x10 || e[0x100] > 0x20) continue;            /* Ganados only */
         if (*(s16*)(e + 0x320) <= 0) continue;
+        dg[1]++;
         dx = px - *(f32*)(e + 0x94); dy = py - *(f32*)(e + 0x98); dz = pz - *(f32*)(e + 0x9C);
         if (dy > 600.0f || dy < -600.0f) continue;
         d2 = dx * dx + dz * dz;
-        if (d2 >= bd || d2 < 1.0f) continue;
+        if (d2 < 1.0f) continue;
         fx = *(f32*)(e + 0x0C + 0x08);         /* its facing: the model matrix's z column */
         fz = *(f32*)(e + 0x0C + 0x28);
         l = SQRTF(d2);
-        if ((fx * dx + fz * dz) / l > -0.25f) continue;   /* Leon must be behind it (> ~105 deg) */
+        dot = (fx * dx + fz * dz) / l;
+        if (d2 < nd) { nd = d2; ndot = dot; }
+        if (d2 >= bd) continue;
+        if (dot > -0.25f) continue;            /* Leon must be behind it (> ~105 deg) */
         best = e; bd = d2;
     }
+    if (nd < 1e11f) { dg[2] = (int)(SQRTF(nd) / 100.0f); dg[3] = (int)(ndot * 100.0f) + 100; }
     return best;
 }
 

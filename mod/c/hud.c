@@ -569,10 +569,11 @@ static void Digit(f32 x, f32 y, int d, u32 c)
     if (m & 0x20) Quad(x, y, t, h, c, 0);
     if (m & 0x40) Quad(x, y + h - t / 2, w, t, c, 0);
 }
+int StealthDiag(int i);
 static void DiagDraw(void)
 {
     Mtx44 p; Mtx m; int i, k, n, nd; char buf[8];
-    if (SwapDiag(-1) <= 0) return;
+    if (StealthDiag(-1) <= 0) return;
     GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
     C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
     PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
@@ -581,7 +582,7 @@ static void DiagDraw(void)
     ModeFlat();
     Quad(96.0f, 116.0f, 4 * 66.0f, 28.0f, 0x000000A0, 0);   /* inside the 16:9 crop */
     for (i = 0; i < 4; i++) {
-        n = SwapDiag(i); if (n < 0) n = 0; if (n > 9999) n = 9999;
+        n = StealthDiag(i); if (n < 0) n = 0; if (n > 9999) n = 9999;
         nd = 0; do { buf[nd++] = (char)(n % 10); n /= 10; } while (n);
         for (k = 0; k < nd; k++) Digit(100.0f + 66.0f * i + 13.0f * (nd - 1 - k), 121.0f, buf[k], i == 0 ? 0xFFE040FF : 0xFFFFFFFF);
     }

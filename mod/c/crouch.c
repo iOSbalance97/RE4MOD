@@ -187,8 +187,10 @@ static void Apply(u8* pl)
     }
 }
 
-static int Free(u8* pl) { return pl[0xFC] == 0 && pl[0xFD] <= 2; }
-static int Armed(u8* pl) { return pl[0xFC] == 0 && (pl[0xFD] == 6 || pl[0xFD] == 0xB); }   /* knife: legs, the slash whole body */
+/* whole body: free moves, and the knife once drawn (stance and slash: the remake's low pose);
+ * legs only: aiming, and the knife's draw / put-away (its own arm animation shows) */
+static int Free(u8* pl) { return pl[0xFC] == 0 && (pl[0xFD] <= 2 || (pl[0xFD] == 0xB && (pl[0xFE] == 1 || pl[0xFE] == 2))); }
+static int Armed(u8* pl) { return pl[0xFC] == 0 && (pl[0xFD] == 6 || pl[0xFD] == 0xB); }
 
 void CrouchPress(void)
 {

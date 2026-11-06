@@ -54,7 +54,20 @@ L_b1: fcmpo cr0,f0,f6
     bge   L_b2
     fmr   f0,f6
 L_b2: stfs  f0,512(r31)
+    b     L_out
 L_skip:
+    # during actions: the game's own behaviour (both angles ease back behind Leon, x0.9 a frame)
+    lis   r0,0x3F66
+    ori   r0,r0,0x6666
+    stw   r0,12(r1)
+    lfs   f3,12(r1)
+    lfs   f0,512(r31)
+    fmuls f0,f0,f3
+    stfs  f0,512(r31)
+    lfs   f0,516(r31)
+    fmuls f0,f0,f3
+    stfs  f0,516(r31)
+L_out:
     lis   r12,0x800B
     ori   r12,r12,0xCE80        # function epilogue
     mtctr r12
