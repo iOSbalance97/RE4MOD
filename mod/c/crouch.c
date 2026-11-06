@@ -187,8 +187,8 @@ static void Apply(u8* pl)
     }
 }
 
-static int Free(u8* pl) { return pl[0xFC] == 0 && (pl[0xFD] <= 2 || pl[0xFD] == 0xB); }   /* knife: whole body */
-static int Armed(u8* pl) { return pl[0xFC] == 0 && pl[0xFD] == 6; }
+static int Free(u8* pl) { return pl[0xFC] == 0 && pl[0xFD] <= 2; }
+static int Armed(u8* pl) { return pl[0xFC] == 0 && (pl[0xFD] == 6 || pl[0xFD] == 0xB); }   /* knife: legs, the slash whole body */
 
 void CrouchPress(void)
 {
@@ -218,12 +218,13 @@ void CrouchFrame(void)
         int k = StealthKilling();
         if (k && !killing) { want = 0; shot = CR_STAB; shot_f = 0.0f; sxf = 0.0f; w = 1.0f; }
         killing = k;
-        if (shot == CR_STAB) full = 1;
+        if (shot == CR_STAB || shot == CR_SLASH) full = 1;
     }
     {   /* crouched knife: the remake's low slash on each slash */
         static int r2_prev;
         int r2 = pl[0xFD] == 0xB ? pl[0xFE] : -1;
         if (want && r2 == 2 && r2_prev != 2 && shot < 0) { shot = CR_SLASH; shot_f = 0.0f; sxf = 0.0f; }
+        if (shot == CR_SLASH) full = 1;
         r2_prev = r2;
     }
     if (want && pl[0xFC] == 0 && pl[0xFD] == 3) {           /* run: up into the sprint */
@@ -294,7 +295,7 @@ void CrouchFrame(void)
                 w -= 1.0f / FADE;
                 if (w <= 0.0f) { w = 0.0f; shot = -1; }
             } else {
-                if (shot == CR_DOWN) { prev = CR_DOWN; prev_f = (f32)(n - 1); xf = 0.0f; }
+                if (shot == CR_DOWN || shot == CR_SLASH) { prev = shot; prev_f = (f32)(n - 1); xf = 0.0f; }   /* fade out of it */
                 shot = -1;
             }
         }

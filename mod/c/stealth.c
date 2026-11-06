@@ -47,11 +47,12 @@ void StealthFrame(void)
     u8* m;
     int i, n = 0;
     f32 prox, foot, foot2;
+    int crouched = CrouchActive();
     if (!pl) return;
     if (pl[0xFD] == 3 && pl[0xFC] == 0) {                 /* running: the game's own */
         prox = 12250000.0f; foot = 25000000.0f; foot2 = 12250000.0f;
-    } else if (CrouchActive()) {              /* crouched: silent, 1.5 m behind */
-        prox = 2250000.0f; foot = 0.0f; foot2 = 0.0f;
+    } else if (CrouchActive()) {              /* crouched: silent, 0.8 m behind */
+        prox = 640000.0f; foot = 0.0f; foot2 = 0.0f;   /* 0.8 m: the kill range is wider */
     } else {                                              /* walking / still / aiming: 2.5 m */
         prox = 6250000.0f; foot = 12250000.0f; foot2 = 6250000.0f;
     }
@@ -67,11 +68,12 @@ void StealthFrame(void)
             c_mod[slot] = m; c_pool[slot] = p;
         }
         if (!p) continue;
-        if (p[0] != key[0] || p[2] != key[2] || p[9] != key[9]) {   /* module memory reused */
+        if (p[0] != key[0] || p[2] != key[2] || p[9] != key[9] || (p[10] != 1000000.0f && p[10] != 360000.0f)) {   /* module memory reused */
             for (i = 0; i < NCACHE; i++) if (c_mod[i] == m) c_mod[i] = 0;
             continue;
         }
         p[3] = foot; p[4] = prox; p[8] = foot2;
+        p[10] = crouched ? 360000.0f : 1000000.0f;     /* FindCk2: 'he is right here' (1 m) */
     }
 }
 
@@ -80,7 +82,7 @@ void StealthFrame(void)
  * over its head (hud.c). Cross: Leon turns to it and does the game's own knife slash (the pad
  * presses knife, then fire), so the hit, the damage and the Ganado's reaction are the game's;
  * the Ganado is left with 1 HP so that slash kills it. Visually Leon stabs (crouch.c CR_STAB). */
-#define KILL_R    1300.0f
+#define KILL_R    1500.0f
 #define KILL_N    48                    /* frames the sequence drives the pad */
 #define EM_ALIVE  (*(u8**)((u8*)EmMgr + 0x10))
 int CrouchActive(void);
@@ -97,21 +99,18 @@ static u8* FindTarget(u8* pl)
     int n = 0;
     f32 px = *(f32*)(pl + 0x94), py = *(f32*)(pl + 0x98), pz = *(f32*)(pl + 0x9C);
     for (e = EM_ALIVE; e && n < 64; e = *(u8**)(e + 4), n++) {
-        f32 dx, dy, dz, d2, a, fx, fz, l;
+        f32 dx, dy, dz, d2, fx, fz, l;
         if ((u32)e < 0x80000000u || (u32)e >= 0x81800000u) break;
-        if (!(*(u32*)e & 1) || e[0x100] < 0x10 || e[0x100] > 0x1F) continue;   /* Ganados only */
+        if (!(*(u32*)e & 1) || e[0x100] < 0x10 || e[0x100] > 0x20) continue;   /* Ganados only */
         if (*(s16*)(e + 0x320) <= 0) continue;
         dx = px - *(f32*)(e + 0x94); dy = py - *(f32*)(e + 0x98); dz = pz - *(f32*)(e + 0x9C);
         if (dy > 600.0f || dy < -600.0f) continue;
         d2 = dx * dx + dz * dz;
         if (d2 >= bd || d2 < 1.0f) continue;
-        a = *(f32*)(e + 0xA4);                 /* its facing (sin, cos) */
-        { f32 a2 = a; while (a2 > 3.1416f) a2 -= 6.2832f; while (a2 < -3.1416f) a2 += 6.2832f; a = a2; }
-        { f32 x2 = a * a; fx = a * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42 * (1 - x2 / 72))));
-          a += 1.5707963f; if (a > 3.1416f) a -= 6.2832f; x2 = a * a;
-          fz = a * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42 * (1 - x2 / 72)))); }
+        fx = *(f32*)(e + 0x0C + 0x08);         /* its facing: the model matrix's z column */
+        fz = *(f32*)(e + 0x0C + 0x28);
         l = SQRTF(d2);
-        if ((fx * dx + fz * dz) / l > -0.45f) continue;   /* Leon must be behind it */
+        if ((fx * dx + fz * dz) / l > -0.25f) continue;   /* Leon must be behind it (> ~105 deg) */
         best = e; bd = d2;
     }
     return best;
