@@ -534,6 +534,7 @@ void SwapFrame(void);
 void LegsFrame(void);
 void CrouchFrame(void);
 void StealthFrame(void);
+int StealthDiag(int i);
 void ModFrame(void)
 {
     mod_frame++;
@@ -544,7 +545,7 @@ void ModFrame(void)
     CrouchFrame();
     IconFrame();
     draw_now = 0;
-    if (SwapDiag(-1) > 0 && modvars[VB_GAMEPLAY]) draw_now = 1;   /* swap timing box (test) */
+    if (StealthDiag(-1) > 0 && modvars[VB_GAMEPLAY]) draw_now = 1;   /* stealth numbers (test) */
     dbg_frame = 1; dbg_play = modvars[VB_GAMEPLAY] != 0; dbg_hud = (*(u32*)(pG + 88) & 0x10000) != 0; dbg_vis = panel_t > 0;
     if (panel_t <= 0) return;
     panel_t -= GetSystemVcnt();

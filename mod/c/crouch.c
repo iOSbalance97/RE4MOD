@@ -24,6 +24,7 @@ int StealthKilling(void);
 #define SPEED_K  0.7f                  /* crouched speed */
 #define CR_STEP  0.5f                  /* clip frames per game frame (clips at 15 fps) */
 #define SLASH_SPD 1.6f                 /* crouched knife slash speed (fits the game's slash) */
+#define KNIFE_DRAW_K 0.65f              /* crouch share of the upper body while the knife is drawn */
 #define STAB_SPD  1.5f                 /* stealth kill stab */
 #define STEP_MIN 1.0f                  /* units / frame that count as moving */
 
@@ -258,8 +259,11 @@ void CrouchFrame(void)
     } else if (want) { w += 1.0f / 4.0f; if (w > 1.0f) w = 1.0f; }
     else if (shot != CR_UP && shot != CR_STAB) { w -= 1.0f / FADE; if (w < 0.0f) w = 0.0f; }
 
-    if (full) { wu += 1.0f / FADE; if (wu > 1.0f) wu = 1.0f; }
-    else { wu -= 1.0f / FADE; if (wu < 0.0f) wu = 0.0f; }
+    {   /* upper body share: whole body when free; the knife's draw half (less twist); aiming none */
+        f32 t = full ? 1.0f : (pl[0xFC] == 0 && pl[0xFD] == 0xB) ? KNIFE_DRAW_K : 0.0f;
+        if (wu < t) { wu += 1.0f / FADE; if (wu > t) wu = t; }
+        else if (wu > t) { wu -= 1.0f / FADE; if (wu < t) wu = t; }
+    }
     if (shot == CR_SPRINT || shot == CR_DOWN || shot == CR_UP || shot == CR_STAB || shot == CR_SLASH) wu = 1.0f;
 
     /* loop clip from the movement in Leon's frame (+z forward, +x left) */
