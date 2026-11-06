@@ -39,8 +39,10 @@ static f32* FindPool(u8* m)
     return 0;
 }
 
+void StealthKillFrame(void);
 void StealthFrame(void)
 {
+    StealthKillFrame();
     u8* pl = pPL;
     u8* m;
     int i, n = 0;
@@ -71,4 +73,86 @@ void StealthFrame(void)
         }
         p[3] = foot; p[4] = prox; p[8] = foot2;
     }
+}
+
+/* ---- stealth kill -------------------------------------------------------------------------
+ * Crouched, behind a Ganado (within KILL_R, more than ~120 deg off its facing): a Cross prompt
+ * over its head (hud.c). Cross: Leon turns to it and does the game's own knife slash (the pad
+ * presses knife, then fire), so the hit, the damage and the Ganado's reaction are the game's;
+ * the Ganado is left with 1 HP so that slash kills it. Visually Leon stabs (crouch.c CR_STAB). */
+#define KILL_R    1300.0f
+#define KILL_N    48                    /* frames the sequence drives the pad */
+#define EM_ALIVE  (*(u8**)((u8*)EmMgr + 0x10))
+int CrouchActive(void);
+static u8* target;
+static int kill_k = -1;
+typedef f32 (*Atan2F)(f32, f32);
+#define atan2f_ ((Atan2F)0x8005FFE8)
+
+static u8* FindTarget(u8* pl)
+{
+    u8* e;
+    u8* best = 0;
+    f32 bd = KILL_R * KILL_R;
+    int n = 0;
+    f32 px = *(f32*)(pl + 0x94), py = *(f32*)(pl + 0x98), pz = *(f32*)(pl + 0x9C);
+    for (e = EM_ALIVE; e && n < 64; e = *(u8**)(e + 4), n++) {
+        f32 dx, dy, dz, d2, a, fx, fz, l;
+        if ((u32)e < 0x80000000u || (u32)e >= 0x81800000u) break;
+        if (!(*(u32*)e & 1) || e[0x100] < 0x10 || e[0x100] > 0x1F) continue;   /* Ganados only */
+        if (*(s16*)(e + 0x320) <= 0) continue;
+        dx = px - *(f32*)(e + 0x94); dy = py - *(f32*)(e + 0x98); dz = pz - *(f32*)(e + 0x9C);
+        if (dy > 600.0f || dy < -600.0f) continue;
+        d2 = dx * dx + dz * dz;
+        if (d2 >= bd || d2 < 1.0f) continue;
+        a = *(f32*)(e + 0xA4);                 /* its facing (sin, cos) */
+        { f32 a2 = a; while (a2 > 3.1416f) a2 -= 6.2832f; while (a2 < -3.1416f) a2 += 6.2832f; a = a2; }
+        { f32 x2 = a * a; fx = a * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42 * (1 - x2 / 72))));
+          a += 1.5707963f; if (a > 3.1416f) a -= 6.2832f; x2 = a * a;
+          fz = a * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42 * (1 - x2 / 72)))); }
+        l = SQRTF(d2);
+        if ((fx * dx + fz * dz) / l > -0.45f) continue;   /* Leon must be behind it */
+        best = e; bd = d2;
+    }
+    return best;
+}
+
+/* hud.c: where to draw the prompt (0 = none) */
+u8* StealthTarget(void) { return kill_k < 0 ? target : 0; }
+int StealthKilling(void) { return kill_k >= 0; }
+
+void StealthKillFrame(void)
+{
+    u8* pl = pPL;
+    if (kill_k >= 0) {
+        if (++kill_k > KILL_N + 20 || !pl) kill_k = -1;
+        target = 0;
+        return;
+    }
+    target = 0;
+    if (!pl || !modvars[VB_GAMEPLAY] || pl[0xFC] != 0 || pl[0xFD] > 2 || !CrouchActive()) return;
+    target = FindTarget(pl);
+}
+
+/* pad.c: Cross pressed -> 1 if it started a kill (the press does not reach the game) */
+int StealthPress(void)
+{
+    u8* pl = pPL;
+    f32 dx, dz;
+    if (kill_k >= 0 || !target || !pl) return 0;
+    dx = *(f32*)(target + 0x94) - *(f32*)(pl + 0x94);
+    dz = *(f32*)(target + 0x9C) - *(f32*)(pl + 0x9C);
+    *(f32*)(pl + 0xA4) = atan2f_(dx, dz);       /* face it */
+    *(s16*)(target + 0x320) = 1;                /* the slash finishes it */
+    kill_k = 0;
+    return 1;
+}
+/* pad.c, every gameplay frame: the knife press sequence while a kill runs */
+u32 StealthPad(u32 out)
+{
+    if (kill_k < 0) return out;
+    out &= ~(PAD_A | PAD_B | PAD_R | PAD_X | PAD_Y | PAD_MOD_CROUCH | PAD_MOD_RELOAD);
+    if (kill_k < KILL_N) out |= PAD_L;                       /* knife stance */
+    if ((kill_k >= 12 && kill_k < 16) || (kill_k >= 22 && kill_k < 26)) out |= PAD_A;   /* slash */
+    return out;
 }

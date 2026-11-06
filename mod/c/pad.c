@@ -16,6 +16,9 @@ int CaseActive(void);
 int SwapLock(void);
 void CrouchPress(void);
 extern int crouch_stand;
+int StealthPress(void);
+u32 StealthPad(u32 out);
+int StealthKilling(void);
 static u32 prev_raw;
 
 void PadRemap(void)
@@ -36,7 +39,8 @@ void PadRemap(void)
     if (modvars[VB_GAMEPLAY]) {
         modvars[VB_GAMEPLAY]--;
         out &= ~WeaponPad(in, p->stickX, p->stickY);      /* D-pad: quick weapons */
-        if (in & PAD_B) out |= PAD_A;                        /* Cross: action */
+        if ((in & ~prev_raw) & PAD_B) { if (StealthPress()) in &= ~PAD_B; }   /* Cross: stealth kill */
+        if (in & PAD_B && !StealthKilling()) out |= PAD_A;   /* Cross: action */
         if (r2) out |= PAD_A;                                /* R2: fire */
         if (l2) out |= PAD_R;                                /* L2: aim */
         if (in & PAD_Z) out |= PAD_L;                        /* L1/R1: knife */
@@ -48,6 +52,7 @@ void PadRemap(void)
         if (l3) out |= PAD_B;                                /* L3: run */
         if (r3) out |= PAD_Z;                                /* R3: map */
         if (SwapLock()) { out = 0; p->stickX = p->stickY = 0; }  /* weapon swap: Leon holds still */
+        if (StealthKilling()) { out = StealthPad(out); p->stickX = p->stickY = 0; p->substickX = p->substickY = 0; }
     } else {
         WeaponPadIdle();
         if ((in & PAD_Z) && CaseActive()) {                 /* case: L1 + D-pad assigns */

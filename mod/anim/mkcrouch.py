@@ -9,6 +9,29 @@ D='/home/claude/re4mod/anim/mixamo/crouch/'
 BODY=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,113,114,117,118]
 def Ry(deg):
     a=math.radians(deg); c,s=math.cos(a),math.sin(a); return np.array([[c,0,s],[0,1,0],[-s,0,c]])
+from leon import OFF
+TARGET_Y=760.0          # all crouch loops sit at this mean root height (legs re-solved, feet kept)
+def rot_between(u,v):
+    u=u/np.linalg.norm(u); v=v/np.linalg.norm(v); c=float(np.dot(u,v)); ax=np.cross(u,v); s=np.linalg.norm(ax)
+    if s<1e-9: return np.eye(3)
+    ax/=s; K=np.array([[0,-ax[2],ax[1]],[ax[2],0,-ax[0]],[-ax[1],ax[0],0]])
+    return np.eye(3)+K*s+K@K*(1-c)
+def relevel(fr,target):
+    my=np.mean([x[2][0][1] for x in fr]); d=target-my; out=[]
+    for vals,R,P in fr:
+        R=list(R); P=[p.copy() for p in P]
+        for hip,knee,ank in ((18,19,20),(22,23,24)):
+            a=np.linalg.norm(OFF[knee]); b=np.linalg.norm(OFF[ank])
+            H0=P[hip].copy(); K0=P[knee].copy(); A=P[ank].copy(); H=H0+np.array([0,d,0])
+            L=np.linalg.norm(A-H); L=min(L,a+b-0.5); u=(A-H)/np.linalg.norm(A-H); u0=(A-H0)/np.linalg.norm(A-H0)
+            v=(K0-H0)-u0*np.dot(K0-H0,u0); v=v-u*np.dot(v,u); v/=np.linalg.norm(v)
+            x=(a*a-b*b+L*L)/(2*L); h=np.sqrt(max(a*a-x*x,0)); K=H+u*x+v*h
+            R[hip]=rot_between(K0-H0,K-H)@R[hip]; R[knee]=rot_between(A-K0,A-K)@R[knee]
+            P[hip]=H; P[knee]=K
+        P[0]=P[0]+np.array([0,d,0])
+        out.append((vals,R,P))
+    return out,d
+ARMS=[5,6,7,8,9,10,11,12,13,14,15,16,113,114,117,118]
 def facing(fr):
     v=[np.cross(x[2][11]-x[2][5],[0,1,0]) for x in fr]; v=np.mean(v,0); return math.degrees(math.atan2(v[0],v[2]))
 def move(fr):
@@ -34,6 +57,12 @@ for nm,f,loop,rule,rev in CL:
     if rule and rule[0]=='face': r=rule[1]-facing(fr)
     if loop: fr=fr[:-1]
     if rev: fr=fr[::-1]
+    if loop: fr,dl=relevel(fr,TARGET_Y)
+    if nm=='idle':          # the idle's arms hang wide open: the crouch walk's arms instead
+        ref=convert(D+'39d5295f-Crouched_Walking.fbx',fps=15,inplace=False)[0][1]
+        La={p:ref[PAR[p]].T@ref[p] for p in ARMS}
+        for vals,R,P in fr:
+            for p in ARMS: R[p]=R[PAR[p]]@La[p]
     Rr=Ry(r); rows=[]; ys=[]
     for vals,R,P in fr:
         e=[]

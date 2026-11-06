@@ -18,10 +18,13 @@
 
 void partsWorldCalc(void* m);
 int SwapLock(void);
+int StealthKilling(void);
 
 #define FADE     6.0f
 #define SPEED_K  0.7f                  /* crouched speed */
 #define CR_STEP  0.5f                  /* clip frames per game frame (clips at 15 fps) */
+#define SLASH_SPD 1.6f                 /* crouched knife slash speed (fits the game's slash) */
+#define STAB_SPD  1.5f                 /* stealth kill stab */
 #define STEP_MIN 1.0f                  /* units / frame that count as moving */
 
 int crouch_stand;                      /* pad.c (unused now) */
@@ -184,8 +187,8 @@ static void Apply(u8* pl)
     }
 }
 
-static int Free(u8* pl) { return pl[0xFC] == 0 && pl[0xFD] <= 2; }
-static int Armed(u8* pl) { return pl[0xFC] == 0 && (pl[0xFD] == 6 || pl[0xFD] == 0xB); }
+static int Free(u8* pl) { return pl[0xFC] == 0 && (pl[0xFD] <= 2 || pl[0xFD] == 0xB); }   /* knife: whole body */
+static int Armed(u8* pl) { return pl[0xFC] == 0 && pl[0xFD] == 6; }
 
 void CrouchPress(void)
 {
@@ -210,6 +213,19 @@ void CrouchFrame(void)
     int clip, n;
     if (!pl || !modvars[VB_GAMEPLAY]) { want = 0; w = wu = 0.0f; shot = -1; have_last = 0; drop = 0.0f; return; }
     full = Free(pl);
+    {   /* stealth kill (stealth.c): stand and stab */
+        static int killing;
+        int k = StealthKilling();
+        if (k && !killing) { want = 0; shot = CR_STAB; shot_f = 0.0f; sxf = 0.0f; w = 1.0f; }
+        killing = k;
+        if (shot == CR_STAB) full = 1;
+    }
+    {   /* crouched knife: the remake's low slash on each slash */
+        static int r2_prev;
+        int r2 = pl[0xFD] == 0xB ? pl[0xFE] : -1;
+        if (want && r2 == 2 && r2_prev != 2 && shot < 0) { shot = CR_SLASH; shot_f = 0.0f; sxf = 0.0f; }
+        r2_prev = r2;
+    }
     if (want && pl[0xFC] == 0 && pl[0xFD] == 3) {           /* run: up into the sprint */
         want = 0; shot = CR_SPRINT; shot_f = 0.0f; sxf = 0.0f; full = 1;
     }
@@ -237,11 +253,11 @@ void CrouchFrame(void)
         w = 1.0f - shot_f / (f32)(cr_clips[CR_SPRINT].n - 1);   /* over the clip */
         if (w < 0.0f) w = 0.0f;
     } else if (want) { w += 1.0f / 4.0f; if (w > 1.0f) w = 1.0f; }
-    else if (shot != CR_UP) { w -= 1.0f / FADE; if (w < 0.0f) w = 0.0f; }
+    else if (shot != CR_UP && shot != CR_STAB) { w -= 1.0f / FADE; if (w < 0.0f) w = 0.0f; }
 
     if (full) { wu += 1.0f / FADE; if (wu > 1.0f) wu = 1.0f; }
     else { wu -= 1.0f / FADE; if (wu < 0.0f) wu = 0.0f; }
-    if (shot == CR_SPRINT || shot == CR_DOWN || shot == CR_UP) wu = 1.0f;
+    if (shot == CR_SPRINT || shot == CR_DOWN || shot == CR_UP || shot == CR_STAB || shot == CR_SLASH) wu = 1.0f;
 
     /* loop clip from the movement in Leon's frame (+z forward, +x left) */
     if (dist >= STEP_MIN) {
@@ -270,10 +286,11 @@ void CrouchFrame(void)
     if (shot >= 0) {
         n = cr_clips[shot].n;
         if (sxf < 1.0f) { sxf += 0.25f; if (sxf > 1.0f) sxf = 1.0f; }
-        shot_f += CR_STEP;
+        shot_f += CR_STEP * (shot == CR_SLASH ? SLASH_SPD : shot == CR_STAB ? STAB_SPD : 1.0f);
         if (shot == CR_DOWN && dist >= STEP_MIN) shot_f = (f32)(n - 1);   /* moved: cut it short */
+        if (shot == CR_SLASH && pl[0xFD] != 0xB) shot_f = (f32)(n - 1);   /* knife put away */
         if (shot_f >= (f32)(n - 1)) {
-            if (shot == CR_UP) {                       /* hold the standing end pose and fade out */
+            if (shot == CR_UP || shot == CR_STAB) {    /* hold the standing end pose and fade out */
                 w -= 1.0f / FADE;
                 if (w <= 0.0f) { w = 0.0f; shot = -1; }
             } else {

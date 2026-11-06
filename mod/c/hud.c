@@ -439,12 +439,68 @@ static void ReticleDraw(void)
     }
 }
 
+
+/* stealth kill prompt (stealth.c): a Cross button over the Ganado's head */
+u8* StealthTarget(void);
+static void XBar(f32 cx, f32 cy, f32 len, f32 t, int flip, u32 c)   /* a 45 deg bar */
+{
+    f32 ux = 0.7071f * len * 0.5f, uy = (flip ? -0.7071f : 0.7071f) * len * 0.5f;
+    f32 nx = -(flip ? -0.7071f : 0.7071f) * t * 0.5f, ny = 0.7071f * t * 0.5f;
+    GXBegin(0x80, 0, 4);
+    GXFIFO_F32 = cx - ux - nx; GXFIFO_F32 = cy - uy - ny; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+    GXFIFO_F32 = cx + ux - nx; GXFIFO_F32 = cy + uy - ny; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+    GXFIFO_F32 = cx + ux + nx; GXFIFO_F32 = cy + uy + ny; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+    GXFIFO_F32 = cx - ux + nx; GXFIFO_F32 = cy - uy + ny; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c;
+}
+static void StealthPromptDraw(void)
+{
+    static const u32 black = 0;
+    static int a;
+    static f32 sx, sy;
+    u8* e = StealthTarget();
+    if (e) {
+        f32* v = (f32*)(pG + 0x74 + 0x30);
+        f32* p = (f32*)(pG + 0x74 + 0x64);
+        f32 x = *(f32*)(e + 0x94), y = *(f32*)(e + 0x98) + 1900.0f, z = *(f32*)(e + 0x9C);
+        f32 vx = v[0] * x + v[1] * y + v[2] * z + v[3];
+        f32 vy = v[4] * x + v[5] * y + v[6] * z + v[7];
+        f32 vz = v[8] * x + v[9] * y + v[10] * z + v[11];
+        f32 cx = p[0] * vx + p[1] * vy + p[2] * vz + p[3];
+        f32 cy = p[4] * vx + p[5] * vy + p[6] * vz + p[7];
+        f32 cw = p[12] * vx + p[13] * vy + p[14] * vz + p[15];
+        if (cw <= 1.0f) { a = 0; return; }
+        sx = 320.0f * (1.0f + cx / cw); sy = 240.0f * (1.0f - cy / cw);
+        if (a < 6) a++;
+    } else if (a > 0) a--;
+    if (a <= 0) return;
+    {
+        Mtx44 pm; Mtx m;
+        u32 al = (u32)(220 * a / 6);
+        GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);
+        ViewportOn();
+        GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
+        C_MTXOrtho(pm, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(pm, 1);
+        PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
+        GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
+        GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
+        ModeFlat();
+        Disc(sx, sy, 11.0f, 0xFFFFFF00 | (al * 3 / 4));      /* white rim */
+        Disc(sx, sy, 9.5f, 0x10101000 | al);                /* dark button */
+        XBar(sx, sy, 10.0f, 1.8f, 0, 0x9AB4FF00 | al);      /* PlayStation cross, blue-ish */
+        XBar(sx, sy, 10.0f, 1.8f, 1, 0x9AB4FF00 | al);
+        GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
+        ViewportOff();
+        GXSetProjection((f32(*)[4])(0x80284420 + 0x64), 0);
+    }
+}
+
 void NoticeBarDraw(void)
 {
     static const u32 black = 0;
     Mtx44 p; Mtx m;
     int left = NoticeLeft(), a = 150;
     ReticleDraw();
+    StealthPromptDraw();
     if (left <= 0 || !modvars[VB_GAMEPLAY]) return;
     if (left < 12) a = a * left / 12;
     GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);
