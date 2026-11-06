@@ -475,10 +475,12 @@ void NoticeBarDraw(void)
 void SwapFrame(void);
 void LegsFrame(void);
 void CrouchFrame(void);
+void StealthFrame(void);
 void ModFrame(void)
 {
     mod_frame++;
     RecoilFrame();
+    StealthFrame();
     SwapFrame();
     LegsFrame();
     CrouchFrame();
