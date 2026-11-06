@@ -13,6 +13,7 @@
 
 #define FADE      6.0f                   /* frames to fade the walk in / out, and to change direction */
 int SwapLock(void);
+int CrouchLegs(void);
 #define SWAY_K    0.5f                   /* share of Mixamo's chest sway / bob put on Leon */
 #define BOB_K     0.5f
 #define CAMSMTH   0x80217948             /* CamSmth (PAL): m_effect.Campos +0x100, .Target +0x10C */
@@ -211,7 +212,7 @@ void LegsFrame(void)
     if (!have_last) { have_last = 1; dx = dz = 0.0f; }
     dist = SQRTF(dx * dx + dz * dz);
     if (dist > 200.0f) dist = 0.0f;                              /* warp (room change, event) */
-    aiming = pl[0xFC] == 0 && pl[0xFD] == 6 && !(*(u32*)(pl + 0x420) & 0x40)   /* not crouched */
+    aiming = pl[0xFC] == 0 && pl[0xFD] == 6 && !CrouchLegs()      /* crouch.c has the legs */
              && modvars[VB_GAMEPLAY];
     if (!aiming) { w = 0.0f; cur = prev = -1; still = 0; return; }
     if (dist >= 2.0f) {
@@ -239,7 +240,4 @@ void LegsFrame(void)
     Apply(pl);
 }
 
-/* crouch: off until it is redone (Circle does nothing) */
-int crouch_stand;
-void CrouchPress(void) { }
-void CrouchFrame(void) { }
+

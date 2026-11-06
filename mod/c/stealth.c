@@ -12,6 +12,7 @@
  * the "always" radius shrink when he walks and more when he is crouched. Running = the game's.
  */
 #include "game.h"
+int CrouchActive(void);
 
 #define MOD_HEAD (*(u8**)0x800030C8)          /* OSModuleInfo queue head */
 static const f32 key[10] = { 225000000.0f, 36000000.0f, 1.0471976f, 25000000.0f, 12250000.0f,
@@ -47,7 +48,7 @@ void StealthFrame(void)
     if (!pl) return;
     if (pl[0xFD] == 3 && pl[0xFC] == 0) {                 /* running: the game's own */
         prox = 12250000.0f; foot = 25000000.0f; foot2 = 12250000.0f;
-    } else if (*(u32*)(pl + 0x420) & 0x40) {              /* crouched: silent, 1.5 m behind */
+    } else if (CrouchActive()) {              /* crouched: silent, 1.5 m behind */
         prox = 2250000.0f; foot = 0.0f; foot2 = 0.0f;
     } else {                                              /* walking / still / aiming: 2.5 m */
         prox = 6250000.0f; foot = 12250000.0f; foot2 = 6250000.0f;
