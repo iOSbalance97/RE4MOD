@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B68** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B69** (10-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -130,7 +130,11 @@ Reglas de trabajo del usuario:
      pies corregidos contra el suelo. Cámara al lado izquierdo-delante del ganado.
      mktake_ik.py = versión anterior (IK/Mixamo) por si se quiere volver.
    - **B68: sin bandas negras**: SetScissorState (0x8012641C) siempre sin tijera (0x80126434 → b),
-     filtros 09/0b a pantalla completa (0x80117A90/94, 0x80190708/0C).
+     filtros 09/0b a pantalla completa (0x80117A90/94, 0x80190708/0C). **No bastó** (vídeo): las
+     bandas las pinta Draw_cinesco (0x801758C4) siempre (CinescoMove pide las bandas cada frame).
+   - B69: Draw_cinesco siempre sale sin dibujar (0x801758DC → b 0x80175B5C). Ejecución más lenta:
+     Seq_speed del ganado (Motion +0xC0 = em+0x298) al 70 % y al 42 % alrededor del corte
+     (26–50); León sigue su frame (kill_f), eventos por cruce de frame; al acabar vuelve a 1.
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.

@@ -102,7 +102,10 @@ W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x8014700
      # B68: no letterbox. SetScissorState (0x8012641C) always takes the no-scissor branch, and the two
      # screen filters (09 / 0b) draw full height instead of the band y 56, h - 111
      0x80126434:0x480000A0,
-     0x80117A90:0x38C60000,0x80117A94:0x38800000,0x80190708:0x38C60000,0x8019070C:0x38800000}
+     0x80117A90:0x38C60000,0x80117A94:0x38800000,0x80190708:0x38C60000,0x8019070C:0x38800000,
+     # B69: the bars themselves: CinescoMove asks for them every frame and Draw_cinesco (0x801758C4)
+     # paints them - it now always takes its 'alpha 0' exit
+     0x801758DC:0x48000280}
 # __ArenaLo: lis r3,hi / addi r3,r3,lo at both sites
 ha=(END+0x8000)>>16; lo=END-(ha<<16)
 W04[0x80069160]=0x3C600000|ha; W04[0x80069164]=0x38630000|(lo&0xFFFF)

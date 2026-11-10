@@ -105,6 +105,10 @@ int CrouchActive(void);
 static u8* target;
 static u8* victim;
 static int kill_k = -1;
+static f32 kill_f, prev_f;               /* takedown frame (motion frames, slowed) */
+#define TK_SPD_BASE 0.70f                 /* B69: the whole takedown at 70 % */
+#define TK_SPD_CUT  0.42f                 /*      and 42 % round the cut (26..50) */
+#define SEQ_SPEED(m) (*(f32*)((m) + 0x1D8 + 0xC0))       /* Motion.Seq_speed */
 static f32 take_f = -1.0f;
 static f32 g0x, g0z, ga, l0x, l0z, la, cam_w;
 static u16 pl_atari;
@@ -194,6 +198,7 @@ static void Blood(u8* pl, int big)
 static void KillEnd(u8* pl)
 {
     if (pl) ATARI_FLAG(pl) = pl_atari;
+    if (victim && victim[0xFC] == 2 && victim[0xFD] == 0x15) SEQ_SPEED(victim) = 1.0f;   /* its fall: normal */
     kill_k = -1; take_f = -1.0f; victim = 0;
 }
 
@@ -206,11 +211,18 @@ void StealthKillFrame(void)
         target = 0;
         kill_k++;
         if (!pl || !victim || (*(u32*)victim & 1) == 0) { KillEnd(pl); return; }
-        f = (f32)kill_k;
-        if (victim[0xFC] == 2 && victim[0xFD] == 0x15) {   /* in step with the Ganado's motion */
-            fr = SEQ_FRAME(victim);
-            if (fr > f - 4.0f && fr < f + 4.0f) f = fr;
+        /* B69: slower, slowest round the cut (the Ganado's Seq_speed, Leon follows its frame) */
+        {
+            f32 sp = TK_SPD_BASE - (TK_SPD_BASE - TK_SPD_CUT) * (Sm((kill_f - 26.0f) / 6.0f) - Sm((kill_f - 44.0f) / 6.0f));
+            if (victim[0xFC] == 2 && victim[0xFD] == 0x15) SEQ_SPEED(victim) = sp;
+            prev_f = kill_f;
+            kill_f += sp;
+            if (victim[0xFC] == 2 && victim[0xFD] == 0x15) {   /* in step with the Ganado's motion */
+                fr = SEQ_FRAME(victim);
+                if (fr > kill_f - 3.0f && fr < kill_f + 3.0f) kill_f = fr;
+            }
         }
+        f = kill_f;
         if (f >= (f32)(TK_N - 1)) { KillEnd(pl); return; }
         take_f = f;
         /* Leon's place: the clip's x / z in the Ganado's start frame */
@@ -228,12 +240,14 @@ void StealthKillFrame(void)
         SetMat(pl, wx, wz, *(f32*)(pl + 0xA4));
         ATARI_FLAG(pl) = pl_atari & ~0x300;
         ATARI_FLAG(victim) &= ~0x300;
-        if (kill_k == TK_STAB0) {                           /* the cut */
+#define CROSS(x) (prev_f < (f32)(x) && f >= (f32)(x))
+        if (CROSS(TK_STAB0)) {                              /* the cut */
             Vec v; PartPos(pl, 10, &v);
             SndCall(1, 0x51, (int)&v, 0, 0, 0);
         }
-        if (kill_k == TK_STAB0 + 2 || kill_k == TK_STAB0 + 4) Blood(pl, 0);   /* along the throat */
-        if (kill_k == TK_STAB) Blood(pl, 1);
+        if (CROSS(TK_STAB0 + 2) || CROSS(TK_STAB0 + 4)) Blood(pl, 0);   /* along the throat */
+        if (CROSS(TK_STAB)) Blood(pl, 1);
+#undef CROSS
         return;
     }
     target = 0;
@@ -257,7 +271,8 @@ int StealthPress(void)
     EM_BEFLG(e) &= ~(0x8000000u | 0x20u);
     *(u32*)(e + 0x3E4) = 0;                                /* Timer: plain MotionMove */
     e[0xFC] = 2; e[0xFD] = 0x15; e[0xFE] = 1; e[0xFF] = 0;
-    kill_k = TK_S0; take_f = (f32)TK_S0; target = 0;
+    kill_k = TK_S0; kill_f = prev_f = (f32)TK_S0; take_f = (f32)TK_S0; target = 0;
+    SEQ_SPEED(e) = TK_SPD_BASE;
     return 1;
 }
 /* pad.c, every frame of a takedown: the knife stays drawn (L) and nothing else gets through */
@@ -265,7 +280,7 @@ u32 StealthPad(u32 out)
 {
     if (kill_k < 0) return out;
     out &= PAD_START;
-    if (kill_k < TK_SHEATH + 2) out |= PAD_L;          /* until it is in the sheath */
+    if (kill_f < (f32)(TK_SHEATH + 2)) out |= PAD_L;  /* until it is in the sheath */
     return out;
 }
 
