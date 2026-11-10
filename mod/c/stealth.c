@@ -84,7 +84,10 @@ void StealthFrame(void)
  * the Ganado is left with 1 HP so that slash kills it. Visually Leon stabs (crouch.c CR_STAB). */
 #define KILL_R    1500.0f
 #define KILL_N    48                    /* frames the sequence drives the pad */
-#define EM_ALIVE  (*(u8**)((u8*)EmMgr + 0x10))
+/* the enemy manager (pArray +0, count +4, work size +8): 0x80283160 in PAL - the one the game's
+ * own target list (GetWepTargetList, 0x800CF030) walks. be_flag bit0 = in use, bit5 = targetable,
+ * id +0x100 (> 0xF: enemies), HP s16 +0x320 */
+#define EM_MGR ((u8*)0x80283160)
 int CrouchActive(void);
 static u8* target;
 static int kill_k = -1;
@@ -95,17 +98,19 @@ static int dg[4];                          /* diagnostics (hud.c DiagDraw while 
 int StealthDiag(int i) { if (i < 0) return CrouchActive() ? 1 : 0; return dg[i]; }
 static u8* FindTarget(u8* pl)
 {
-    u8* arr = *(u8**)((u8*)EmMgr + 0x00);
-    u32 cnt = *(u32*)((u8*)EmMgr + 0x04), sz = *(u32*)((u8*)EmMgr + 0x08), i;
+    u8* arr = *(u8**)(EM_MGR + 0x00);
+    u32 cnt = *(u32*)(EM_MGR + 0x04), sz = *(u32*)(EM_MGR + 0x08), i;
     u8* best = 0;
     f32 bd = KILL_R * KILL_R, nd = 1e12f, ndot = 0.0f;
     f32 px = *(f32*)(pl + 0x94), py = *(f32*)(pl + 0x98), pz = *(f32*)(pl + 0x9C);
     dg[0] = dg[1] = 0; dg[2] = 9999; dg[3] = 0;
-    if ((u32)arr < 0x80000000u || (u32)arr >= 0x81800000u || cnt > 256 || sz < 0x400 || sz > 0x4000) return 0;
+    if ((u32)arr < 0x80000000u || (u32)arr >= 0x81800000u || cnt > 1024 || sz < 0x320 || sz > 0x40000) {
+        dg[2] = (int)cnt; dg[3] = (int)(sz >> 4); return 0;   /* (diagnostic: what was read) */
+    }
     for (i = 0; i < cnt; i++) {
         u8* e = arr + i * sz;
         f32 dx, dy, dz, d2, fx, fz, l, dot;
-        if (!(*(u32*)e & 1)) continue;
+        if ((*(u32*)e & 0x21) != 0x21) continue;
         dg[0]++;
         if (e[0x100] < 0x10 || e[0x100] > 0x20) continue;            /* Ganados only */
         if (*(s16*)(e + 0x320) <= 0) continue;

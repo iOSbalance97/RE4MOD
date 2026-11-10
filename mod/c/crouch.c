@@ -226,7 +226,10 @@ void CrouchFrame(void)
     {   /* crouched knife: the remake's low slash on each slash */
         static int r2_prev;
         int r2 = pl[0xFD] == 0xB ? pl[0xFE] : -1;
-        if (want && r2 == 2 && r2_prev != 2 && shot < 0) { shot = CR_SLASH; shot_f = 0.0f; sxf = 0.0f; }
+        if (want && r2 == 2 && r2_prev != 2 && (shot < 0 || shot == CR_SLASH)) {   /* also chained slashes */
+            sxf = shot == CR_SLASH ? 0.5f : 0.0f;
+            shot = CR_SLASH; shot_f = 0.0f;
+        }
         if (shot == CR_SLASH) full = 1;
         r2_prev = r2;
     }
