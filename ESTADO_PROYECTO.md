@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B62** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B63** (10-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -96,7 +96,7 @@ Reglas de trabajo del usuario:
      frame (x/z del clip en el marco inicial del ganado), colisión con personajes desactivada.
      Hoja del cuchillo supuesta en el +z local de la mano (lado del pulgar): **comprobar en vídeo**.
    - Sangre (EstSet 0x80105A90, EFF_CORE 0/1/2) en la punta en el 35 y al sacarlo; sonido 0x51.
-   - Cámara (hook 0x800BDB00 en CameraQuasiFPS::hitCheck → StealthCam; los puntos de QFPS_OFFSET están en el espacio de la matriz m = r3, B61 los convierte; B62: punto cercano al 80 % hacia el ojo para que el rayo de colisión no choque con León y el ganado): se acerca por el lado
+   - Cámara (hook 0x800BDB00 en CameraQuasiFPS::hitCheck → StealthCam; hitCheck es miembro: r3 = this, r4 = m, r5 = QFPS_OFFSET; los puntos están en el espacio de m (B63: B61/B62 usaban r3 por error, cámara en el suelo); B62: punto cercano al 80 % hacia el ojo para que el rayo de colisión no choque con León y el ganado): se acerca por el lado
      derecho, algo adelantada, y vuelve a la normal entre los frames 70 y 96.
    - Diagnóstico de números quitado.
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a

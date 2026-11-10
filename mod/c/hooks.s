@@ -154,7 +154,8 @@ hook_aimcam:
     lwz   r3,1928(r30)        # original instruction
     b     ret_aimcam
 
-# CameraQuasiFPS::hitCheck (0x800BDB00, after the prologue; c12.s ran at the entry): r5 = QFPS_OFFSET
+# CameraQuasiFPS::hitCheck(this, Mtx m, QFPS_OFFSET* ofs, out) (0x800BDB00, after the prologue; c12.s ran at
+# the entry): r4 = m, r5 = QFPS_OFFSET
 # (eye, close point, target, fovy). StealthCam (stealth.c) moves it for the takedown.
     .globl hook_cam
 hook_cam:
@@ -169,8 +170,8 @@ hook_cam:
     stw   r8,28(r1)
     stfs  f1,32(r1)
     stfs  f2,36(r1)
-    mr    r4,r3               # m: the offsets are in its space
-    mr    r3,r5
+    mr    r3,r5               # r4 = m (r3 is `this`: hitCheck is a member) - the offsets are in m's space
+
     bl    StealthCam
     lwz   r3,8(r1)
     lwz   r4,12(r1)
