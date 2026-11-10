@@ -77,6 +77,57 @@ def two_bone(S, T, la, lb, pole):
 # ---------------------------------------------------------------- the Ganado (game motion)
 arc = load_arc(EM10)
 mot, seq = entry(arc, MOT), entry(arc, SEQ)
+
+# ---- edits to the Ganado's data (B64)
+# 1) the neck break twists the head ~80-200 deg (frames 40-84): the head and neck keys are replaced
+#    there by a limp head (sags forward, a little to the side), blended in and out.
+def patch_rot(m, part, fn):
+    m = bytearray(m)
+    mf = struct.unpack('>H', m[0:2])[0] & 0x3fff; n = m[2]
+    kinds = struct.unpack('>%dH' % n, m[3:3 + 2 * n]); nos = list(m[3 + 2 * n:3 + 3 * n])
+    t = (3 + 3 * n + 3) & ~3; t += 4
+    offs = struct.unpack('>%dI' % n, m[t:t + 4 * n])
+    from mot import KSIZE, key
+    for i in range(n):
+        if nos[i] != part or (kinds[i] & 0xff) != 2: continue
+        fmt = kinds[i] >> 12; p = offs[i]
+        assert fmt in (0, 5), fmt
+        for ax in range(3):
+            k = struct.unpack('>H', m[p:p + 2])[0]
+            fr = struct.unpack('>%dH' % k, m[p + 2:p + 2 + 2 * k]); d0 = p + 2 + 2 * k
+            old = [key(fmt, bytes(m[d0:]), j) for j in range(k)]
+            for j in range(k):
+                f = fr[j]
+                g = lambda x: fn(ax, x, old, fr)
+                v = g(f); sl = g(f + 0.5) - g(f - 0.5)
+                tin = sl * (f - fr[j - 1]) if j > 0 else 0.0
+                tout = sl * (fr[j + 1] - f) if j + 1 < k else 0.0
+                o = d0 + j * KSIZE[fmt]
+                if fmt == 0: m[o:o + 12] = struct.pack('>fff', v, tin, tout)
+                else:
+                    c = lambda x: max(-32767, min(32767, int(round(x * 10000))))
+                    m[o:o + 6] = struct.pack('>hhh', c(v), c(tin), c(tout))
+            p = d0 + KSIZE[fmt] * k
+    return bytes(m)
+def herm_old(old, fr, f):
+    from mot import sample
+    return sample([(fr[j],) + tuple(old[j]) for j in range(len(fr))], f)
+def limp(target, axes):
+    def fn(ax, f, old, fr):
+        o = herm_old(old, fr, f)
+        if ax not in axes: return o
+        w = ramp(f, 33, 40) * (1 - ramp(f, 84, 94))
+        return o * (1 - w) + target[ax] * w
+    return fn
+mot = patch_rot(mot, 4, limp([0.35, 0.15, -0.15], (0, 1, 2)))
+mot = patch_rot(mot, 3, limp([0.0, 0.15, 0.08], (1, 2)))
+# 2) the 'neck' event (Free 0x11: death voice, weapon dropped, score) moves from frame 37 to 9, so
+#    a pitchfork / axe falls when Leon grabs instead of going through him
+seq = bytearray(seq)
+def seq_ent(f): return 4 + 4 * f
+assert struct.unpack('>H', seq[seq_ent(37):seq_ent(37) + 2])[0] == 37 << 6 and seq[seq_ent(37) + 3] == 0x11
+seq[seq_ent(37) + 3] = 0; seq[seq_ent(9) + 3] |= 0x11
+seq = bytes(seq)
 MF, CH = parse(mot)
 DISP = [c for c in CH if c['no'] == 0 and c['kind'] == 1][0]
 def ganado(f):
@@ -121,7 +172,7 @@ F_OUT = (49, 58)  # knife pulled out
 F_REL = (74, 86)  # lets the body go (it falls forward from ~80)
 F_END = 100       # back in the crouch idle
 NF = F_END + 1
-KNIFE = 200.0     # wrist -> blade tip
+KNIFE = 330.0     # wrist -> blade tip (the game's knife is long: B63 video)
 
 # Leon root follows the Ganado's neck while he holds it
 def neck_track(f):
@@ -214,9 +265,9 @@ def leon(f):
     def knife_hand(d, fingers):
         return frame([0, 0, 1], d, [-1, 0, 0], fingers)
     neck_c = gP[3] + gR[3] @ np.array([0.0, 25.0, 15.0])
-    d_stab = nrm(gR[3] @ np.array([1.0, 0.12, 0.30]))                  # leftwards into the neck
+    d_stab = nrm(gR[3] @ np.array([0.62, -0.22, 0.75]))                # forwards-left into the side of the neck
     surf = neck_c - d_stab * 55.0                                        # its right side
-    wrist_hit = surf + d_stab * 60.0 - d_stab * KNIFE
+    wrist_hit = surf + d_stab * 45.0 - d_stab * KNIFE
     hand_hit = knife_hand(d_stab, [0, -0.3, 1])
     cock = P[2] + Rh @ np.array([-330.0, 160.0, -40.0])
     hand_cock = knife_hand(nrm([0.55, 0.45, 0.70]), [0.2, 0.2, 1])

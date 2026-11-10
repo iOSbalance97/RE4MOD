@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B63** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B64** (10-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -99,6 +99,12 @@ Reglas de trabajo del usuario:
    - Cámara (hook 0x800BDB00 en CameraQuasiFPS::hitCheck → StealthCam; hitCheck es miembro: r3 = this, r4 = m, r5 = QFPS_OFFSET; los puntos están en el espacio de m (B63: B61/B62 usaban r3 por error, cámara en el suelo); B62: punto cercano al 80 % hacia el ojo para que el rayo de colisión no choque con León y el ganado): se acerca por el lado
      derecho, algo adelantada, y vuelve a la normal entre los frames 70 y 96.
    - Diagnóstico de números quitado.
+   - B63 (vídeo): ya se ve; fallos: cuello retorcido (la rotura de cuello gira la cabeza 80–200°),
+     cámara pegada, horca atravesando a León, hoja pasando por delante del cuello.
+   - B64: mktake.py edita la copia del movimiento (cabeza/cuello 3–4 sin giro entre 33 y 94: cabeza
+     caída), adelanta el evento 0x11 de la secuencia del frame 37 al 9 (suelta el arma al agarrar),
+     cuchillo 330 de muñeca a punta y estocada hacia delante-izquierda; cámara a ~1,8 m, punto
+     cercano a 65 cm del objetivo, entrada en 16 frames.
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.

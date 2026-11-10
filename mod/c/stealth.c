@@ -286,7 +286,7 @@ void StealthCam(f32* q, const f32* m)
     f32 f = take_f, w, tx, ty, tz, ex, ey, ez, s, c, ox, oz, k, e[3], tg[3];
     u8* pl = pPL;
     if (kill_k < 0 || !pl || !victim) { cam_w = 0.0f; return; }
-    w = Sm(f / 12.0f) * (1.0f - Sm((f - 70.0f) / 26.0f));
+    w = Sm(f / 16.0f) * (1.0f - Sm((f - 70.0f) / 26.0f));
     if (w <= 0.0f) return;
     s = SinA(ga); c = CosA(ga);
     /* target: between Leon and the Ganado, at neck height */
@@ -294,22 +294,24 @@ void StealthCam(f32* q, const f32* m)
     tz = (*(f32*)(pl + 0x9C) + *(f32*)(victim + 0x9C)) * 0.5f;
     ty = *(f32*)(pl + 0x98) + 1250.0f;
     /* eye: right side (-x of the Ganado's frame), a bit ahead, slowly closing in */
-    k = 1.0f - 0.18f * Sm((f - 10.0f) / 50.0f);
-    ox = -950.0f * k; oz = 420.0f * k;
+    k = 1.0f - 0.12f * Sm((f - 10.0f) / 50.0f);
+    ox = -1750.0f * k; oz = 600.0f * k;               /* B64: about 1.8 m (B63's 1 m filled the screen) */
     ex = tx + ox * c + oz * s;
     ez = tz - ox * s + oz * c;
-    ey = ty + 120.0f;
+    ey = ty + 150.0f;
     ToLocal(m, ex, ey, ez, e);
     ToLocal(m, tx, ty, tz, tg);
     q[0] += (e[0] - q[0]) * w; q[1] += (e[1] - q[1]) * w; q[2] += (e[2] - q[2]) * w;
     /* close point (where hitCheck's ray starts) near the eye: the ray from the target crossed Leon
        and the Ganado and pulled the camera into them (B61) - now only the scenery right behind the
        eye can pull it in */
-    {
-        f32 cp0 = tg[0] + (e[0] - tg[0]) * 0.8f, cp1 = tg[1] + (e[1] - tg[1]) * 0.8f, cp2 = tg[2] + (e[2] - tg[2]) * 0.8f;
+    {   /* 0.65 m out from the target: clear of the two bodies, walls further out still pull it in */
+        f32 dx = e[0] - tg[0], dy = e[1] - tg[1], dz = e[2] - tg[2], r = SQRTF(dx * dx + dy * dy + dz * dz);
+        f32 u = r > 650.0f ? 650.0f / r : 1.0f;
+        f32 cp0 = tg[0] + dx * u, cp1 = tg[1] + dy * u, cp2 = tg[2] + dz * u;
         q[3] += (cp0 - q[3]) * w; q[4] += (cp1 - q[4]) * w; q[5] += (cp2 - q[5]) * w;
     }
     q[6] += (tg[0] - q[6]) * w; q[7] += (tg[1] - q[7]) * w; q[8] += (tg[2] - q[8]) * w;
-    q[10] *= 1.0f - 0.12f * w;
+    q[10] *= 1.0f - 0.05f * w;
     cam_w = w;
 }
