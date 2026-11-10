@@ -158,6 +158,22 @@ static Q LQ(f32* l)
     return MtxQ(m);
 }
 
+/* the takedown draws the knife smaller (TK_KNIFE_K): every part of the weapon model scaled about
+ * its first part (the grip), after it has been put back in the hand */
+static void KnifeScale(u8* mm, f32 k)
+{
+    u8* p = *(u8**)(mm + 0xF4);
+    f32* r = (f32*)(p + 0x0C);
+    f32 ox = r[3], oy = r[7], oz = r[11];
+    int n = 0, i;
+    while (p && (u32)p >= 0x80000000u && (u32)p < 0x81800000u && n++ < 32) {
+        f32* w = (f32*)(p + 0x0C);
+        for (i = 0; i < 3; i++) { w[i * 4] *= k; w[i * 4 + 1] *= k; w[i * 4 + 2] *= k; }
+        w[3] = ox + (w[3] - ox) * k; w[7] = oy + (w[7] - oy) * k; w[11] = oz + (w[11] - oz) * k;
+        p = *(u8**)(p + 0xF4);
+    }
+}
+
 static void Apply(u8* pl)
 {
     static const Q ident = { 1.0f, 0.0f, 0.0f, 0.0f };
@@ -187,8 +203,10 @@ static void Apply(u8* pl)
     {   /* re-attach whatever is in the hand (gun / knife) to the moved hand */
         u8* wep = *(u8**)(pl + 0x788);
         u8* mm = wep ? *(u8**)(wep + 0x34) : 0;
-        if (!SwapLock() && mm && *(u32*)(mm + 0xF4) >= 0x80000000u && *(u32*)(mm + 0xF4) < 0x81800000u)
+        if (!SwapLock() && mm && *(u32*)(mm + 0xF4) >= 0x80000000u && *(u32*)(mm + 0xF4) < 0x81800000u) {
             partsWorldCalc(mm);
+            if (shot == CR_TAKE && pl[0xFD] == 0xB) KnifeScale(mm, TK_KNIFE_K);
+        }
     }
 }
 

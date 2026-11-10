@@ -299,19 +299,33 @@ void StealthCam(f32* q, const f32* m)
     ex = tx + ox * c + oz * s;
     ez = tz - ox * s + oz * c;
     ey = ty + 150.0f;
-    ToLocal(m, ex, ey, ez, e);
-    ToLocal(m, tx, ty, tz, tg);
-    q[0] += (e[0] - q[0]) * w; q[1] += (e[1] - q[1]) * w; q[2] += (e[2] - q[2]) * w;
-    /* close point (where hitCheck's ray starts) near the eye: the ray from the target crossed Leon
-       and the Ganado and pulled the camera into them (B61) - now only the scenery right behind the
-       eye can pull it in */
-    {   /* 0.65 m out from the target: clear of the two bodies, walls further out still pull it in */
+    {   /* B65: blend in world space along an orbit round the target (the straight blend went
+           through Leon's back), then into m's space */
+        f32 g0x_ = m[0] * q[0] + m[1] * q[1] + m[2] * q[2] + m[3];
+        f32 g0y_ = m[4] * q[0] + m[5] * q[1] + m[6] * q[2] + m[7];
+        f32 g0z_ = m[8] * q[0] + m[9] * q[1] + m[10] * q[2] + m[11];
+        f32 gtx = m[0] * q[6] + m[1] * q[7] + m[2] * q[8] + m[3];
+        f32 gty = m[4] * q[6] + m[5] * q[7] + m[6] * q[8] + m[7];
+        f32 gtz = m[8] * q[6] + m[9] * q[7] + m[10] * q[8] + m[11];
+        f32 ax = g0x_ - gtx, az = g0z_ - gtz, bx = ex - tx, bz = ez - tz;
+        f32 da = SQRTF(ax * ax + az * az), db = SQRTF(bx * bx + bz * bz);
+        f32 aa = atan2f_(ax, az), ab = atan2f_(bx, bz), an, d, h, wx, wy, wz;
+        wx = gtx + (tx - gtx) * w; wy = gty + (ty - gty) * w; wz = gtz + (tz - gtz) * w;   /* target */
+        an = aa + Wrap(ab - aa) * w;
+        d = da + (db - da) * w;
+        h = (g0y_ - gty) + ((ey - ty) - (g0y_ - gty)) * w;
+        ToLocal(m, wx, wy, wz, tg);
+        ToLocal(m, wx + SinA(an) * d, wy + h, wz + CosA(an) * d, e);
+    }
+    q[0] = e[0]; q[1] = e[1]; q[2] = e[2];
+    q[6] = tg[0]; q[7] = tg[1]; q[8] = tg[2];
+    {   /* close point (hitCheck's ray start) 0.65 m out from the target, clear of the two bodies (B61
+           pulled the camera into them); walls further out still pull it in */
         f32 dx = e[0] - tg[0], dy = e[1] - tg[1], dz = e[2] - tg[2], r = SQRTF(dx * dx + dy * dy + dz * dz);
         f32 u = r > 650.0f ? 650.0f / r : 1.0f;
         f32 cp0 = tg[0] + dx * u, cp1 = tg[1] + dy * u, cp2 = tg[2] + dz * u;
         q[3] += (cp0 - q[3]) * w; q[4] += (cp1 - q[4]) * w; q[5] += (cp2 - q[5]) * w;
     }
-    q[6] += (tg[0] - q[6]) * w; q[7] += (tg[1] - q[7]) * w; q[8] += (tg[2] - q[8]) * w;
     q[10] *= 1.0f - 0.05f * w;
     cam_w = w;
 }
