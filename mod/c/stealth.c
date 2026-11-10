@@ -271,11 +271,19 @@ u32 StealthPad(u32 out)
 }
 
 /* Camera (hook in CameraQuasiFPS::hitCheck, after c12.s): q = QFPS_OFFSET (eye +0, close point +0xC,
- * target +0x18, fovy +0x28). During a takedown it moves in close at the right side of the two,
+ * target +0x18, fovy +0x28), all in the space of m (hitCheck's first argument: the camera base on
+ * Leon), so the world points below are taken into it (m is a rotation + translation). During a takedown it moves in close at the right side of the two,
  * a little ahead (the knife hand and the Ganado's face in view), and eases back at the end. */
-void StealthCam(f32* q)
+static void ToLocal(const f32* m, f32 x, f32 y, f32 z, f32* o)
 {
-    f32 f = take_f, w, tx, ty, tz, ex, ey, ez, s, c, ox, oz, k;
+    x -= m[3]; y -= m[7]; z -= m[11];
+    o[0] = m[0] * x + m[4] * y + m[8] * z;
+    o[1] = m[1] * x + m[5] * y + m[9] * z;
+    o[2] = m[2] * x + m[6] * y + m[10] * z;
+}
+void StealthCam(f32* q, const f32* m)
+{
+    f32 f = take_f, w, tx, ty, tz, ex, ey, ez, s, c, ox, oz, k, e[3], tg[3];
     u8* pl = pPL;
     if (kill_k < 0 || !pl || !victim) { cam_w = 0.0f; return; }
     w = Sm(f / 12.0f) * (1.0f - Sm((f - 70.0f) / 26.0f));
@@ -291,9 +299,11 @@ void StealthCam(f32* q)
     ex = tx + ox * c + oz * s;
     ez = tz - ox * s + oz * c;
     ey = ty + 120.0f;
-    q[0] += (ex - q[0]) * w; q[1] += (ey - q[1]) * w; q[2] += (ez - q[2]) * w;
-    q[3] += (tx - q[3]) * w; q[4] += (ty - q[4]) * w; q[5] += (tz - q[5]) * w;
-    q[6] += (tx - q[6]) * w; q[7] += (ty - q[7]) * w; q[8] += (tz - q[8]) * w;
+    ToLocal(m, ex, ey, ez, e);
+    ToLocal(m, tx, ty, tz, tg);
+    q[0] += (e[0] - q[0]) * w; q[1] += (e[1] - q[1]) * w; q[2] += (e[2] - q[2]) * w;
+    q[3] += (tg[0] - q[3]) * w; q[4] += (tg[1] - q[4]) * w; q[5] += (tg[2] - q[5]) * w;
+    q[6] += (tg[0] - q[6]) * w; q[7] += (tg[1] - q[7]) * w; q[8] += (tg[2] - q[8]) * w;
     q[10] *= 1.0f - 0.12f * w;
     cam_w = w;
 }

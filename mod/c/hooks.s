@@ -169,6 +169,7 @@ hook_cam:
     stw   r8,28(r1)
     stfs  f1,32(r1)
     stfs  f2,36(r1)
+    mr    r4,r3               # m: the offsets are in its space
     mr    r3,r5
     bl    StealthCam
     lwz   r3,8(r1)
