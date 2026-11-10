@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B67** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B68** (10-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -119,6 +119,18 @@ Reglas de trabajo del usuario:
      para que la estocada caiga en la parte trasera-derecha del cuello; tiempo 3→0, 30→10, 35→15,
      49→26, 58→37; giro del pecho del clip al 15 %. Para que haya sitio, León se queda a 36 cm
      (antes 20) y la mano izquierda va a la frente (no a la boca). Cuchillo al 66 %.
+   - B67 (vídeo): "muy raro" (brazo rígido, cuchillo, sin unión con el ganado).
+   - **B68: León = la mitad de HUNK de la rotura de cuello** (em10.drs juego 0x2B9 = arc.py 0x2B5,
+     77 frames, brazos FK / piernas IK; EmCatchPLSet: ganado a (−75.21, 0, 1076.1) delante de HUNK y
+     girado 180°). Se reproduce **en espejo** (izq↔der) para que la mano derecha (cuchillo) vaya
+     a la garganta y la izquierda a la nuca (IK para corregir el espejo), y en vez de girar el
+     cuello **raja la garganta** (frames 33–39, sangre ×3). El ganado arranca su movimiento en el
+     frame 18 (MotionSetCore frame = TK_S0; evento 0x11 movido al 19). León queda al lado derecho
+     del ganado mirando de través (TK_YAW ≈ +85°); de 56 a 92 baja a agachado, funda 66–78,
+     pies corregidos contra el suelo. Cámara al lado izquierdo-delante del ganado.
+     mktake_ik.py = versión anterior (IK/Mixamo) por si se quiere volver.
+   - **B68: sin bandas negras**: SetScissorState (0x8012641C) siempre sin tijera (0x80126434 → b),
+     filtros 09/0b a pantalla completa (0x80117A90/94, 0x80190708/0C).
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.

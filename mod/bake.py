@@ -98,7 +98,11 @@ W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x8014700
      0x80146E04:0x38000000,0x80146EA0:0x38000000,0x80146FD8:0x38000000,0x80147070:0x38000000,0x80147104:0x38000000,
      0x80146D8C:0xC0091FA8,0x800BCD5C:0x813E0788,0x800BCD64:0xC0090030,0x80157A20:0x60000000,0x80157A2C:0x48000060,
      0x8003EB68:0x60000000,   # no laser dot on enemies (reticle instead)
-     0x80146F48:0x48000010}   # aim pitch: up as fast as down (no 0.8 when aiming upwards)
+     0x80146F48:0x48000010,   # aim pitch: up as fast as down (no 0.8 when aiming upwards)
+     # B68: no letterbox. SetScissorState (0x8012641C) always takes the no-scissor branch, and the two
+     # screen filters (09 / 0b) draw full height instead of the band y 56, h - 111
+     0x80126434:0x480000A0,
+     0x80117A90:0x38C60000,0x80117A94:0x38800000,0x80190708:0x38C60000,0x8019070C:0x38800000}
 # __ArenaLo: lis r3,hi / addi r3,r3,lo at both sites
 ha=(END+0x8000)>>16; lo=END-(ha<<16)
 W04[0x80069160]=0x3C600000|ha; W04[0x80069164]=0x38630000|(lo&0xFFFF)

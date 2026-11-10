@@ -175,41 +175,6 @@ static void KnifeScale(u8* mm, f32 k)
         p = *(u8**)(p + 0xF4);
     }
 }
-/* the blade going into the neck (B66): the knife is squashed along its blade (hand +z, the thumb
- * side) so that its tip stays inside the Ganado's neck instead of coming out the other side */
-static void KnifeInto(u8* pl, u8* mm)
-{
-    u8* em = StealthVictim();
-    u8* p = *(u8**)(mm + 0xF4);
-    f32* h = (f32*)((u8*)getPartsPtr(pl, 10) + 0x0C);
-    f32* nk;
-    f32 dx = h[2], dy = h[6], dz = h[10], l, ox, oy, oz, t, s, a[3][3];
-    int n = 0, i, j;
-    if (!em || !p) return;
-    nk = (f32*)((u8*)getPartsPtr(em, 3) + 0x0C);
-    l = SQRTF(dx * dx + dy * dy + dz * dz); if (l < 0.01f) return;
-    dx /= l; dy /= l; dz /= l;
-    ox = ((f32*)(p + 0x0C))[3]; oy = ((f32*)(p + 0x0C))[7]; oz = ((f32*)(p + 0x0C))[11];
-    t = (nk[3] - ox) * dx + (nk[7] + 60.0f - oy) * dy + (nk[11] - oz) * dz;   /* to the neck's middle */
-    s = t / TK_KNIFE;
-    if (s >= 1.0f) return;
-    if (s < 0.3f) s = 0.3f;
-    /* S = I + (s - 1) d d^T */
-    {
-        f32 d[3] = { dx, dy, dz };
-        for (i = 0; i < 3; i++) for (j = 0; j < 3; j++) a[i][j] = (i == j ? 1.0f : 0.0f) + (s - 1.0f) * d[i] * d[j];
-    }
-    while (p && (u32)p >= 0x80000000u && (u32)p < 0x81800000u && n++ < 32) {
-        f32* w = (f32*)(p + 0x0C);
-        f32 r[3][4];
-        for (i = 0; i < 3; i++) for (j = 0; j < 4; j++) r[i][j] = w[i * 4 + j];
-        r[0][3] -= ox; r[1][3] -= oy; r[2][3] -= oz;
-        for (i = 0; i < 3; i++) for (j = 0; j < 4; j++) w[i * 4 + j] = a[i][0] * r[0][j] + a[i][1] * r[1][j] + a[i][2] * r[2][j];
-        w[3] += ox; w[7] += oy; w[11] += oz;
-        p = *(u8**)(p + 0xF4);
-    }
-}
-
 static void Apply(u8* pl)
 {
     static const Q ident = { 1.0f, 0.0f, 0.0f, 0.0f };
@@ -243,7 +208,6 @@ static void Apply(u8* pl)
             partsWorldCalc(mm);
             if (shot == CR_TAKE && pl[0xFD] == 0xB) {
                 KnifeScale(mm, shot_f >= (f32)TK_SHEATH ? 0.0f : TK_KNIFE_K);   /* sheathed: gone */
-                if (shot_f >= (f32)(TK_STAB0 + 3) && shot_f < (f32)(TK_OUT + 6)) KnifeInto(pl, mm);
             } else if (knife_hide && pl[0xFD] == 0xB) KnifeScale(mm, 0.0f);
         }
     }

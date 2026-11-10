@@ -220,20 +220,20 @@ void StealthKillFrame(void)
         s = SinA(ga); c = CosA(ga);
         wx = g0x + x * c + z * s;
         wz = g0z - x * s + z * c;
-        t = Sm(f / (f32)TK_IN);                                  /* from where he stood */
+        t = Sm((f - (f32)TK_S0) / (f32)(TK_IN - TK_S0));        /* from where he stood */
         wx = l0x + (wx - l0x) * t;
         wz = l0z + (wz - l0z) * t;
         *(f32*)(pl + 0x94) = wx; *(f32*)(pl + 0x9C) = wz;
-        *(f32*)(pl + 0xA4) = Wrap(la + Wrap(ga - la) * Sm(f / 6.0f));
+        *(f32*)(pl + 0xA4) = Wrap(la + Wrap(ga + TK_YAW - la) * Sm((f - (f32)TK_S0) / 6.0f));   /* across its back */
         SetMat(pl, wx, wz, *(f32*)(pl + 0xA4));
         ATARI_FLAG(pl) = pl_atari & ~0x300;
         ATARI_FLAG(victim) &= ~0x300;
-        if (kill_k == TK_STAB0) {                           /* the swing */
+        if (kill_k == TK_STAB0) {                           /* the cut */
             Vec v; PartPos(pl, 10, &v);
             SndCall(1, 0x51, (int)&v, 0, 0, 0);
         }
-        if (kill_k == TK_STAB) Blood(pl, 0);
-        if (kill_k == TK_OUT + 2) Blood(pl, 1);
+        if (kill_k == TK_STAB0 + 2 || kill_k == TK_STAB0 + 4) Blood(pl, 0);   /* along the throat */
+        if (kill_k == TK_STAB) Blood(pl, 1);
         return;
     }
     target = 0;
@@ -252,12 +252,12 @@ int StealthPress(void)
     l0x = *(f32*)(pl + 0x94); l0z = *(f32*)(pl + 0x9C); la = *(f32*)(pl + 0xA4);
     pl_atari = ATARI_FLAG(pl);
     /* the Ganado: Dm_NeckBreak from its step 1 (step 0 would also start HUNK's half on Leon) */
-    MotionSetCore(e, e + 0x1D8, (void*)tk_em_mot, (void*)tk_em_seq, 6, 1, 0);
+    MotionSetCore(e, e + 0x1D8, (void*)tk_em_mot, (void*)tk_em_seq, 6, 1, TK_S0);   /* held from TK_S0 */
     *(s16*)(e + 0x320) = 0;
     EM_BEFLG(e) &= ~(0x8000000u | 0x20u);
     *(u32*)(e + 0x3E4) = 0;                                /* Timer: plain MotionMove */
     e[0xFC] = 2; e[0xFD] = 0x15; e[0xFE] = 1; e[0xFF] = 0;
-    kill_k = 0; take_f = 0.0f; target = 0;
+    kill_k = TK_S0; take_f = (f32)TK_S0; target = 0;
     return 1;
 }
 /* pad.c, every frame of a takedown: the knife stays drawn (L) and nothing else gets through */
@@ -285,16 +285,16 @@ void StealthCam(f32* q, const f32* m)
     f32 f = take_f, w, tx, ty, tz, ex, ey, ez, s, c, ox, oz, k, e[3], tg[3];
     u8* pl = pPL;
     if (kill_k < 0 || !pl || !victim) { cam_w = 0.0f; return; }
-    w = Sm(f / 16.0f) * (1.0f - Sm((f - 70.0f) / 26.0f));
+    w = Sm((f - (f32)TK_S0) / 16.0f) * (1.0f - Sm((f - 60.0f) / 24.0f));
     if (w <= 0.0f) return;
     s = SinA(ga); c = CosA(ga);
     /* target: between Leon and the Ganado, at neck height */
-    tx = (*(f32*)(pl + 0x94) + *(f32*)(victim + 0x94)) * 0.5f;
-    tz = (*(f32*)(pl + 0x9C) + *(f32*)(victim + 0x9C)) * 0.5f;
+    tx = *(f32*)(pl + 0x94) * 0.4f + *(f32*)(victim + 0x94) * 0.6f;
+    tz = *(f32*)(pl + 0x9C) * 0.4f + *(f32*)(victim + 0x9C) * 0.6f;
     ty = *(f32*)(pl + 0x98) + 1250.0f;
-    /* eye: right side (-x of the Ganado's frame), a bit ahead, slowly closing in */
+    /* eye: the Ganado's left front (+x, +z of its frame), slowly closing in */
     k = 1.0f - 0.12f * Sm((f - 10.0f) / 50.0f);
-    ox = -1750.0f * k; oz = 600.0f * k;               /* B64: about 1.8 m (B63's 1 m filled the screen) */
+    ox = 1500.0f * k; oz = 900.0f * k;                /* B68: its left front (Leon is at its right) */
     ex = tx + ox * c + oz * s;
     ez = tz - ox * s + oz * c;
     ey = ty + 150.0f;

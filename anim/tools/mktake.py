@@ -127,11 +127,11 @@ def limp(target, axes):
 mot = patch_rot(mot, 4, limp([0.35, 0.15, -0.15], (0, 1, 2)))
 mot = patch_rot(mot, 3, limp([0.0, 0.15, 0.08], (1, 2)))
 # 2) the 'neck' event (Free 0x11: death voice, weapon dropped, score) moves from frame 37 to 9, so
-#    a pitchfork / axe falls when Leon grabs instead of going through him
+#    a pitchfork / axe falls when Leon grabs instead of going through him (B68: 19, the first frame played)
 seq = bytearray(seq)
 def seq_ent(f): return 4 + 4 * f
 assert struct.unpack('>H', seq[seq_ent(37):seq_ent(37) + 2])[0] == 37 << 6 and seq[seq_ent(37) + 3] == 0x11
-seq[seq_ent(37) + 3] = 0; seq[seq_ent(9) + 3] |= 0x11
+seq[seq_ent(37) + 3] = 0; seq[seq_ent(19) + 3] |= 0x11     # B68: the motion starts at 18
 seq = bytes(seq)
 MF, CH = parse(mot)
 DISP = [c for c in CH if c['no'] == 0 and c['kind'] == 1][0]
@@ -169,215 +169,194 @@ def load_idle():
     return L, float(y0)
 IDLE_L, IDLE_Y = load_idle()
 
-# ---------------------------------------------------------------- the knife arm from Mixamo (B67)
-# 'Stabbing' (anim/mixamo/crouch/Stabbing_takedown.fbx, 30 fps): wind-up by the ear, straight thrust,
-# hold, pull back. Its hand path and elbow (in the chest frame, from the shoulder) drive Leon's knife
-# arm, turned and scaled so that the thrust lands on the Ganado's neck; its chest turn is added at
-# half strength. Time map (our frame -> its frame):
-from conv import convert
-MX = convert('/home/claude/re4mod/anim/mixamo/crouch/Stabbing_takedown.fbx', fps=30, inplace=False)
-MX_T = [(0, 0.0), (3, 0.0), (30, 10.0), (35, 15.0), (49, 26.0), (58, 37.0)]
-MX_PEAK = 15.0
-MX_CHEST = 0.15
-def mx_t(f):
-    if f <= MX_T[0][0]: return MX_T[0][1]
-    for (a, x), (b, y) in zip(MX_T, MX_T[1:]):
-        if f <= b: return x + (y - x) * (f - a) / float(b - a)
-    return MX_T[-1][1]
-def mx_at(t):
-    i = int(t); u = t - i; j = min(i + 1, len(MX) - 1)
-    def g(k):
-        v, R, P = MX[k]
-        C = R[2].T
-        return C @ (P[10] - P[7]), C @ (P[8] - P[7]), R[2]
-    h0, e0, r0 = g(i); h1, e1, r1 = g(j)
-    return h0 * (1 - u) + h1 * u, e0 * (1 - u) + e1 * u, slerpR(r0, r1, u)
-MX_R20 = MX[0][1][2]
+# ---------------------------------------------------------------- Leon = HUNK's half of the neck break (B68)
+# em10.drs also carries the catcher's motion of that pair: game 0x2B9 (arc.py 0x2B5, 77 frames, FK arms,
+# IK legs). EmCatchPLSet(em, 0, 2, -75.21, 0, 1076.1) puts the Ganado 1076 in front of HUNK, turned
+# away from him (180 deg); from frame ~18 HUNK is at its side holding its head. Leon plays that body
+# motion MIRRORED (left <-> right: his right hand - the knife - comes to the front of the throat, the
+# left one holds the back of the head) and, instead of the twist, the knife hand draws across the
+# throat (frames 33-39). Frames before TK_S0 are not played: the Ganado's motion starts at TK_S0 and
+# Leon gets there from his crouch in the first frames.
+HUNK = entry(arc, 0x2B9 - 4)
+HMF, HCH = parse(HUNK)
+_seen = set(); HCH1 = []
+for c in HCH:                                   # (it repeats a few channels at the end: not body ones)
+    k = (c['no'], c['kind'])
+    if k in _seen: continue
+    _seen.add(k); HCH1.append(c)
+R180 = np.diag([-1.0, 1.0, -1.0]); BASE = np.array([-75.21, 0.0, 1076.1])
+MIR = np.diag([-1.0, 1.0, 1.0])
+SWAP = {5: 11, 6: 12, 7: 13, 8: 14, 9: 15, 10: 16, 18: 22, 19: 23, 20: 24, 21: 25, 113: 114, 117: 118}
+SWAP.update({v: k for k, v in list(SWAP.items())})
+TK_S0 = 18                                      # first motion frame played (Ganado held from here)
+
+def hunk(f):
+    """HUNK's world rotations / positions at frame f, in the Ganado's start frame, mirrored"""
+    f = min(f, HMF)
+    L = {}; root = np.array([0, 1050.0, 0]); pos = {}; rot_w = {}; disp = np.zeros(3)
+    for c in HCH1:
+        v = np.array(eval_chan(c, f)); n = c['no']
+        if c['kind'] == 2 and n < N:
+            L[n] = rotm(v)
+        if c['kind'] == 4:
+            if n == 0: root = v
+            else: pos[n] = v
+        if c['kind'] == 1 and n == 0: disp = v
+    off = np.array([disp[0], 0, disp[2]])
+    R = [None] * N; P = [None] * N
+    for i in range(N):
+        p = PAR[i]
+        if p == 255: R[i] = np.eye(3); P[i] = root + off; continue
+        Li = L.get(i, np.eye(3))
+        if i in (20, 24): R[i] = L.get(i, np.eye(3))           # IK effector: model-space rotation
+        else: R[i] = R[p] @ Li
+        P[i] = P[p] + R[p] @ OFF[i]
+    for t in (113, 117, 114, 118):                               # twist bones follow their arm bone
+        R[t] = R[{113: 7, 117: 8, 114: 13, 118: 14}[t]]
+    # legs: IK to the keyed ankle, knee towards the foot's forward
+    for hip, kn, an, toe in ((18, 19, 20, 21), (22, 23, 24, 25)):
+        A = pos.get(an, P[an] - off) + off
+        fwd = R[an] @ np.array([0, 0, 1.0])
+        K, A2 = two_bone(P[hip], A, np.linalg.norm(OFF[kn]), np.linalg.norm(OFF[an]), fwd + np.array([0, 0.2, 0]))
+        R[hip] = frame([0, -1, 0], K - P[hip], [0, 0, 1], fwd)
+        R[kn] = frame([0, -1, 0], A2 - K, [0, 0, 1], fwd)
+        R[toe] = R[an] @ L.get(toe, np.eye(3))
+    # HUNK frame -> Ganado start frame (its back to him: 180 deg), then mirrored
+    W = {}
+    for i in range(N):
+        if R[i] is None: continue
+        j = SWAP.get(i, i)
+        W[j] = MIR @ (R180 @ R[i]) @ MIR
+    root_g = MIR @ (R180 @ (P[0] - BASE))
+    return W, root_g
+
+# Leon's facing during the take: HUNK's hips, mirrored (about +90 deg: across the Ganado's back)
+def _yaw(W): v = W[1] @ np.array([0, 0, 1.0]); return math.atan2(v[0], v[2])
+Y0 = float(np.mean([_yaw(hunk(f)[0]) for f in range(TK_S0, 56)]))
+RY0 = Ry(Y0)
 
 # ---------------------------------------------------------------- timeline (motion frames, 30 / s)
-F_IN = 10         # crouch -> grab (B66: 7 was abrupt)
-F_COCK = (3, 13)  # knife drawn back
-F_STAB = (30, 35) # the thrust; hits at 35 (the sequence's 'neck' event is frame 37)
-F_OUT = (49, 58)  # knife pulled out
-F_REL = (74, 86)  # lets the body go (it falls forward from ~80)
-F_SHEATH = (84, 96)  # B66: down in the crouch, the knife goes back into the chest sheath (hidden at 96)
-F_END = 110       # back in the crouch idle
+F_IN = TK_S0 + 9          # crouch -> HUNK's hold
+F_SLIT = (33, 39)         # the knife across the throat
+F_STAB = F_SLIT
+F_OUT = (40, 48)          # hand away from the throat
+F_REL = (52, 62)          # HUNK lets go (hands off the head)
+F_HUNK = 56               # last HUNK frame; then Leon settles into the crouch where he is
+F_SHEATH = (66, 78)       # down in the crouch: knife to the chest sheath (hidden at 78)
+F_END = 92
 NF = F_END + 1
-KNIFE_K = 0.66    # the knife is drawn smaller during the takedown (crouch.c) - the game's is long
+KNIFE_K = 0.70
 KNIFE = 330.0 * KNIFE_K   # wrist -> blade tip
-
-# Leon root follows the Ganado's neck while he holds it
-def neck_track(f):
-    R, P = ganado(min(f, F_REL[0]))
-    return P[3]
-NECK = [neck_track(f) for f in range(NF)]
-for it in range(3):     # smooth
-    NECK = [NECK[0]] + [(NECK[i-1] + 2 * NECK[i] + NECK[i+1]) / 4 for i in range(1, NF - 1)] + [NECK[-1]]
-
-def leon_root(f):
-    n = NECK[f]
-    x = n[0] - 70.0
-    z = n[2] - 360.0
-    y = 1050.0 - 25.0 * math.sin(math.pi * ramp(f, 8, 30))            # settles while pulling
-    y = lerp(IDLE_Y, y, ramp(f, 0, F_IN + 2))
-    y = lerp(y, IDLE_Y, ramp(f, 78, 94))
-    return np.array([x, y, z])
-
-# feet: planted, stepping towards a stance under the root
-STANCE = {20: np.array([-125.0, 0, -150.0]), 24: np.array([115.0, 0, 140.0])}
-def feet_track():
-    _, P0 = fk_local(IDLE_L, [0, IDLE_Y, 0])
-    pos = {20: P0[20].copy(), 24: P0[24].copy()}
-    for k in pos: pos[k][1] = 0.0
-    out = []; step = {20: None, 24: None}; order = [24, 20]
-    for f in range(NF):
-        r = leon_root(f); fr = {}
-        for k in order:
-            tgt = np.array([r[0], 0, r[2]]) + STANCE[k]
-            if step[k] is None and np.linalg.norm(tgt - pos[k]) > 110 and all(step[j] is None for j in step if j != k):
-                step[k] = (f, pos[k].copy(), 7)
-            if step[k] is not None:
-                f0, p0, nlen = step[k]; t = (f - f0) / nlen
-                p = lerp(p0, tgt, ss(t)); lift = 70.0 * math.sin(math.pi * min(1, t))
-                fr[k] = p + np.array([0, lift, 0])
-                if t >= 1: pos[k] = tgt.copy(); step[k] = None
-            else:
-                fr[k] = pos[k].copy()
-        out.append(fr)
-    return out
-FEET = feet_track()
-
-LA_ARM = np.linalg.norm(OFF[8]); LB_ARM = np.linalg.norm(OFF[9]) + np.linalg.norm(OFF[10])
-LA_LEG = np.linalg.norm(OFF[19]); LB_LEG = np.linalg.norm(OFF[20])
+GD_S0 = ganado(TK_S0)[1][0] * np.array([1, 0, 1])                # Ganado root at the press (x / z)
 
 def arm(Wrot, P_sh, wrist, hand_R, side, pole):
-    """side -1 right (bone axis -x), +1 left (+x). Sets upper / fore / twist / hand rotations."""
     up, fore = (7, 8) if side < 0 else (13, 14)
     tw_u, tw_f, mid, hand = (113, 117, 9, 10) if side < 0 else (114, 118, 15, 16)
-    E, W = two_bone(P_sh, wrist, LA_ARM, LB_ARM, pole)
+    E, Wp = two_bone(P_sh, wrist, np.linalg.norm(OFF[8]), np.linalg.norm(OFF[9]) + np.linalg.norm(OFF[10]), pole)
     ax = np.array([side, 0, 0.0])
-    # elbow bend: the forearm folds towards local +z of the upper arm (as the bind's elbow)
-    Ru = frame(ax, E - P_sh, [0, 0, 1], W - E)
-    Rf = frame(ax, W - E, [0, 1, 0], hand_R @ np.array([0, 1, 0]))
-    for p in (6, up, tw_u) if side < 0 else (12, up, tw_u): Wrot[p] = Ru
+    Ru = frame(ax, E - P_sh, [0, 0, 1], Wp - E)
+    Rf = frame(ax, Wp - E, [0, 1, 0], hand_R @ np.array([0, 1, 0]))
+    for p in (up, tw_u): Wrot[p] = Ru
     for p in (fore, tw_f, mid): Wrot[p] = Rf
     Wrot[hand] = hand_R
-
-def leg(Wrot, P_hip, ankle, side_parts, yaw):
-    th, sh, ft, toe = side_parts
-    K, A = two_bone(P_hip, ankle, LA_LEG, LB_LEG, Ry(yaw) @ np.array([0, 0.2, 1.0]))
-    fwd = Ry(yaw) @ np.array([0, 0, 1.0])
-    Wrot[th] = frame([0, -1, 0], K - P_hip, [0, 0, 1], fwd)
-    Wrot[sh] = frame([0, -1, 0], A - K, [0, 0, 1], fwd)
-    Wrot[ft] = Ry(yaw); Wrot[toe] = Ry(yaw)
+def knife_hand(d, fingers):
+    return frame([0, 0, 1], d, [-1, 0, 0], fingers)
 
 def leon(f):
-    gR, gP = ganado(min(f, F_REL[1]))
-    root = leon_root(f)
-    Wrot = {0: np.eye(3)}
-    # torso: leans in for the grab, back while pulling, upright when letting go
-    lean = lerp(0.45, -0.10, ramp(f, F_IN - 2, 26))                    # lunges in, then pulls
-    lean = lerp(lean, 0.05, ramp(f, F_STAB[0] - 3, F_STAB[1]))       # into the thrust
-    lean = lerp(lean, 0.10, ramp(f, F_REL[0], F_REL[1]))
-    lean = lerp(lean, 0.30, ramp(f, 80, 94))                              # crouched again
-    yaw = lerp(0.0, -0.12, ramp(f, F_STAB[0] - 4, F_STAB[1])) * (1 - ramp(f, F_OUT[0], F_REL[1]))
-    Rh = Ry(yaw) @ Rx(lean * 0.5)
-    Wrot[1] = Rh; Wrot[17] = Ry(yaw * 0.3); Wrot[2] = Rh @ Rx(lean * 0.6)
-    if f <= 60:                                                            # Mixamo's chest turn, half
-        _, _, r2m = mx_at(mx_t(f))
-        Wrot[2] = slerpR(np.eye(3), r2m @ MX_R20.T, MX_CHEST * (1 - ramp(f, 52, 60))) @ Wrot[2]
-    _, P = fk(Wrot, root)
-    # head looks at the Ganado's neck
-    tgt = gP[3] + np.array([0, 40, 0])
-    Wrot[4] = frame([0, 0, 1], tgt - P[4], [0, 1, 0], [0, 1, 0])
-    Wrot[3] = slerpR(Wrot[2], Wrot[4], 0.5)
-    _, P = fk(Wrot, root)
-    # left hand over the mouth: palm towards Leon (-z of the head), fingers to the Ganado's right
-    gh = gR[4]
-    mouth = gP[4] + gh @ np.array([0.0, 75.0, 95.0])                    # B67: the forehead (Leon stands further off)
-    hand_L = gh @ frame([1, 0, 0], [-1, -0.2, 0.3], [0, -1, 0], [0, -0.5, -1])
-    wrist_L = mouth - hand_L @ np.array([55.0, -15.0, 0.0])
-    # right hand: knife back by the shoulder, then into the neck (blade = hand +z, the thumb side)
-    def knife_hand(d, fingers):
-        return frame([0, 0, 1], d, [-1, 0, 0], fingers)
-    neck_c = gP[3] + gR[3] @ np.array([0.0, 25.0, 15.0])
-    # B67: the Mixamo 'Stabbing' thrust. Leon holds the Ganado a little further off (his left hand on
-    # its forehead pulling the head back) so that his right arm has room: the wind-up by the ear and
-    # the straight thrust come from the clip (hand path and elbow, in the chest frame from the
-    # shoulder), turned and scaled to land in the back-right of the neck, blade first.
-    C2 = Wrot[2]
-    surf = neck_c + np.array([-40.0, 15.0, -45.0])                       # back-right of the neck
-    d_stab = nrm(np.array([0.30, -0.08, 0.95]))
-    wrist_hit = surf + d_stab * 45.0 - d_stab * KNIFE
-    hp, ep, _ = mx_at(MX_PEAK); hc, _, _ = mx_at(10.0)
-    tgt = C2.T @ (wrist_hit - P[7])
-    M = rot_between(hp, tgt) * (np.linalg.norm(tgt) / np.linalg.norm(hp))
-    hand_hit = knife_hand(d_stab, [0.3, -0.2, 1])
-    hm, em, _ = mx_at(mx_t(f))
-    push = 15.0 * math.sin(math.pi * ramp(f, F_STAB[1], F_STAB[1] + 10)) * (1 - ramp(f, *F_OUT))
-    wrist_R = P[7] + C2 @ (M @ hm) + d_stab * push
-    cockw = P[7] + C2 @ (M @ hc)
-    mx_pole = C2 @ (rot_between(hp, tgt) @ (em - hm * np.dot(em, hm) / np.dot(hm, hm)))
-    rest = P[2] + Rh @ np.array([-250.0, -340.0, 110.0])                 # low guard (end)
-    hand_rest = knife_hand(nrm([0.4, 0.25, 0.88]), [0.3, -0.4, 1])
-    hand_low = knife_hand(nrm([0.35, 0.40, 0.85]), [0.4, -0.1, 1])
-    hand_cock = knife_hand(d_stab, [0.2, 0.5, 1])
-    hR = slerpR(slerpR(hand_low, hand_cock, ramp(f, 8, 28)), hand_hit, ramp(f, 29, F_STAB[1]))
-    hR = slerpR(hR, hand_rest, ramp(f, F_OUT[0] + 2, F_OUT[1] + 6))
-    wrist_R = lerp(wrist_R, rest, ramp(f, F_OUT[1], F_REL[1]))
-    if f == 35: DBG.append(np.linalg.norm(wrist_hit - P[7]))
-    # into the sheath on the left of the chest, blade down
-    sheath = P[2] + Rh @ np.array([70.0, 10.0, 175.0])
-    hand_sh = knife_hand(nrm([0.1, -1.0, 0.15]), [1.0, 0.2, 0.3])
-    t_sh = ramp(f, *F_SHEATH)
-    wrist_R = lerp(wrist_R, sheath, t_sh); hR = slerpR(hR, hand_sh, t_sh)
-    # left arm: reaches round the head, holds, lets go
-    reach0 = P[2] + Rh @ np.array([200.0, -150.0, 250.0])
-    t_g = ramp(f, 0, F_IN - 3); t_r = ramp(f, *F_REL)
-    wL = lerp(lerp(reach0, wrist_L, t_g), P[2] + Rh @ np.array([260.0, -300.0, 160.0]), t_r)
-    hL = slerpR(slerpR(frame([1, 0, 0], [0.3, -0.5, 1], [0, -1, 0], [1, -0.3, 0]), hand_L, t_g),
-                frame([1, 0, 0], [0.2, -1, 0.3], [0, -1, 0], [1, 0, 0]), t_r)
-    arm(Wrot, P[13], wL, hL, +1, np.array([0.8, -1.0, -0.6]))
-    pole_R = lerp(nrm(mx_pole) if np.linalg.norm(mx_pole) > 1 else np.array([-0.15, -1.0, -0.35]), np.array([-0.15, -1.0, -0.35]), ramp(f, F_OUT[1], F_REL[1]))
-    arm(Wrot, P[7], wrist_R, hR, -1, pole_R)
-    _, P = fk(Wrot, root)
-    # legs
-    A20 = FEET[f][20] + np.array([0, 91.0, -82.0]); A24 = FEET[f][24] + np.array([0, 91.0, -82.0])
-    leg(Wrot, P[18], A20, (18, 19, 20, 21), -0.25)
-    leg(Wrot, P[22], A24, (22, 23, 24, 25), 0.15)
-    R, P = fk(Wrot, root)
-    return R, P, root
+    fh = min(max(f, TK_S0), F_HUNK)
+    W, root = hunk(fh)
+    gR, gP = ganado(min(f, 70))
+    _, P = fk(W, root)
+    # the knife hand: HUNK's (front of the face) -> across the throat -> away -> down by the side
+    throat_far = gP[3] + np.array([70.0, 70.0, 75.0])            # the Ganado's left, under the jaw
+    throat_near = gP[3] + np.array([-80.0, 55.0, 65.0])          # its right (Leon's side)
+    d = nrm(np.array([1.0, -0.10, -0.25]))                       # blade: tip to the far side, pressed in
+    hand_s = knife_hand(d, [0.0, -0.4, 1.0])
+    start = throat_far - d * KNIFE
+    end = throat_near - d * KNIFE + np.array([-60.0, -20.0, 0.0])
+    away = end + np.array([-120.0, -160.0, 40.0])
+    t_in = ramp(f, F_SLIT[0] - 9, F_SLIT[0])                     # from HUNK's hand to the start
+    t_cut = min(1.0, max(0.0, (f - F_SLIT[0]) / float(F_SLIT[1] - F_SLIT[0])))
+    t_cut = t_cut * t_cut * (3 - 2 * t_cut)
+    t_out = ramp(f, *F_OUT)
+    w_ik = t_in * (1 - ramp(f, F_OUT[1], F_REL[1]))
+    if w_ik > 0:
+        wr = lerp(lerp(start, end, t_cut), away, t_out)
+        wr = lerp(P[10], wr, w_ik)
+        hr = slerpR(W[10], hand_s, w_ik)
+        Wk = dict(W)
+        arm(Wk, P[7], wr, hr, -1, np.array([-0.2, -1.0, 0.3]) if True else None)
+        W = Wk
+    # left hand (mirrored HUNK's right): on the back of the head - the mirror moved it off
+    w_l = ramp(f, TK_S0 + 3, TK_S0 + 9) * (1 - ramp(f, *F_REL))
+    if w_l > 0:
+        _, P = fk(W, root)
+        back = gP[4] + np.array([-20.0, 40.0, -95.0])
+        hl = frame([1, 0, 0], [0.3, 0.6, 0.75], [0, -1, 0], [0, 0, 1])      # palm on the head, fingers up over it
+        wl = back - hl @ np.array([60.0, -20.0, 0.0])
+        wl = lerp(P[16], wl, w_l)
+        Wk = dict(W); arm(Wk, P[13], wl, slerpR(W[16], hl, w_l), +1, np.array([0.3, -1.0, -0.3])); W = Wk
+    root = root.copy()
+    R, P = fk(W, root)
+    return W, R, P, root
 
-def locals_of(R):
-    return {p: (R[PAR[p]].T @ R[p] if PAR[p] != 0 else R[p]) for p in BODY}
+def locals_of(W):
+    R, _ = fk(W, np.zeros(3))
+    out = {}
+    for p in BODY:
+        if PAR[p] == 0: out[p] = RY0.T @ R[p]            # root turned to Leon's facing (ga + Y0)
+        else: out[p] = R[PAR[p]].T @ R[p]
+    return out
 
 ARM_PARTS = {5,6,7,8,9,10,11,12,13,14,15,16,113,114,117,118}
-DBG = []
 frames = []
-_, IDLE_P = fk_local(IDLE_L, [0, IDLE_Y, 0])
 for f in range(NF):
-    R, P, root = leon(f)
-    L = locals_of(R)
-    # blend from / back to the crouch idle (local rotations)
-    # blend from the crouch idle (arms first: they lead the lunge) and back to it at the end
-    a_b = 1.0 - ramp(f, 0, F_IN); a_a = 1.0 - ramp(f, 0, F_IN - 4); b = ramp(f, F_SHEATH[1] + 2, F_END)
+    W, R, P, root = leon(f)
+    L = locals_of(W)
+    # from the crouch idle (arms first) and, after HUNK, back to it (the sheath on the way)
+    a_b = 1.0 - ramp(f, TK_S0, F_IN); a_a = 1.0 - ramp(f, TK_S0, F_IN - 3)
+    b = ramp(f, F_HUNK, F_END - 6)
+    root = root.copy(); root[1] = lerp(root[1], IDLE_Y, b)             # height goes with the pose
     for p in BODY:
         k = max(a_a if p in ARM_PARTS else a_b, b)
         if k > 0: L[p] = slerpR(L[p], IDLE_L[p], k)
-    frames.append((L, root))
+    # sheath: right hand to the left of the chest, blade down (on top of the idle blend), then back
+    w_s = ramp(f, *F_SHEATH) * (1 - ramp(f, F_SHEATH[1] + 2, F_END - 2))
+    if w_s > 0:
+        R, P = fk_local({**L, 0: RY0}, root)
+        Wd = {p: R[p] for p in range(N) if R[p] is not None}
+        sheath = P[2] + R[2] @ np.array([70.0, 10.0, 170.0])
+        hs = R[2] @ knife_hand(nrm([0.1, -1.0, 0.15]), [1.0, 0.2, 0.3])
+        arm(Wd, P[7], lerp(P[10], sheath, w_s), slerpR(R[10], hs, w_s), -1, R[2] @ np.array([-0.3, -1.0, -0.2]))
+        for p in (7, 8, 9, 10, 113, 117):
+            L[p] = Wd[PAR[p]].T @ Wd[p]
+    # feet on the floor: where a toe goes below it (blends between HUNK's legs and the crouch), the leg
+    # is solved again with the ankle raised by that much
+    R, P = fk_local({**L, 0: RY0}, root)
+    Wd = {p: R[p] for p in range(N) if R[p] is not None}; fix = False
+    for hip, kn, an, toe in ((18, 19, 20, 21), (22, 23, 24, 25)):
+        low = min(P[toe][1], P[an][1] - 85.0)
+        if low < 0:
+            A = P[an] + np.array([0, -low, 0]); fwd = R[an] @ np.array([0, 0, 1.0])
+            K, A2 = two_bone(P[hip], A, np.linalg.norm(OFF[kn]), np.linalg.norm(OFF[an]), fwd + np.array([0, 0.2, 0]))
+            Wd[hip] = frame([0, -1, 0], K - P[hip], [0, 0, 1], fwd)
+            Wd[kn] = frame([0, -1, 0], A2 - K, [0, 0, 1], fwd); fix = True
+    if fix:
+        for p in (18, 19, 20, 21, 22, 23, 24, 25):
+            L[p] = (RY0.T @ Wd[p]) if PAR[p] == 0 else Wd[PAR[p]].T @ Wd[p]
+    frames.append((L, root - GD_S0))
 
 def check():
-    """distances that matter, printed for the record"""
-    for f in (0, 8, 20, 30, 35, 40, 60, 76, 90, 100):
+    for f in (TK_S0, 24, 30, 33, 36, 39, 44, 52, 60, 70, 89):
         L, root = frames[f]
-        R, P = fk_local({**L, 0: np.eye(3)}, root)
-        gR, gP = ganado(min(f, F_REL[1]))
+        R, P = fk_local({**L, 0: RY0}, root + GD_S0)
+        gR, gP = ganado(min(f, 70))
         tip = P[10] + R[10] @ np.array([0, 0, KNIFE])
-        print('f%3d heads %4.0f root %s  Lhand-mouth %4.0f  tip-neck %4.0f  Lchest-Gneck z %4.0f  feet y %3.0f %3.0f' % (
-            f, np.linalg.norm(P[4] - gP[4]), root.round(), np.linalg.norm(P[16] - (gP[4] + gR[4] @ np.array([0, 5, 125]))),
-            np.linalg.norm(tip - gP[3]), gP[3][2] - P[2][2], P[21][1], P[25][1]))
+        print('f%3d root %s  Rhand-head %4.0f Lhand-head %4.0f tip-throat %4.0f chest-neck %4.0f feet y %3.0f %3.0f' % (
+            f, (root).round(), np.linalg.norm(P[10] - gP[4]), np.linalg.norm(P[16] - gP[4]),
+            np.linalg.norm(tip - (gP[3] + np.array([0, 60, 70]))), np.linalg.norm(P[2] - gP[3]), P[21][1], P[25][1]))
 check()
-print('reach at the hit', [round(float(x)) for x in DBG])
+print('Y0 %.2f rad' % Y0)
 
 # ---------------------------------------------------------------- render (check)
 if '--png' in sys.argv:
@@ -386,8 +365,8 @@ if '--png' in sys.argv:
     fs = [int(x) for x in sys.argv[sys.argv.index('--png') + 1].split(',')]
     fig, axs = plt.subplots(3, len(fs), figsize=(2.6 * len(fs), 9))
     for j, f in enumerate(fs):
-        L, root = frames[f]; R, P = fk_local({**L, 0: np.eye(3)}, root)
-        gR, gP = ganado(f)
+        L, root = frames[f]; R, P = fk_local({**L, 0: RY0}, root + GD_S0)
+        gR, gP = ganado(min(f, 70))
         tip = P[10] + R[10] @ np.array([0, 0, KNIFE])
         for r, (a, b, lab) in enumerate(((0, 1, 'detras'), (2, 1, 'lado'), (0, 2, 'arriba'))):
             ax = axs[r][j]
@@ -418,7 +397,7 @@ def blob(name, b):
         ',\n'.join(','.join('0x%08X' % x for x in w[i:i+8]) for i in range(0, len(w), 8)) + '};\n'
 out = '/* generated by anim/tools/mktake.py - crouch.c defines TK_POSE, stealth.c TK_SCENE */\n'
 out += '#define TK_N %d\n#define TK_STAB0 %d\n#define TK_STAB %d\n#define TK_OUT %d\n#define TK_REL %d\n#define TK_SHEATH %d\n#define TK_IN %d\n' % (NF, F_STAB[0], F_STAB[1], F_OUT[0], F_REL[0], F_SHEATH[1], F_IN)
-out += '#define TK_KNIFE %.1ff\n#define TK_KNIFE_K %.2ff\n' % (KNIFE, KNIFE_K)
+out += '#define TK_KNIFE %.1ff\n#define TK_KNIFE_K %.2ff\n#define TK_S0 %d\n#define TK_YAW %.4ff\n' % (KNIFE, KNIFE_K, TK_S0, Y0)
 out += '#ifdef TK_POSE\n'
 out += 'static const s16 tk_rot[TK_N][CR_NPARTS*3] = {\n' + ',\n'.join('{' + ','.join(map(str, e)) + '}' for e in rows) + '};\n'
 out += 'static const s16 tk_y[TK_N] = {%s};\n' % ','.join(map(str, ys))
