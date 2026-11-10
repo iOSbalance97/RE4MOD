@@ -153,3 +153,34 @@ hook_aimcam:
     addi  r1,r1,16
     lwz   r3,1928(r30)        # original instruction
     b     ret_aimcam
+
+# CameraQuasiFPS::hitCheck (0x800BDB00, after the prologue; c12.s ran at the entry): r5 = QFPS_OFFSET
+# (eye, close point, target, fovy). StealthCam (stealth.c) moves it for the takedown.
+    .globl hook_cam
+hook_cam:
+    stwu  r1,-48(r1)
+    mflr  r0
+    stw   r0,52(r1)
+    stw   r3,8(r1)
+    stw   r4,12(r1)
+    stw   r5,16(r1)
+    stw   r6,20(r1)
+    stw   r7,24(r1)
+    stw   r8,28(r1)
+    stfs  f1,32(r1)
+    stfs  f2,36(r1)
+    mr    r3,r5
+    bl    StealthCam
+    lwz   r3,8(r1)
+    lwz   r4,12(r1)
+    lwz   r5,16(r1)
+    lwz   r6,20(r1)
+    lwz   r7,24(r1)
+    lwz   r8,28(r1)
+    lfs   f1,32(r1)
+    lfs   f2,36(r1)
+    lwz   r0,52(r1)
+    mtlr  r0
+    addi  r1,r1,48
+    mr    r31,r5              # original instruction
+    b     ret_cam

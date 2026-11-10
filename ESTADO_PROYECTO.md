@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B59** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B60** (10-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -50,7 +50,7 @@ Reglas de trabajo del usuario:
   Variables compartidas asm↔C en `modvars` (VB, `VARS_SIZE=0x48`).
 - Espacio: el mod va desde 0x802BD5E0 hasta ~0x802E4xxx (límite 0x80300000; sube ArenaLo).
 
-## 3. Lo que ya funciona (B1–B59)
+## 3. Lo que ya funciona (B1–B59; B60 pendiente de probar)
 - **Moverse apuntando** (m15.s) y **andar apuntando con animación completa** (legs.c: piernas Mixamo
   en 4 direcciones aplicadas tras la actualización del juego; torso con balanceo; el arma se
   recoloca en la mano tras el balanceo).
@@ -79,20 +79,31 @@ Reglas de trabajo del usuario:
   inclinación vuelve a nivel (B59).
 
 ## 4. En curso / pendiente (orden del usuario)
-1. **Ataque sigiloso** (stealth.c + crouch.c CR_STAB): aún **no comprobado**. En B58 los números de
-   diagnóstico salieron `0 0 9999 0` porque leía mal la lista de enemigos. En **B59** se usa el gestor
-   real **0x80283160** (el que recorre GetWepTargetList 0x800CF030: pArray +0, count +4, tamaño +8;
-   be_flag bit0 en uso + bit5 atacable; id +0x100 (>0xF enemigos); vida s16 +0x320).
-   Mecánica: agachado, por la espalda (<1,5 m) → botón X sobre la cabeza → León se gira, el mod
-   pulsa cuchillo+tajo (el golpe real lo hace el juego) con el ganado a 1 de vida, y se ve Stabbing.
-   **Siguiente paso**: ver el vídeo/captura de B59 con los 4 números (vivos, ganados, distancia en dm,
-   orientación: <75 = a su espalda) y ajustar. Quitar el diagnóstico cuando funcione.
+1. **Ejecución sigilosa estilo Remake (B60, sin probar)**. B59: el sigilo funcionaba (X, golpe del
+   juego). B60 lo sustituye por una secuencia completa:
+   - Condiciones de la X (stealth.c FindTarget): León agachado y libre; ganado (id 0x10–0x20 menos
+     0x18) vivo, en su rutina normal (r_no_0 1), **sin haber detectado a León** (Be_flg +0x3E0 bit
+     0x100 y Lose_timer +0xA18 < 90 → alerta), a < 1,5 m, ±60 cm de altura, por la espalda (> ~105°).
+   - Ganado: se reproduce la muerte "agarrado por detrás" del propio juego (rotura de cuello de HUNK en
+     Mercenarios): movimiento em10.drs 0x2BA + secuencia 0x2BB (índice arc.py = juego − 4), copiados
+     en `take_data.h` porque solo em10.drs los tiene, con la rutina Dm_NeckBreak (R0 2 / R1 0x15)
+     arrancada en el paso 1 (el paso 0 lanzaría la mitad de HUNK sobre León). Evento "cuello" en el
+     frame 37 (voz, suelta el arma), cae hacia delante y pasa a Die_Cramp (objetos, puntos).
+   - León: clip propio `anim/tools/mktake.py` (IK de brazos y piernas contra el movimiento del
+     ganado, mismo esqueleto 0–25): mano izquierda a la boca, cuchillo hacia atrás, puñalada al lado
+     derecho del cuello (frames 30–35), lo saca (49–58), suelta (74–86), vuelve a agachado (100).
+     crouch.c CR_TAKE (cuerpo entero, frame sincronizado con Seq_frame del ganado); León colocado cada
+     frame (x/z del clip en el marco inicial del ganado), colisión con personajes desactivada.
+     Hoja del cuchillo supuesta en el +z local de la mano (lado del pulgar): **comprobar en vídeo**.
+   - Sangre (EstSet 0x80105A90, EFF_CORE 0/1/2) en la punta en el 35 y al sacarlo; sonido 0x51.
+   - Cámara (hook 0x800BDB00 en CameraQuasiFPS::hitCheck → StealthCam): se acerca por el lado
+     derecho, algo adelantada, y vuelve a la normal entre los frames 70 y 96.
+   - Diagnóstico de números quitado.
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
-3. **Escalera**: confirmar que con B59 ya no gira la cámara al terminar de subir.
-4. Ganados más listos (que investiguen ruidos antes de detectarte), opcional.
-5. Más adelante: gesto de cambio de arma corriendo, interruptor Moderno/Clásico, tabla de controles
+3. Ganados más listos (que investiguen ruidos antes de detectarte), opcional.
+4. Más adelante: gesto de cambio de arma corriendo, interruptor Moderno/Clásico, tabla de controles
    para Dolphin, revisar puertas, suavizar la entrada del stick.
 
 ## 5. Direcciones PAL útiles (verificadas)
@@ -106,6 +117,10 @@ Reglas de trabajo del usuario:
 - Jugador: r_no 0xFC–0xFF (r_no_1: 0 quieto, 1 andar, 2 atrás, 3 correr, 6 arma, 0xB cuchillo;
   cuchillo r_no_2: 0 sacar, 1 guardia, 2 tajo, 3 guardar) · pos 0x94 · ang.y 0xA4 · mat 0x0C ·
   Wep 0x788 (m_pWep +0x34, pitch +0x28) · partes: l_mat +0x3C.
+- EstSet (efectos) 0x80105A90 · CameraQuasiFPS::hitCheck tras el prólogo 0x800BDB00 (r5 = QFPS_OFFSET).
+- Ganado (cEm + work em10 en +0x3E0): Motion +0x1D8 (Seq_frame +0x290), atari.m_flag +0x2CE,
+  Be_flg +0x3E0, Timer +0x3E4, Lose_timer +0xA18. Decomp: los índices de motion del juego son los
+  de arc.py + 4 (arc.py empieza en ofs[4]).
 - Funciones: PlWepHitCheck2 0x80145A0C · PlWepLockCtrl hook 0x80146D50 · PlWepLockRand 0x80147284 ·
   drawLaserSight 0x8003EA48/0x8003EB6C · calcDepressionRatio rama apuntado 0x800BCD54 ·
   atan2f 0x8005FFE8 · MotionSetCore 0x8012B480 · lista de módulos REL 0x800030C8.
@@ -114,4 +129,7 @@ Reglas de trabajo del usuario:
 - Pipeline: `anim/tools/conv.py` (retarget a Leon, esqueleto de pl00.drs, S=10.51),
   `mkwalk.py` (andar apuntando → c/walk_data.h), `mkcrouch.py` (agachado → c/crouch_data.h,
   15 fps, s16 1e-4 rad, altura 760 mm con IK de piernas).
+- `mktake.py` (takedown): `python3 mktake.py --png 6,24,36 out.png` dibuja León + ganado para
+  revisar; escribe c/take_data.h (necesita em10.drs extraído en /home/claude/disc/ext1/files/em/;
+  extractor de ficheros de ISO: `python3 gciso.py iso extract 'em/em10.drs' destino`).
 - Ojo: archivos con piel (>1,8 MB) llegan cortados en la subida → pedir "Without Skin".

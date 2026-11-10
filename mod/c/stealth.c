@@ -77,71 +77,164 @@ void StealthFrame(void)
     }
 }
 
-/* ---- stealth kill -------------------------------------------------------------------------
- * Crouched, behind a Ganado (within KILL_R, more than ~120 deg off its facing): a Cross prompt
- * over its head (hud.c). Cross: Leon turns to it and does the game's own knife slash (the pad
- * presses knife, then fire), so the hit, the damage and the Ganado's reaction are the game's;
- * the Ganado is left with 1 HP so that slash kills it. Visually Leon stabs (crouch.c CR_STAB). */
+/* ---- stealth kill (takedown) -----------------------------------------------------------------
+ * Crouched, behind an unaware Ganado (within KILL_R, more than ~105 deg off its facing, not
+ * chasing Leon): a Cross prompt over its head (hud.c). Cross starts the remake-style takedown:
+ *   - the Ganado plays the game's own grabbed-from-behind death: em10.drs motion 0x2BA / sequence
+ *     0x2BB (HUNK's neck break victim, carried here as a blob - take_data.h - because only em10.drs
+ *     has it) run by its own Dm_NeckBreak routine (R0 2 / R1 0x15, step 1, in every Ganado module):
+ *     the motion, the 'neck' event (voice, weapon dropped), the fall and Die_Cramp are the game's;
+ *   - Leon plays the matching takedown clip (anim/tools/mktake.py, crouch.c CR_TAKE): left hand over
+ *     the mouth, the knife into the neck, back into the crouch. He is placed every frame from the
+ *     clip (x / z in the Ganado's start frame), so both stay in step;
+ *   - the camera comes in close at the side (StealthCam) and goes back to normal at the end. */
+#define TK_SCENE
+#include "take_data.h"
 #define KILL_R    1500.0f
-#define KILL_N    48                    /* frames the sequence drives the pad */
+#define TK_IN     8.0f                  /* frames Leon takes to reach the grab */
+#define TK_KNIFE_UNTIL 70               /* frames the knife stays drawn (pad L) */
 /* the enemy manager (pArray +0, count +4, work size +8): 0x80283160 in PAL - the one the game's
  * own target list (GetWepTargetList, 0x800CF030) walks. be_flag bit0 = in use, bit5 = targetable,
- * id +0x100 (> 0xF: enemies), HP s16 +0x320 */
+ * id +0x100 (> 0xF: enemies), HP s16 +0x320. Ganado work (em10, from cEm +0x3E0): Be_flg +0x3E0
+ * (0x100: the player was found), Timer +0x3E4, Lose_timer +0xA18 (frames without sight). */
 #define EM_MGR ((u8*)0x80283160)
+#define EM_BEFLG(e) (*(u32*)((e) + 0x3E0))
+#define EM_LOSE(e)  (*(u32*)((e) + 0xA18))
+#define SEQ_FRAME(m) (*(f32*)((m) + 0x1D8 + 0xB8))    /* Motion.Seq_frame */
+#define ATARI_FLAG(m) (*(u16*)((m) + 0x2B4 + 0x1A))    /* atari.m_flag: 0x300 = collides with characters */
+void EstSet(void* model, int no, Vec* pos, Vec* rot, int owner, int id, int core, int kind, void* g, void* h);
 int CrouchActive(void);
 static u8* target;
+static u8* victim;
 static int kill_k = -1;
+static f32 take_f = -1.0f;
+static f32 g0x, g0z, ga, l0x, l0z, la, cam_w;
+static u16 pl_atari;
 typedef f32 (*Atan2F)(f32, f32);
 #define atan2f_ ((Atan2F)0x8005FFE8)
 
-static int dg[4];                          /* diagnostics (hud.c DiagDraw while crouched) */
-int StealthDiag(int i) { if (i < 0) return CrouchActive() ? 1 : 0; return dg[i]; }
+int StealthDiag(int i) { (void)i; return 0; }        /* (the test numbers are gone) */
+static f32 Sm(f32 t) { if (t <= 0.0f) return 0.0f; if (t >= 1.0f) return 1.0f; return t * t * (3.0f - 2.0f * t); }
+static f32 SinA(f32 a)
+{
+    const f32 PI = 3.14159265f;
+    f32 a2;
+    while (a > PI) a -= 2.0f * PI;
+    while (a < -PI) a += 2.0f * PI;
+    if (a > PI * 0.5f) a = PI - a;
+    else if (a < -PI * 0.5f) a = -PI - a;
+    a2 = a * a;
+    return a * (1.0f - a2 / 6.0f * (1.0f - a2 / 20.0f * (1.0f - a2 / 42.0f)));
+}
+static f32 CosA(f32 a) { return SinA(a + 1.57079633f); }
+static f32 Wrap(f32 a) { while (a > 3.14159265f) a -= 6.2831853f; while (a < -3.14159265f) a += 6.2831853f; return a; }
+
+static int Unaware(u8* e)
+{
+    /* found (0x100) and seen within the last 3 s: it is after Leon */
+    return !((EM_BEFLG(e) & 0x100) && EM_LOSE(e) < 90);
+}
 static u8* FindTarget(u8* pl)
 {
     u8* arr = *(u8**)(EM_MGR + 0x00);
     u32 cnt = *(u32*)(EM_MGR + 0x04), sz = *(u32*)(EM_MGR + 0x08), i;
     u8* best = 0;
-    f32 bd = KILL_R * KILL_R, nd = 1e12f, ndot = 0.0f;
+    f32 bd = KILL_R * KILL_R;
     f32 px = *(f32*)(pl + 0x94), py = *(f32*)(pl + 0x98), pz = *(f32*)(pl + 0x9C);
-    dg[0] = dg[1] = 0; dg[2] = 9999; dg[3] = 0;
-    if ((u32)arr < 0x80000000u || (u32)arr >= 0x81800000u || cnt > 1024 || sz < 0x320 || sz > 0x40000) {
-        dg[2] = (int)cnt; dg[3] = (int)(sz >> 4); return 0;   /* (diagnostic: what was read) */
-    }
+    if ((u32)arr < 0x80000000u || (u32)arr >= 0x81800000u || cnt > 1024 || sz < 0xC00 || sz > 0x40000) return 0;
     for (i = 0; i < cnt; i++) {
         u8* e = arr + i * sz;
         f32 dx, dy, dz, d2, fx, fz, l, dot;
         if ((*(u32*)e & 0x21) != 0x21) continue;
-        dg[0]++;
-        if (e[0x100] < 0x10 || e[0x100] > 0x20) continue;            /* Ganados only */
-        if (*(s16*)(e + 0x320) <= 0) continue;
-        dg[1]++;
+        if (e[0x100] < 0x10 || e[0x100] > 0x20 || e[0x100] == 0x18) continue;   /* Ganados (em10 code) */
+        if (*(s16*)(e + 0x320) <= 0 || e[0xFC] != 1) continue;                   /* alive, own routine */
+        if (!Unaware(e)) continue;
         dx = px - *(f32*)(e + 0x94); dy = py - *(f32*)(e + 0x98); dz = pz - *(f32*)(e + 0x9C);
         if (dy > 600.0f || dy < -600.0f) continue;
         d2 = dx * dx + dz * dz;
-        if (d2 < 1.0f) continue;
+        if (d2 < 1.0f || d2 >= bd) continue;
         fx = *(f32*)(e + 0x0C + 0x08);         /* its facing: the model matrix's z column */
         fz = *(f32*)(e + 0x0C + 0x28);
         l = SQRTF(d2);
         dot = (fx * dx + fz * dz) / l;
-        if (d2 < nd) { nd = d2; ndot = dot; }
-        if (d2 >= bd) continue;
         if (dot > -0.25f) continue;            /* Leon must be behind it (> ~105 deg) */
         best = e; bd = d2;
     }
-    if (nd < 1e11f) { dg[2] = (int)(SQRTF(nd) / 100.0f); dg[3] = (int)(ndot * 100.0f) + 100; }
     return best;
 }
 
 /* hud.c: where to draw the prompt (0 = none) */
 u8* StealthTarget(void) { return kill_k < 0 ? target : 0; }
 int StealthKilling(void) { return kill_k >= 0; }
+/* crouch.c: the takedown clip frame (-1 = none) */
+f32 StealthTakeFrame(void) { return kill_k >= 0 ? take_f : -1.0f; }
+
+static void SetMat(u8* m, f32 x, f32 z, f32 a)
+{
+    f32* t = (f32*)(m + 0x0C);
+    f32 s = SinA(a), c = CosA(a);
+    t[0] = c;  t[1] = 0.0f; t[2] = s;  t[3] = x;
+    t[4] = 0.0f; t[5] = 1.0f; t[6] = 0.0f;
+    t[8] = -s; t[9] = 0.0f; t[10] = c; t[11] = z;
+}
+static void PartPos(u8* m, int no, Vec* v)
+{
+    f32* w = (f32*)((u8*)getPartsPtr(m, no) + 0x0C);
+    v->x = w[3]; v->y = w[7]; v->z = w[11];
+}
+static void Blood(u8* pl, int big)
+{
+    f32* w = (f32*)((u8*)getPartsPtr(pl, 10) + 0x0C);      /* the blade tip: hand +z (thumb side) */
+    Vec p, r;
+    p.x = w[3] + w[2] * TK_KNIFE * 0.8f; p.y = w[7] + w[6] * TK_KNIFE * 0.8f; p.z = w[11] + w[10] * TK_KNIFE * 0.8f;
+    r.x = 0.0f; r.y = Wrap(ga - 1.5707963f); r.z = 0.0f;
+    EstSet(0, -1, &p, &r, 0, big ? 1 : 0, 0, 0, 0, 0);     /* EFF_CORE 0: blade hit, 1: burst */
+    EstSet(0, -1, &p, &r, 0, 2, 0, 0, 0, 0);               /* spray */
+}
+
+static void KillEnd(u8* pl)
+{
+    if (pl) ATARI_FLAG(pl) = pl_atari;
+    kill_k = -1; take_f = -1.0f; victim = 0;
+}
 
 void StealthKillFrame(void)
 {
     u8* pl = pPL;
     if (kill_k >= 0) {
-        if (++kill_k > KILL_N + 20 || !pl) kill_k = -1;
+        f32 f, x, z, wx, wz, s, c, t, fr;
+        int i;
         target = 0;
+        kill_k++;
+        if (!pl || !victim || (*(u32*)victim & 1) == 0) { KillEnd(pl); return; }
+        f = (f32)kill_k;
+        if (victim[0xFC] == 2 && victim[0xFD] == 0x15) {   /* in step with the Ganado's motion */
+            fr = SEQ_FRAME(victim);
+            if (fr > f - 4.0f && fr < f + 4.0f) f = fr;
+        }
+        if (f >= (f32)(TK_N - 1)) { KillEnd(pl); return; }
+        take_f = f;
+        /* Leon's place: the clip's x / z in the Ganado's start frame */
+        i = (int)f; t = f - (f32)i;
+        x = (f32)tk_xz[i * 2] + (f32)(tk_xz[i * 2 + 2] - tk_xz[i * 2]) * t;
+        z = (f32)tk_xz[i * 2 + 1] + (f32)(tk_xz[i * 2 + 3] - tk_xz[i * 2 + 1]) * t;
+        s = SinA(ga); c = CosA(ga);
+        wx = g0x + x * c + z * s;
+        wz = g0z - x * s + z * c;
+        t = Sm(f / TK_IN);                                  /* from where he stood */
+        wx = l0x + (wx - l0x) * t;
+        wz = l0z + (wz - l0z) * t;
+        *(f32*)(pl + 0x94) = wx; *(f32*)(pl + 0x9C) = wz;
+        *(f32*)(pl + 0xA4) = Wrap(la + Wrap(ga - la) * Sm(f / 6.0f));
+        SetMat(pl, wx, wz, *(f32*)(pl + 0xA4));
+        ATARI_FLAG(pl) = pl_atari & ~0x300;
+        ATARI_FLAG(victim) &= ~0x300;
+        if (kill_k == TK_STAB0) {                           /* the swing */
+            Vec v; PartPos(pl, 10, &v);
+            SndCall(1, 0x51, (int)&v, 0, 0, 0);
+        }
+        if (kill_k == TK_STAB) Blood(pl, 0);
+        if (kill_k == TK_OUT + 2) Blood(pl, 1);
         return;
     }
     target = 0;
@@ -149,25 +242,58 @@ void StealthKillFrame(void)
     target = FindTarget(pl);
 }
 
-/* pad.c: Cross pressed -> 1 if it started a kill (the press does not reach the game) */
+/* pad.c: Cross pressed -> 1 if it started a takedown (the press does not reach the game) */
 int StealthPress(void)
 {
     u8* pl = pPL;
-    f32 dx, dz;
-    if (kill_k >= 0 || !target || !pl) return 0;
-    dx = *(f32*)(target + 0x94) - *(f32*)(pl + 0x94);
-    dz = *(f32*)(target + 0x9C) - *(f32*)(pl + 0x9C);
-    *(f32*)(pl + 0xA4) = atan2f_(dx, dz);       /* face it */
-    *(s16*)(target + 0x320) = 1;                /* the slash finishes it */
-    kill_k = 0;
+    u8* e = target;
+    if (kill_k >= 0 || !e || !pl || !Unaware(e)) return 0;
+    victim = e;
+    g0x = *(f32*)(e + 0x94); g0z = *(f32*)(e + 0x9C); ga = *(f32*)(e + 0xA4);
+    l0x = *(f32*)(pl + 0x94); l0z = *(f32*)(pl + 0x9C); la = *(f32*)(pl + 0xA4);
+    pl_atari = ATARI_FLAG(pl);
+    /* the Ganado: Dm_NeckBreak from its step 1 (step 0 would also start HUNK's half on Leon) */
+    MotionSetCore(e, e + 0x1D8, (void*)tk_em_mot, (void*)tk_em_seq, 6, 1, 0);
+    *(s16*)(e + 0x320) = 0;
+    EM_BEFLG(e) &= ~(0x8000000u | 0x20u);
+    *(u32*)(e + 0x3E4) = 0;                                /* Timer: plain MotionMove */
+    e[0xFC] = 2; e[0xFD] = 0x15; e[0xFE] = 1; e[0xFF] = 0;
+    kill_k = 0; take_f = 0.0f; target = 0;
     return 1;
 }
-/* pad.c, every gameplay frame: the knife press sequence while a kill runs */
+/* pad.c, every frame of a takedown: the knife stays drawn (L) and nothing else gets through */
 u32 StealthPad(u32 out)
 {
     if (kill_k < 0) return out;
-    out &= ~(PAD_A | PAD_B | PAD_R | PAD_X | PAD_Y | PAD_MOD_CROUCH | PAD_MOD_RELOAD);
-    if (kill_k < KILL_N) out |= PAD_L;                       /* knife stance */
-    if ((kill_k >= 12 && kill_k < 16) || (kill_k >= 22 && kill_k < 26)) out |= PAD_A;   /* slash */
+    out &= PAD_START;
+    if (kill_k < TK_KNIFE_UNTIL) out |= PAD_L;
     return out;
+}
+
+/* Camera (hook in CameraQuasiFPS::hitCheck, after c12.s): q = QFPS_OFFSET (eye +0, close point +0xC,
+ * target +0x18, fovy +0x28). During a takedown it moves in close at the right side of the two,
+ * a little ahead (the knife hand and the Ganado's face in view), and eases back at the end. */
+void StealthCam(f32* q)
+{
+    f32 f = take_f, w, tx, ty, tz, ex, ey, ez, s, c, ox, oz, k;
+    u8* pl = pPL;
+    if (kill_k < 0 || !pl || !victim) { cam_w = 0.0f; return; }
+    w = Sm(f / 12.0f) * (1.0f - Sm((f - 70.0f) / 26.0f));
+    if (w <= 0.0f) return;
+    s = SinA(ga); c = CosA(ga);
+    /* target: between Leon and the Ganado, at neck height */
+    tx = (*(f32*)(pl + 0x94) + *(f32*)(victim + 0x94)) * 0.5f;
+    tz = (*(f32*)(pl + 0x9C) + *(f32*)(victim + 0x9C)) * 0.5f;
+    ty = *(f32*)(pl + 0x98) + 1250.0f;
+    /* eye: right side (-x of the Ganado's frame), a bit ahead, slowly closing in */
+    k = 1.0f - 0.18f * Sm((f - 10.0f) / 50.0f);
+    ox = -1250.0f * k; oz = 520.0f * k;
+    ex = tx + ox * c + oz * s;
+    ez = tz - ox * s + oz * c;
+    ey = ty + 120.0f;
+    q[0] += (ex - q[0]) * w; q[1] += (ey - q[1]) * w; q[2] += (ez - q[2]) * w;
+    q[3] += (tx - q[3]) * w; q[4] += (ty - q[4]) * w; q[5] += (tz - q[5]) * w;
+    q[6] += (tx - q[6]) * w; q[7] += (ty - q[7]) * w; q[8] += (tz - q[8]) * w;
+    q[10] *= 1.0f - 0.12f * w;
+    cam_w = w;
 }

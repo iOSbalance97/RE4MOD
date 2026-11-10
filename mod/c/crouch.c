@@ -15,17 +15,21 @@
  * via hud.c CrouchDrop) and the Ganados notice him later (stealth.c CrouchActive). */
 #include "game.h"
 #include "crouch_data.h"
+#define TK_POSE
+#include "take_data.h"
+#define CR_TAKE CR_NCLIPS                  /* the stealth takedown (stealth.c / mktake.py) */
+static const CrClip cr_take = { TK_N, 0.0f, 0, tk_rot, tk_y };
+static const CrClip* Clip(int c) { return c == CR_TAKE ? &cr_take : &cr_clips[c]; }
 
 void partsWorldCalc(void* m);
 int SwapLock(void);
-int StealthKilling(void);
+f32 StealthTakeFrame(void);
 
 #define FADE     6.0f
 #define SPEED_K  0.7f                  /* crouched speed */
 #define CR_STEP  0.5f                  /* clip frames per game frame (clips at 15 fps) */
 #define SLASH_SPD 1.6f                 /* crouched knife slash speed (fits the game's slash) */
 #define KNIFE_DRAW_K 0.65f              /* crouch share of the upper body while the knife is drawn */
-#define STAB_SPD  1.5f                 /* stealth kill stab */
 #define STEP_MIN 1.0f                  /* units / frame that count as moving */
 
 int crouch_stand;                      /* pad.c (unused now) */
@@ -93,7 +97,7 @@ static void QMtx(Q q, f32 m[3][3])
 /* ---- clips ---- */
 static void Frames(int c, f32 f, int* a, int* b, f32* t)
 {
-    const CrClip* k = &cr_clips[c];
+    const CrClip* k = Clip(c);
     int i = (int)f;
     *t = f - (f32)i;
     if (k->loop) { *a = i % k->n; *b = (*a + 1) % k->n; }
@@ -104,7 +108,7 @@ static void Frames(int c, f32 f, int* a, int* b, f32* t)
 }
 static Q ClipQ(int c, f32 f, int i)
 {
-    const CrClip* k = &cr_clips[c];
+    const CrClip* k = Clip(c);
     int a, b, j;
     f32 t, e[3], m[3][3];
     Q qa, qb;
@@ -117,7 +121,7 @@ static Q ClipQ(int c, f32 f, int i)
 }
 static f32 ClipY(int c, f32 f)
 {
-    const CrClip* k = &cr_clips[c];
+    const CrClip* k = Clip(c);
     int a, b;
     f32 t;
     Frames(c, f, &a, &b, &t);
@@ -214,15 +218,23 @@ void CrouchFrame(void)
     u8* pl = pPL;
     f32 x, z, dx, dz, dist, s, c, lx, lz, ax;
     int clip, n;
+    {   /* stealth takedown (stealth.c): the whole body follows the clip, in step with the Ganado;
+           at the end Leon is crouched again (the clip ends on the crouch idle) */
+        static int taking;
+        f32 tf = StealthTakeFrame();
+        if (tf >= 0.0f) {
+            taking = 1; want = 0; shot = CR_TAKE; shot_f = tf; sxf = 1.0f; w = 1.0f; wu = 1.0f;
+            prev = -1; xf = 1.0f; cur = CR_IDLE; phase = 0.0f; have_last = 0; still = 4;
+            if (pl) Apply(pl);
+            return;
+        }
+        if (taking) {
+            taking = 0; want = 1; shot = -1; w = 1.0f; wu = 1.0f;
+            cur = CR_IDLE; phase = 0.0f; prev = CR_TAKE; prev_f = (f32)(TK_N - 1); xf = 0.0f;
+        }
+    }
     if (!pl || !modvars[VB_GAMEPLAY]) { want = 0; w = wu = 0.0f; shot = -1; have_last = 0; drop = 0.0f; return; }
     full = Free(pl);
-    {   /* stealth kill (stealth.c): stand and stab */
-        static int killing;
-        int k = StealthKilling();
-        if (k && !killing) { want = 0; shot = CR_STAB; shot_f = 0.0f; sxf = 0.0f; w = 1.0f; }
-        killing = k;
-        if (shot == CR_STAB || shot == CR_SLASH) full = 1;
-    }
     {   /* crouched knife: the remake's low slash on each slash */
         static int r2_prev;
         int r2 = pl[0xFD] == 0xB ? pl[0xFE] : -1;
@@ -260,14 +272,14 @@ void CrouchFrame(void)
         w = 1.0f - shot_f / (f32)(cr_clips[CR_SPRINT].n - 1);   /* over the clip */
         if (w < 0.0f) w = 0.0f;
     } else if (want) { w += 1.0f / 4.0f; if (w > 1.0f) w = 1.0f; }
-    else if (shot != CR_UP && shot != CR_STAB) { w -= 1.0f / FADE; if (w < 0.0f) w = 0.0f; }
+    else if (shot != CR_UP) { w -= 1.0f / FADE; if (w < 0.0f) w = 0.0f; }
 
     {   /* upper body share: whole body when free; the knife's draw half (less twist); aiming none */
         f32 t = full ? 1.0f : (pl[0xFC] == 0 && pl[0xFD] == 0xB) ? KNIFE_DRAW_K : 0.0f;
         if (wu < t) { wu += 1.0f / FADE; if (wu > t) wu = t; }
         else if (wu > t) { wu -= 1.0f / FADE; if (wu < t) wu = t; }
     }
-    if (shot == CR_SPRINT || shot == CR_DOWN || shot == CR_UP || shot == CR_STAB || shot == CR_SLASH) wu = 1.0f;
+    if (shot == CR_SPRINT || shot == CR_DOWN || shot == CR_UP || shot == CR_SLASH) wu = 1.0f;
 
     /* loop clip from the movement in Leon's frame (+z forward, +x left) */
     if (dist >= STEP_MIN) {
@@ -296,11 +308,11 @@ void CrouchFrame(void)
     if (shot >= 0) {
         n = cr_clips[shot].n;
         if (sxf < 1.0f) { sxf += 0.25f; if (sxf > 1.0f) sxf = 1.0f; }
-        shot_f += CR_STEP * (shot == CR_SLASH ? SLASH_SPD : shot == CR_STAB ? STAB_SPD : 1.0f);
+        shot_f += CR_STEP * (shot == CR_SLASH ? SLASH_SPD : 1.0f);
         if (shot == CR_DOWN && dist >= STEP_MIN) shot_f = (f32)(n - 1);   /* moved: cut it short */
         if (shot == CR_SLASH && pl[0xFD] != 0xB) shot_f = (f32)(n - 1);   /* knife put away */
         if (shot_f >= (f32)(n - 1)) {
-            if (shot == CR_UP || shot == CR_STAB) {    /* hold the standing end pose and fade out */
+            if (shot == CR_UP) {                       /* hold the standing end pose and fade out */
                 w -= 1.0f / FADE;
                 if (w <= 0.0f) { w = 0.0f; shot = -1; }
             } else {

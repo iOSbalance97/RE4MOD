@@ -70,6 +70,7 @@ void PadRemap(void)
         if (in & PAD_Y) out |= PAD_X;
         if (l3) out |= PAD_B;
         if (r3) out |= PAD_Z;
+        if (StealthKilling()) { out = StealthPad(0); p->stickX = p->stickY = 0; p->substickX = p->substickY = 0; }
     }
     prev_raw = p->button;
     p->button = (u16)out;
