@@ -295,14 +295,20 @@ void StealthCam(f32* q, const f32* m)
     ty = *(f32*)(pl + 0x98) + 1250.0f;
     /* eye: right side (-x of the Ganado's frame), a bit ahead, slowly closing in */
     k = 1.0f - 0.18f * Sm((f - 10.0f) / 50.0f);
-    ox = -1250.0f * k; oz = 520.0f * k;
+    ox = -950.0f * k; oz = 420.0f * k;
     ex = tx + ox * c + oz * s;
     ez = tz - ox * s + oz * c;
     ey = ty + 120.0f;
     ToLocal(m, ex, ey, ez, e);
     ToLocal(m, tx, ty, tz, tg);
     q[0] += (e[0] - q[0]) * w; q[1] += (e[1] - q[1]) * w; q[2] += (e[2] - q[2]) * w;
-    q[3] += (tg[0] - q[3]) * w; q[4] += (tg[1] - q[4]) * w; q[5] += (tg[2] - q[5]) * w;
+    /* close point (where hitCheck's ray starts) near the eye: the ray from the target crossed Leon
+       and the Ganado and pulled the camera into them (B61) - now only the scenery right behind the
+       eye can pull it in */
+    {
+        f32 cp0 = tg[0] + (e[0] - tg[0]) * 0.8f, cp1 = tg[1] + (e[1] - tg[1]) * 0.8f, cp2 = tg[2] + (e[2] - tg[2]) * 0.8f;
+        q[3] += (cp0 - q[3]) * w; q[4] += (cp1 - q[4]) * w; q[5] += (cp2 - q[5]) * w;
+    }
     q[6] += (tg[0] - q[6]) * w; q[7] += (tg[1] - q[7]) * w; q[8] += (tg[2] - q[8]) * w;
     q[10] *= 1.0f - 0.12f * w;
     cam_w = w;
