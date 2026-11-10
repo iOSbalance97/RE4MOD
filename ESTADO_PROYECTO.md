@@ -34,7 +34,7 @@ Reglas de trabajo del usuario:
   (binarios estáticos x86-64 de encounter/gc-wii-binutils 2.42-1: `powerpc-eabi-as`, `-ld`,
   `-objcopy`...; `bake.py` los busca en `/home/claude/tools/binutils/powerpc-eabi-*`).
   Si no estuvieran: `https://github.com/encounter/gc-wii-binutils/releases/download/2.42-1/linux-x86_64.zip`.
-- Además: clang (venía instalado; si falta, `pip install --break-system-packages clang` no sirve: usar `apt-get install clang` o el paquete `ziglang` con `zig cc`)
+- Además: clang 18 (suele venir instalado; si falta: `apt-get install clang`)
   (`--target=powerpc-unknown-eabi -mcpu=750`). Decomp de referencia: **adonis-singh/re4** (NTSC;
   las direcciones PAL hay que buscarlas en el dol PAL, no son un desplazamiento fijo).
 - Flujo:
