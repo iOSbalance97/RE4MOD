@@ -237,9 +237,9 @@ RY0 = Ry(Y0)
 
 # ---------------------------------------------------------------- timeline (motion frames, 30 / s)
 F_IN = TK_S0 + 9          # crouch -> HUNK's hold
-F_SLIT = (33, 39)         # the knife across the throat
+F_SLIT = (33, 41)         # the knife across the throat (B70: longer)
 F_STAB = F_SLIT
-F_OUT = (40, 48)          # hand away from the throat
+F_OUT = (42, 50)          # hand away from the throat
 F_REL = (52, 62)          # HUNK lets go (hands off the head)
 F_HUNK = 56               # last HUNK frame; then Leon settles into the crouch where he is
 F_SHEATH = (66, 78)       # down in the crouch: knife to the chest sheath (hidden at 78)
@@ -268,14 +268,16 @@ def leon(f):
     gR, gP = ganado(min(f, 70))
     _, P = fk(W, root)
     # the knife hand: HUNK's (front of the face) -> across the throat -> away -> down by the side
-    throat_far = gP[3] + np.array([70.0, 70.0, 75.0])            # the Ganado's left, under the jaw
-    throat_near = gP[3] + np.array([-80.0, 55.0, 65.0])          # its right (Leon's side)
+    # B70: lower and closer in (B69's blade went past the chin, in the air): the throat, 45 mm in
+    # front of the neck's middle, just under the jaw
+    throat_far = gP[3] + np.array([65.0, 5.0, 45.0])             # the Ganado's left
+    throat_near = gP[3] + np.array([-75.0, 0.0, 40.0])           # its right (Leon's side)
     d = nrm(np.array([1.0, -0.10, -0.25]))                       # blade: tip to the far side, pressed in
     hand_s = knife_hand(d, [0.0, -0.4, 1.0])
     start = throat_far - d * KNIFE
     end = throat_near - d * KNIFE + np.array([-60.0, -20.0, 0.0])
     away = end + np.array([-120.0, -160.0, 40.0])
-    t_in = ramp(f, F_SLIT[0] - 9, F_SLIT[0])                     # from HUNK's hand to the start
+    t_in = ramp(f, 22, 28)                                        # B70: knife on the throat early, held there until the cut
     t_cut = min(1.0, max(0.0, (f - F_SLIT[0]) / float(F_SLIT[1] - F_SLIT[0])))
     t_cut = t_cut * t_cut * (3 - 2 * t_cut)
     t_out = ramp(f, *F_OUT)
@@ -352,9 +354,10 @@ def check():
         R, P = fk_local({**L, 0: RY0}, root + GD_S0)
         gR, gP = ganado(min(f, 70))
         tip = P[10] + R[10] @ np.array([0, 0, KNIFE])
-        print('f%3d root %s  Rhand-head %4.0f Lhand-head %4.0f tip-throat %4.0f chest-neck %4.0f feet y %3.0f %3.0f' % (
+        mid = P[10] + R[10] @ np.array([0, 0, KNIFE * 0.6])
+        print('f%3d root %s  Rhand-head %4.0f Lhand-head %4.0f tip-throat %4.0f blade60-throat %4.0f feet y %3.0f %3.0f' % (
             f, (root).round(), np.linalg.norm(P[10] - gP[4]), np.linalg.norm(P[16] - gP[4]),
-            np.linalg.norm(tip - (gP[3] + np.array([0, 60, 70]))), np.linalg.norm(P[2] - gP[3]), P[21][1], P[25][1]))
+            np.linalg.norm(tip - (gP[3] + np.array([0, 0, 45]))), np.linalg.norm(mid - (gP[3] + np.array([0, 0, 45]))), P[21][1], P[25][1]))
 check()
 print('Y0 %.2f rad' % Y0)
 

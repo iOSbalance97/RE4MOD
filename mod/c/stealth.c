@@ -106,8 +106,8 @@ static u8* target;
 static u8* victim;
 static int kill_k = -1;
 static f32 kill_f, prev_f;               /* takedown frame (motion frames, slowed) */
-#define TK_SPD_BASE 0.70f                 /* B69: the whole takedown at 70 % */
-#define TK_SPD_CUT  0.42f                 /*      and 42 % round the cut (26..50) */
+#define TK_SPD_BASE 0.60f                 /* B70: the whole takedown at 60 % */
+#define TK_SPD_CUT  0.32f                 /*      and 32 % round the cut (26..50) */
 #define SEQ_SPEED(m) (*(f32*)((m) + 0x1D8 + 0xC0))       /* Motion.Seq_speed */
 static f32 take_f = -1.0f;
 static f32 g0x, g0z, ga, l0x, l0z, la, cam_w;
