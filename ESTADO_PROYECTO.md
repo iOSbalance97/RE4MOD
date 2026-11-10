@@ -24,7 +24,17 @@ Reglas de trabajo del usuario:
 - ISOs limpias (sha1): disc1 `9e58a28b32cbbddd215f2fcbecb79c41812f5f54`,
   disc2 `5dc7461496040f6656ecd7e187ab9f54d05d58fd`. Se esperan en `/home/claude/disc/iso/discN.iso`;
   el `main.dol` limpio extraído en `/home/claude/disc/ext1/sys/main.dol`.
-- Herramientas: binutils powerpc-eabi en `/home/claude/tools/binutils`, `xdelta3`, clang
+- **Herramientas (no compilar binutils: hace falta flex/bison y no hay)**. Están ya compiladas en el
+  repo, en `tools/`:
+  ```
+  mkdir -p /home/claude/tools/binutils
+  unzip -o tools/binutils-2.42-1-linux-x86_64.zip -d /home/claude/tools/binutils
+  chmod +x /home/claude/tools/binutils/* tools/xdelta3; cp tools/xdelta3 /home/claude/tools/
+  ```
+  (binarios estáticos x86-64 de encounter/gc-wii-binutils 2.42-1: `powerpc-eabi-as`, `-ld`,
+  `-objcopy`...; `bake.py` los busca en `/home/claude/tools/binutils/powerpc-eabi-*`).
+  Si no estuvieran: `https://github.com/encounter/gc-wii-binutils/releases/download/2.42-1/linux-x86_64.zip`.
+- Además: clang (venía instalado; si falta, `pip install --break-system-packages clang` no sirve: usar `apt-get install clang` o el paquete `ziglang` con `zig cc`)
   (`--target=powerpc-unknown-eabi -mcpu=750`). Decomp de referencia: **adonis-singh/re4** (NTSC;
   las direcciones PAL hay que buscarlas en el dol PAL, no son un desplazamiento fijo).
 - Flujo:
