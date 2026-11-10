@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B66** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B67** (10-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -114,6 +114,11 @@ Reglas de trabajo del usuario:
      frames con los brazos por delante y más inclinación; final: baja a agachado (78–94), guarda el
      cuchillo en la funda del pecho (84–96, desaparece en 96, L hasta 98) y el guardado del juego no
      se ve (knife_hide); clip de 111 frames. Sangre: se queda como está (usuario).
+   - B67: brazo del cuchillo desde Mixamo 'Stabbing' (anim/mixamo/crouch/Stabbing_takedown.fbx):
+     trayectoria de la mano y codo del clip (marco del pecho, desde el hombro) girada y escalada
+     para que la estocada caiga en la parte trasera-derecha del cuello; tiempo 3→0, 30→10, 35→15,
+     49→26, 58→37; giro del pecho del clip al 15 %. Para que haya sitio, León se queda a 36 cm
+     (antes 20) y la mano izquierda va a la frente (no a la boca). Cuchillo al 66 %.
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
