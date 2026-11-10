@@ -24,6 +24,8 @@ static const CrClip* Clip(int c) { return c == CR_TAKE ? &cr_take : &cr_clips[c]
 void partsWorldCalc(void* m);
 int SwapLock(void);
 f32 StealthTakeFrame(void);
+u8* StealthVictim(void);
+static int knife_hide;                  /* after the takedown: knife in the sheath until put away */
 
 #define FADE     6.0f
 #define SPEED_K  0.7f                  /* crouched speed */
@@ -173,6 +175,40 @@ static void KnifeScale(u8* mm, f32 k)
         p = *(u8**)(p + 0xF4);
     }
 }
+/* the blade going into the neck (B66): the knife is squashed along its blade (hand +z, the thumb
+ * side) so that its tip stays inside the Ganado's neck instead of coming out the other side */
+static void KnifeInto(u8* pl, u8* mm)
+{
+    u8* em = StealthVictim();
+    u8* p = *(u8**)(mm + 0xF4);
+    f32* h = (f32*)((u8*)getPartsPtr(pl, 10) + 0x0C);
+    f32* nk;
+    f32 dx = h[2], dy = h[6], dz = h[10], l, ox, oy, oz, t, s, a[3][3];
+    int n = 0, i, j;
+    if (!em || !p) return;
+    nk = (f32*)((u8*)getPartsPtr(em, 3) + 0x0C);
+    l = SQRTF(dx * dx + dy * dy + dz * dz); if (l < 0.01f) return;
+    dx /= l; dy /= l; dz /= l;
+    ox = ((f32*)(p + 0x0C))[3]; oy = ((f32*)(p + 0x0C))[7]; oz = ((f32*)(p + 0x0C))[11];
+    t = (nk[3] - ox) * dx + (nk[7] + 60.0f - oy) * dy + (nk[11] - oz) * dz;   /* to the neck's middle */
+    s = t / TK_KNIFE;
+    if (s >= 1.0f) return;
+    if (s < 0.3f) s = 0.3f;
+    /* S = I + (s - 1) d d^T */
+    {
+        f32 d[3] = { dx, dy, dz };
+        for (i = 0; i < 3; i++) for (j = 0; j < 3; j++) a[i][j] = (i == j ? 1.0f : 0.0f) + (s - 1.0f) * d[i] * d[j];
+    }
+    while (p && (u32)p >= 0x80000000u && (u32)p < 0x81800000u && n++ < 32) {
+        f32* w = (f32*)(p + 0x0C);
+        f32 r[3][4];
+        for (i = 0; i < 3; i++) for (j = 0; j < 4; j++) r[i][j] = w[i * 4 + j];
+        r[0][3] -= ox; r[1][3] -= oy; r[2][3] -= oz;
+        for (i = 0; i < 3; i++) for (j = 0; j < 4; j++) w[i * 4 + j] = a[i][0] * r[0][j] + a[i][1] * r[1][j] + a[i][2] * r[2][j];
+        w[3] += ox; w[7] += oy; w[11] += oz;
+        p = *(u8**)(p + 0xF4);
+    }
+}
 
 static void Apply(u8* pl)
 {
@@ -205,7 +241,10 @@ static void Apply(u8* pl)
         u8* mm = wep ? *(u8**)(wep + 0x34) : 0;
         if (!SwapLock() && mm && *(u32*)(mm + 0xF4) >= 0x80000000u && *(u32*)(mm + 0xF4) < 0x81800000u) {
             partsWorldCalc(mm);
-            if (shot == CR_TAKE && pl[0xFD] == 0xB) KnifeScale(mm, TK_KNIFE_K);
+            if (shot == CR_TAKE && pl[0xFD] == 0xB) {
+                KnifeScale(mm, shot_f >= (f32)TK_SHEATH ? 0.0f : TK_KNIFE_K);   /* sheathed: gone */
+                if (shot_f >= (f32)(TK_STAB0 + 3) && shot_f < (f32)(TK_OUT + 6)) KnifeInto(pl, mm);
+            } else if (knife_hide && pl[0xFD] == 0xB) KnifeScale(mm, 0.0f);
         }
     }
 }
@@ -247,12 +286,16 @@ void CrouchFrame(void)
             return;
         }
         if (taking) {
+            knife_hide = 1;
             taking = 0; want = 1; shot = -1; w = 1.0f; wu = 1.0f;
             cur = CR_IDLE; phase = 0.0f; prev = CR_TAKE; prev_f = (f32)(TK_N - 1); xf = 0.0f;
         }
     }
     if (!pl || !modvars[VB_GAMEPLAY]) { want = 0; w = wu = 0.0f; shot = -1; have_last = 0; drop = 0.0f; return; }
     full = Free(pl);
+    if (knife_hide) {                                       /* the game's put-away: not shown */
+        if (pl[0xFC] == 0 && pl[0xFD] == 0xB) full = 1; else knife_hide = 0;
+    }
     {   /* crouched knife: the remake's low slash on each slash */
         static int r2_prev;
         int r2 = pl[0xFD] == 0xB ? pl[0xFE] : -1;

@@ -91,8 +91,6 @@ void StealthFrame(void)
 #define TK_SCENE
 #include "take_data.h"
 #define KILL_R    1500.0f
-#define TK_IN     8.0f                  /* frames Leon takes to reach the grab */
-#define TK_KNIFE_UNTIL 70               /* frames the knife stays drawn (pad L) */
 /* the enemy manager (pArray +0, count +4, work size +8): 0x80283160 in PAL - the one the game's
  * own target list (GetWepTargetList, 0x800CF030) walks. be_flag bit0 = in use, bit5 = targetable,
  * id +0x100 (> 0xF: enemies), HP s16 +0x320. Ganado work (em10, from cEm +0x3E0): Be_flg +0x3E0
@@ -168,6 +166,7 @@ u8* StealthTarget(void) { return kill_k < 0 ? target : 0; }
 int StealthKilling(void) { return kill_k >= 0; }
 /* crouch.c: the takedown clip frame (-1 = none) */
 f32 StealthTakeFrame(void) { return kill_k >= 0 ? take_f : -1.0f; }
+u8* StealthVictim(void) { return kill_k >= 0 ? victim : 0; }
 
 static void SetMat(u8* m, f32 x, f32 z, f32 a)
 {
@@ -221,7 +220,7 @@ void StealthKillFrame(void)
         s = SinA(ga); c = CosA(ga);
         wx = g0x + x * c + z * s;
         wz = g0z - x * s + z * c;
-        t = Sm(f / TK_IN);                                  /* from where he stood */
+        t = Sm(f / (f32)TK_IN);                                  /* from where he stood */
         wx = l0x + (wx - l0x) * t;
         wz = l0z + (wz - l0z) * t;
         *(f32*)(pl + 0x94) = wx; *(f32*)(pl + 0x9C) = wz;
@@ -266,7 +265,7 @@ u32 StealthPad(u32 out)
 {
     if (kill_k < 0) return out;
     out &= PAD_START;
-    if (kill_k < TK_KNIFE_UNTIL) out |= PAD_L;
+    if (kill_k < TK_SHEATH + 2) out |= PAD_L;          /* until it is in the sheath */
     return out;
 }
 

@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B65** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B66** (10-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -109,6 +109,11 @@ Reglas de trabajo del usuario:
      junto a la cadera, una estocada hacia arriba bajo la mandíbula al lado del cuello, saca hacia
      atrás y abajo, codo hacia abajo); cuchillo dibujado al 72 % durante la ejecución (crouch.c
      KnifeScale, TK_KNIFE_K); la cámara entra/sale orbitando alrededor del objetivo en el mundo.
+   - B66 (vídeo B65: mucho mejor): la hoja se aplasta a lo largo de su eje mientras está clavada
+     para que la punta quede dentro del cuello (crouch.c KnifeInto, frames 33–55); arranque en 10
+     frames con los brazos por delante y más inclinación; final: baja a agachado (78–94), guarda el
+     cuchillo en la funda del pecho (84–96, desaparece en 96, L hasta 98) y el guardado del juego no
+     se ve (knife_hide); clip de 111 frames. Sangre: se queda como está (usuario).
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
