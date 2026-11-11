@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B70** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B71** (10-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -141,6 +141,13 @@ Reglas de trabajo del usuario:
    - Bandas: en los vídeos el juego ocupa las filas 189–1187 de 1290 tanto antes como después de
      B68/B69; el negro de fuera es el área de la vista de OmniStation (entre L/Z/R y START), no
      del juego → arreglarlo en la conversación de OmniStation (o un modo panorámico en el juego).
+     **Corrección (captura de partida del usuario)**: sí son del juego. Con VI de 480 líneas y XFB
+     de 448, las bandas son exactamente las líneas 0–56 y 393–448 del XFB (las 16 líneas de borde
+     del VI muestran restos); el menú (640×448) no las tiene. Cinesco y tijera están anulados (B70
+     verificado) y no hay otro GXSetScissor/quad con 56/393 en el dol ni en los REL → origen sin
+     encontrar. B71 = prueba: pone el color de borrado de la copia EFB en rojo oscuro (FIFO BP 0x4F/
+     0x50, una vez, ClearRedTest en hud.c): rojo = zona sin dibujar; negro = algo la pinta.
+   - B71: cuchillo +40 mm (B70 quedaba por debajo de la garganta).
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.

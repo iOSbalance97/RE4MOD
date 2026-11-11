@@ -270,8 +270,8 @@ def leon(f):
     # the knife hand: HUNK's (front of the face) -> across the throat -> away -> down by the side
     # B70: lower and closer in (B69's blade went past the chin, in the air): the throat, 45 mm in
     # front of the neck's middle, just under the jaw
-    throat_far = gP[3] + np.array([65.0, 5.0, 45.0])             # the Ganado's left
-    throat_near = gP[3] + np.array([-75.0, 0.0, 40.0])           # its right (Leon's side)
+    throat_far = gP[3] + np.array([65.0, 45.0, 52.0])            # the Ganado's left (B71: +40 up)
+    throat_near = gP[3] + np.array([-75.0, 40.0, 48.0])          # its right (Leon's side)
     d = nrm(np.array([1.0, -0.10, -0.25]))                       # blade: tip to the far side, pressed in
     hand_s = knife_hand(d, [0.0, -0.4, 1.0])
     start = throat_far - d * KNIFE

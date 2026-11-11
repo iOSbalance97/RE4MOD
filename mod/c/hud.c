@@ -535,9 +535,25 @@ void LegsFrame(void);
 void CrouchFrame(void);
 void StealthFrame(void);
 int StealthDiag(int i);
+/* B71 (test, to be removed): the EFB copy clear colour set to dark red (BP 0x4F / 0x50 through the
+ * write-gather pipe, once, between frames). Whatever the game does not draw over shows red: if the
+ * black bands turn red they are an undrawn area (scissor / viewport), if they stay black something
+ * paints them. */
+static void ClearRedTest(void)
+{
+    static int done;
+    volatile u8* wg8 = (volatile u8*)0xCC008000;
+    volatile u32* wg32 = (volatile u32*)0xCC008000;
+    if (done || !pPL || !modvars[VB_GAMEPLAY]) return;
+    done = 1;
+    *wg8 = 0x61; *wg32 = (0x4Fu << 24) | (0xFFu << 8) | 0x90u;   /* alpha, red */
+    *wg8 = 0x61; *wg32 = (0x50u << 24) | (0x00u << 8) | 0x00u;   /* green, blue */
+}
+
 void ModFrame(void)
 {
     mod_frame++;
+    ClearRedTest();
     RecoilFrame();
     StealthFrame();
     SwapFrame();
