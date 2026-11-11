@@ -104,6 +104,7 @@ void EstSet(void* model, int no, Vec* pos, Vec* rot, int owner, int id, int core
 int CrouchActive(void);
 static u8* target;
 static u8* victim;
+static u8* corpse;                       /* B76: the last takedown victim, watched until it is down */
 static int kill_k = -1;
 static f32 kill_f, prev_f;               /* takedown frame (motion frames, slowed) */
 #define TK_SPD_BASE 0.60f                 /* B70: the whole takedown at 60 % */
@@ -223,6 +224,7 @@ static void KillEnd(u8* pl)
 {
     if (pl) ATARI_FLAG(pl) = pl_atari;
     if (victim && victim[0xFC] == 2 && victim[0xFD] == 0x15) SEQ_SPEED(victim) = 1.0f;   /* its fall: normal */
+    corpse = victim;
     kill_k = -1; take_f = -1.0f; victim = 0;
 }
 
@@ -241,6 +243,16 @@ static void ScaleOne(u8* e)
 void StealthKillFrame(void)
 {
     u8* pl = pPL;
+    /* B76: the takedown corpse keeps em->flag 0x10000000 until Die_Cramp has decided to keep it
+     * (r_no 3,0,2): no Die_Lost dissolve (its one-frame flash of the body at the cart + pink column) */
+    if (corpse) {
+        if ((*(u32*)corpse & 1) == 0 || corpse[0xFC] > 3) corpse = 0;
+        else {
+            *(u32*)(corpse + 0x3C8) |= 0x10000000u;
+            if (corpse[0xFC] == 3 && corpse[0xFD] == 0 && corpse[0xFE] >= 2) corpse = 0;
+            else if (corpse[0xFC] == 3 && corpse[0xFD] != 0) corpse = 0;
+        }
+    }
     if (kill_k >= 0) {
         f32 f, x, z, wx, wz, s, c, t, fr;
         int i;

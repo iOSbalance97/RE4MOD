@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B75** (11-11-2026). Responder **siempre en español**.
+Última versión entregada: **B76** (11-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -192,6 +192,13 @@ Reglas de trabajo del usuario:
      codo entre frames). Cadáver: el "parpadeo y aparece de pie" era Die_Lost (disolución normal del
      juego, efecto EFF_EM10 0x19 = columna rosa); la víctima del sigilo lleva em->flag 0x10000000 y
      Die_Cramp deja el cuerpo en el suelo (en etapa 4+ el juego lo disuelve igualmente).
+   - **B76**: el vídeo a cámara lenta que mandó el usuario era la grabación de B74 (Fotos: "Hoy 2:25").
+     Fotograma a fotograma: el cuerpo ya se había desvanecido (Die_Lost) y 1 fotograma después aparece
+     el ganado encorvado junto al carro, luego "COGER" + columna rosa: todo es Die_Lost, que B75 ya
+     evita. Verificado en em10.drs PAL que Die_Cramp lee em->flag +0x3C8 bit 0x10000000 (también hay
+     una condición etapa>3 y sala≤4 → disuelve). B76 refuerza: `corpse` vigila a la víctima tras
+     KillEnd y vuelve a poner el bit cada frame hasta que Die_Cramp la deja (r_no 3,0,2). El usuario
+     quiere conservar el cadáver (se usará para otra cosa).
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
