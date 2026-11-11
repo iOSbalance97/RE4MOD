@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B76** (11-11-2026). Responder **siempre en español**.
+Última versión entregada: **B77** (11-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -199,6 +199,10 @@ Reglas de trabajo del usuario:
      una condición etapa>3 y sala≤4 → disuelve). B76 refuerza: `corpse` vigila a la víctima tras
      KillEnd y vuelve a poner el bit cada frame hasta que Die_Cramp la deja (r_no 3,0,2). El usuario
      quiere conservar el cadáver (se usará para otra cosa).
+   - **B77**: con B76 el usuario sigue viendo el parpadeo (el flag no basta: algo la manda a Die_Lost
+     igualmente). Ahora StealthKillFrame vigila `corpse` cada frame y si la ve en Die_Lost sin empezar
+     (r_no 3,3,0) la devuelve a Die_Cramp reposo (3,0,2). Si aun así parpadea, no es Die_Lost: pedir
+     vídeo a velocidad normal con la cámara en el cuerpo.
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
