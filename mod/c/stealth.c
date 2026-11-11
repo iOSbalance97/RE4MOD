@@ -313,6 +313,9 @@ int StealthPress(void)
     SEQ_SPEED(e) = TK_SPD_BASE;
     ScaleOne(e);
     neck_dy = 0.0f;
+    /* B75: the corpse stays (em->flag 0x10000000: Die_Cramp keeps it instead of Die_Lost's dissolve,
+     * whose effect stood up as a pink column where the body lay; stage 4+ dissolves anyway) */
+    *(u32*)(e + 0x3C8) |= 0x10000000u;
     return 1;
 }
 /* pad.c, every frame of a takedown: the knife stays drawn (L) and nothing else gets through */

@@ -259,7 +259,7 @@ def arm(Wrot, P_sh, wrist, hand_R, side, pole):
     for p in (up, tw_u): Wrot[p] = Ru
     for p in (fore, tw_f, mid): Wrot[p] = Rf
     Wrot[hand] = hand_R
-def arm_free(Wrot, P_sh, wrist, hand_fn, side, fd, out=None, w_out=0.0):
+def arm_free(Wrot, P_sh, wrist, hand_fn, side, fd, out=None, w_out=0.0, ref_e=None, w_ref=0.5):
     """two-bone arm with the elbow picked round its circle so the forearm points along fd (the
     hand then continues the forearm: hand_fn(forearm dir) -> hand rotation); returns the forearm dir"""
     la = np.linalg.norm(OFF[8]); lb = np.linalg.norm(OFF[9]) + np.linalg.norm(OFF[10])
@@ -271,6 +271,7 @@ def arm_free(Wrot, P_sh, wrist, hand_fn, side, fd, out=None, w_out=0.0):
         E, Wp = two_bone(P_sh, wrist, la, lb, pole)
         sc = nrm(Wp - E) @ fd - 0.004 * max(0.0, E[1] - P_sh[1] - 120.0)  # not over the shoulder
         if out is not None: sc += w_out * (nrm(E - P_sh) @ out)          # B74: the elbow out, not in
+        if ref_e is not None: sc += w_ref * (nrm(E - P_sh) @ ref_e)      # B75: near HUNK's elbow (no flips)
         if best is None or sc > best[0]: best = (sc, pole)
     hand_R = None
     E, Wp = two_bone(P_sh, wrist, la, lb, best[1])
@@ -323,7 +324,7 @@ def leon(f):
     tip = A + u * (R_NECK - ins) + (u * 90.0 - lat * 80.0 + np.array([0.0, -150.0, 0.0])) * t_out
     b = nrm(-u + np.array([0.0, -0.6, 0.0]) * t_out)              # pulled out: blade down
     wrist = tip - b * KNIFE
-    w_ik = t_in * (1 - ramp(f, F_OUT[1], F_REL[1]))
+    w_ik = t_in                                                   # B75: idle blend takes it (b_arm)
     if w_ik > 0:
         hunk_fd = nrm(P[10] - P[8])
         fd = nrm(lerp(hunk_fd, tg, w_ik))
@@ -333,23 +334,26 @@ def leon(f):
             hs = frame([0, 0, 1], b, [-1, 0, 0], fdir)             # blade out of the thumb side, wrist straight
             return slerpR(W[10], hs, w_ik)
         out = P[7] - P[13]; out[1] = 0.0; out = nrm(out)               # Leon's right, outwards
-        arm_free(Wk, P[7], wr, hand_fn, -1, fd, out, 0.8 * w_ik)
+        arm_free(Wk, P[7], wr, hand_fn, -1, fd, out, 0.8 * w_ik, nrm(P[8] - P[7]), 0.4)
         W = Wk
-    # left hand (mirrored HUNK's right): palm on the back of the head, in line with the forearm
-    w_l = ramp(f, TK_S0 + 3, TK_S0 + 9) * (1 - ramp(f, *F_REL))
+    # left hand (mirrored HUNK's right): B75 on the nape, behind the head (B74's palm on the back of
+    # the head stuck out at its side), fingers up the back of the head, wrist <= ~35 deg; it is not
+    # faded back to HUNK's (that raised a fist beside the head): the idle blend takes it (b_arm)
+    w_l = ramp(f, TK_S0 + 3, TK_S0 + 9)
     if w_l > 0:
         _, P = fk(W, root)
-        back = gP[4] + np.array([-20.0, 40.0, -95.0])
-        head_c = gP[4] + np.array([0.0, 60.0, 0.0])
-        fd = nrm(lerp(nrm(P[16] - P[14]), nrm(back - P[13]), w_l))
-        wl = back - fd * 70.0
+        nape = gP[3] + (gP[4] - gP[3]) * 0.75 - fw * 78.0
+        fd = nrm(lerp(nrm(P[16] - P[14]), nrm(nape - P[13]), w_l))
+        wl = nape - fd * 60.0
         for _ in range(3):
             Wk = dict(W)
             def hand_l(fdir):
-                hs = frame([1, 0, 0], fdir, [0, -1, 0], head_c - wl)   # palm (-y) on the head
+                up = nrm(np.array([0.0, 1.0, 0.0]) - fw * 0.3)
+                fing = nrm(fdir + up * 0.7)                         # fingers up the back of the head
+                hs = frame([1, 0, 0], fing, [0, -1, 0], fw)           # palm (-y) on the neck
                 return slerpR(W[16], hs, w_l)
-            fdir = arm_free(Wk, P[13], lerp(P[16], wl, w_l), hand_l, +1, fd)
-            wl = back - fdir * 70.0
+            fdir = arm_free(Wk, P[13], lerp(P[16], wl, w_l), hand_l, +1, fd, None, 0.0, nrm(P[14] - P[13]), 0.6)
+            wl = nape - nrm(fdir + nrm(np.array([0.0, 1.0, 0.0]) - fw * 0.3) * 0.7) * 60.0
         W = Wk
     root = root.copy()
     R, P = fk(W, root)

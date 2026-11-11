@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B74** (11-11-2026). Responder **siempre en español**.
+Última versión entregada: **B75** (11-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -184,6 +184,14 @@ Reglas de trabajo del usuario:
      León), arm_free premia el codo hacia fuera (lado derecho de León) y León se inclina 9 cm hacia el
      ganado en 28–56 (el cuerpo de HUNK se aleja y el brazo no llegaba); salida: mano hacia fuera y
      abajo. Codo fuera en todo el corte, punta en el cuello 30–42 (13 mm), muñeca ≤ 25°.
+   - **B75** (vídeo B74: "casi listo"): mano izquierda en la nuca (75 % del cuello, 78 mm detrás), dedos
+     hacia arriba por detrás de la cabeza, palma al cuello; antes la palma en la parte de atrás de la
+     cabeza asomaba por el lado y al soltar volvía a la pose de HUNK (puño levantado junto a la
+     cabeza). Ahora ninguno de los dos brazos vuelve a HUNK: el IK se mantiene y la mezcla a la pose
+     agachada (b_arm 50–66) los lleva. arm_free con preferencia por el codo de HUNK (sin saltos del
+     codo entre frames). Cadáver: el "parpadeo y aparece de pie" era Die_Lost (disolución normal del
+     juego, efecto EFF_EM10 0x19 = columna rosa); la víctima del sigilo lleva em->flag 0x10000000 y
+     Die_Cramp deja el cuerpo en el suelo (en etapa 4+ el juego lo disuelve igualmente).
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
