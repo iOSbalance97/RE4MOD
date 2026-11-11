@@ -24,6 +24,7 @@ static const CrClip* Clip(int c) { return c == CR_TAKE ? &cr_take : &cr_clips[c]
 void partsWorldCalc(void* m);
 int SwapLock(void);
 f32 StealthTakeFrame(void);
+f32 StealthNeckK(void);
 u8* StealthVictim(void);
 static int knife_hide;                  /* after the takedown: knife in the sheath until put away */
 
@@ -119,6 +120,21 @@ static Q ClipQ(int c, f32 f, int i)
     EulerMtx(e, m); qa = MtxQ(m);
     for (j = 0; j < 3; j++) e[j] = (f32)k->rot[b][i * 3 + j] * 0.0001f;
     EulerMtx(e, m); qb = MtxQ(m);
+    if (c == CR_TAKE && tk_vcol[i] >= 0 && a >= TK_V0 && b < TK_V0 + TK_VN) {
+        /* B73 auto-fit: towards the arm poses for a neck TK_DV higher / lower */
+        f32 kk = StealthNeckK();
+        if (kk != 0.0f) {
+            const s16 (*v)[TK_NV * 3] = kk > 0.0f ? tk_rot_up : tk_rot_dn;
+            int col = tk_vcol[i] * 3;
+            Q va, vb;
+            if (kk < 0.0f) kk = -kk;
+            for (j = 0; j < 3; j++) e[j] = (f32)v[a - TK_V0][col + j] * 0.0001f;
+            EulerMtx(e, m); va = MtxQ(m);
+            for (j = 0; j < 3; j++) e[j] = (f32)v[b - TK_V0][col + j] * 0.0001f;
+            EulerMtx(e, m); vb = MtxQ(m);
+            qa = QLerp(qa, va, kk); qb = QLerp(qb, vb, kk);
+        }
+    }
     return QLerp(qa, qb, t);
 }
 static f32 ClipY(int c, f32 f)

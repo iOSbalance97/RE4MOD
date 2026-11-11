@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B72** (11-11-2026). Responder **siempre en español**.
+Última versión entregada: **B73** (11-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -164,6 +164,19 @@ Reglas de trabajo del usuario:
      el ganado a escala 1. mktake: la garganta se calcula del propio cuello (55 % entre base del cuello
      y cabeza, 60 mm delante de su eje), el centro de la hoja sobre ella; tras el corte la mano baja
      pegada (no se abre hacia fuera) y los brazos van directos a la pose agachada (no a la de HUNK).
+   - **B73**: (usuario: B72 sin bandas en partida OK; quiere quitarlas en todo, un recuadro rojo
+     arriba, muñeca de León doblada, corte "casi" en el cuello, ajuste automático por tamaño).
+     Bandas en todo el juego: preset "everywhere" (0x801757AC bne→nop, sin las 7 palabras de B72).
+     Recuadro rojo = objeto del HUD aparcado en la franja de arriba (antes tapado por las barras):
+     hook_hud empuja fuera de pantalla los objetos sin padre con y > 182 mientras System_flg 0x800.
+     Muñeca: B72 la doblaba 100–130° (la hoja sale del puño en ángulo recto y se la ponía cruzada).
+     Ahora la punta entra en el lado del cuello y se arrastra por delante (θ +30°→−70°, de su
+     izquierda-delante hacia el lado de León), mano en línea con el antebrazo (arm_free: elige el codo
+     en su círculo para alinear antebrazo; flexión ≤ ~25° durante el corte). Garganta al 62 % del
+     cuello. Ajuste automático: mktake exporta las poses de brazos con el cuello ±70 mm (tk_rot_up/dn,
+     frames 18–67) y tk_neck (altura esperada); stealth.c NeckMeasure mide la altura real (partes 3/4
+     del ganado − pos.y, filtrada) y crouch.c ClipQ mezcla hacia la variante (StealthNeckK ±1). Se
+     mantiene ScaleOne.
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.

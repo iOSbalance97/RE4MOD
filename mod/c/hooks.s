@@ -187,18 +187,33 @@ hook_cam:
     mr    r31,r5              # original instruction
     b     ret_cam
 
-# B72: health meter to the screen edge in gameplay (bars removed). idSysMove00 after pos = pos0 + anim
-# (0x8011D47C, r31 = ID_UNIT): class 0x21 (IDC_LIFE_METER), no parent, Stop_flg == 0 -> pos.y -= 60
+# B72/B73: idSysMove00 after pos = pos0 + anim (0x8011D47C, r31 = ID_UNIT, +2 class, +0x68 parent,
+# +0x98 pos.y; 640x480 units, y up). Top-level units only:
+#  - while the game is in letterbox mode (System_flg 0x800, pG+0x54) anything it parks in the old
+#    top bar (y > 182: covered by the bars there) is pushed off screen (the red marker at the top)
+#  - the health meter (class 0x21) 60 down to the screen edge in free play (Stop_flg == 0)
     .globl hook_hud
 hook_hud:
-    lbz   r12,2(r31)
-    cmpwi r12,0x21
-    bne   1f
     lwz   r12,0x68(r31)
     cmpwi r12,0
     bne   1f
-    lwz   r12,-29912(r13)
-    lwz   r12,0x170(r12)
+    lwz   r11,-29912(r13)
+    lwz   r12,0x54(r11)
+    andi. r12,r12,0x800
+    beq   2f
+    lfs   f0,0x98(r31)
+    lis   r12,hud_top@ha
+    lfs   f1,hud_top@l(r12)
+    fcmpo cr0,f0,f1
+    ble   2f
+    lis   r12,hud_off@ha
+    lfs   f1,hud_off@l(r12)
+    fadds f0,f0,f1
+    stfs  f0,0x98(r31)
+2:  lbz   r12,2(r31)
+    cmpwi r12,0x21
+    bne   1f
+    lwz   r12,0x170(r11)
     cmpwi r12,0
     bne   1f
     lfs   f0,0x98(r31)
@@ -209,4 +224,6 @@ hook_hud:
 1:  lbz   r0,4(r31)           # original instruction
     b     ret_hud
     .balign 4
+hud_top: .float 182.0
+hud_off: .float 600.0
 hud_dy: .float 60.0

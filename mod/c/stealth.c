@@ -170,6 +170,30 @@ u8* StealthTarget(void) { return kill_k < 0 ? target : 0; }
 int StealthKilling(void) { return kill_k >= 0; }
 /* crouch.c: the takedown clip frame (-1 = none) */
 f32 StealthTakeFrame(void) { return kill_k >= 0 ? take_f : -1.0f; }
+/* B73 auto-fit: how much higher (+) / lower (-) this Ganado's throat is than the take's, in units of
+ * TK_DV (crouch.c blends Leon's arm poses worked out for +-TK_DV) */
+static f32 neck_dy;
+static void PartPos(u8* m, int no, Vec* v);
+f32 StealthNeckK(void)
+{
+    f32 k = neck_dy / TK_DV;
+    if (kill_k < 0) return 0.0f;
+    return k > 1.0f ? 1.0f : k < -1.0f ? -1.0f : k;
+}
+static void NeckMeasure(u8* e, f32 f)
+{
+    Vec n3, n4;
+    int i = (int)f;
+    f32 t, want, have;
+    if (!getPartsPtr(e, 3) || !getPartsPtr(e, 4)) return;
+    if (i < 0) i = 0;
+    if (i >= TK_N - 1) { i = TK_N - 2; }
+    t = f - (f32)i; if (t > 1.0f) t = 1.0f;
+    want = (f32)tk_neck[i] + (f32)(tk_neck[i + 1] - tk_neck[i]) * t;
+    PartPos(e, 3, &n3); PartPos(e, 4, &n4);
+    have = n3.y + (n4.y - n3.y) * TK_NECK_UP - *(f32*)(e + 0x98);
+    neck_dy += (have - want - neck_dy) * 0.25f;
+}
 u8* StealthVictim(void) { return kill_k >= 0 ? victim : 0; }
 
 static void SetMat(u8* m, f32 x, f32 z, f32 a)
@@ -224,6 +248,7 @@ void StealthKillFrame(void)
         kill_k++;
         if (!pl || !victim || (*(u32*)victim & 1) == 0) { KillEnd(pl); return; }
         ScaleOne(victim);
+        NeckMeasure(victim, kill_f);
         /* B69: slower, slowest round the cut (the Ganado's Seq_speed, Leon follows its frame) */
         {
             f32 sp = TK_SPD_BASE - (TK_SPD_BASE - TK_SPD_CUT) * (Sm((kill_f - 26.0f) / 6.0f) - Sm((kill_f - 44.0f) / 6.0f));
@@ -287,6 +312,7 @@ int StealthPress(void)
     kill_k = TK_S0; kill_f = prev_f = (f32)TK_S0; take_f = (f32)TK_S0; target = 0;
     SEQ_SPEED(e) = TK_SPD_BASE;
     ScaleOne(e);
+    neck_dy = 0.0f;
     return 1;
 }
 /* pad.c, every frame of a takedown: the knife stays drawn (L) and nothing else gets through */

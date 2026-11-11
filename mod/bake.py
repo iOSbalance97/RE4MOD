@@ -109,9 +109,8 @@ W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x8014700
      0x80180760:0x70090000,0x80186C58:0x70090000,
      # 3) fade-to-black overlay top 56.0 -> 0.0
      0x801F0184:0x00000000,
-     # 4) cine_polling (0x8017579C): bars only when Stop_flg (menus, inventory, cutscenes, movies) or title
-     0x801757A0:0x80090170,0x801757A4:0x81895020,0x801757A8:0x558C8FFE,0x801757AC:0x7C006378,
-     0x801757B0:0x3180FFFF,0x801757B4:0x7D6C0110,0x801757B8:0x88030002}
+     # 4) B73 preset "everywhere": cine_polling (0x8017579C) never wants the bars (bne -> nop)
+     0x801757AC:0x60000000}
 # __ArenaLo: lis r3,hi / addi r3,r3,lo at both sites
 ha=(END+0x8000)>>16; lo=END-(ha<<16)
 W04[0x80069160]=0x3C600000|ha; W04[0x80069164]=0x38630000|(lo&0xFFFF)
