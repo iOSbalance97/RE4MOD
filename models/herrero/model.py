@@ -7,9 +7,9 @@ SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, CLOTH, HOT = range(10)
 def J(s):
     d = dict(hip=V(s*215, 1040, -10), knee=V(s*305, 570, 75), ank=V(s*285, 120, -5),
              sh=V(s*465, 1690, 75))
-    if s < 0: d.update(el=V(-650, 1290, 40), wr=V(-705, 935, 215))       # weapon arm, hanging
-    else:     d.update(el=V(640, 1340, 200), wr=V(585, 1075, 500))       # claw arm, forward
+    d.update(sh=V(s*455, 1665, 60)); d.update(el=d['sh'] + V(s*442, 0, 0)); d.update(wr=d['el'] + V(s*400, 0, 0))   # T-pose (bind)
     return d
+GROWTH = [((165, 1835, 30), 62), ((235, 1800, -55), 50), ((115, 1880, -45), 44), ((285, 1770, 40), 40), ((95, 1820, 120), 36), ((200, 1870, -10), 30)]
 JR, JL = J(-1), J(1)
 HEAD = V(0, 1872, 352)
 def fore_r(j, s): return (150 if s < 0 else 142), (104 if s < 0 else 98)
@@ -18,14 +18,17 @@ def fore_r(j, s): return (150 if s < 0 else 142), (104 if s < 0 else 98)
 def torso(p):
     d = ell(p, V(0, 1285, 105), V(395, 305, 335))                          # belly
     d = smin(d, ell(p, V(0, 1575, 75), V(435, 275, 295)), 60)              # chest
-    d = smin(d, ell(p, V(0, 1705, -70), V(405, 235, 255)), 70)             # hump
-    d = smin(d, ell(p, V(0, 1420, -150), V(360, 330, 200)), 60)            # back
+    d = smin(d, ell(p, V(0, 1730, -75), V(330, 235, 250)), 90)             # hump: a dome, not a slab
+    d = smin(d, ell(p, V(0, 1440, -120), V(300, 340, 215)), 70)            # back, tapering to the waist
     for s in (-1, 1):
         d = smin(d, ell(p, V(s*185, 1560, 300), V(195, 140, 95)), 40)      # pecs
-        d = smin(d, ell(p, V(s*230, 1500, -250), V(190, 230, 110)), 40)    # lats
-        d = smin(d, ell(p, V(s*200, 1740, -210), V(170, 130, 110)), 40)    # shoulder blades
-        d = smin(d, ell(p, V(s*300, 1250, -40), V(150, 130, 230)), 50)     # love handles
-    d = smax(d, -rcone(p, V(0, 1250, -335), V(0, 1700, -330), 18, 26), 30) # spine groove
+        d = smin(d, ell(p, V(s*235, 1545, -175), V(150, 215, 120)), 55)    # lats (wedge towards the waist)
+        d = smin(d, ell(p, V(s*190, 1700, -235), V(125, 115, 75)), 35)     # shoulder blades
+        d = smin(d, ell(p, V(s*75, 1420, -300), V(60, 250, 55)), 30)       # erectors
+        d = smin(d, ell(p, V(s*290, 1250, -40), V(150, 130, 220)), 50)     # love handles
+    for i in range(9):                                                     # vertebrae showing through
+        d = smin(d, sph(p, V(0, 1240 + i * 62, -322 - 22 * math.sin(i * 0.42) + (i > 6) * 14 * (i - 6)), 21), 10)
+    for c, r in GROWTH: d = smin(d, sph(p, V(*c), r), 22)                  # Plaga growths, left neck / shoulder
     return d
 def pelvis(p): return ell(p, V(0, 1085, 5), V(335, 205, 250))
 def arms(p):
@@ -35,11 +38,11 @@ def arms(p):
         a = rcone(p, j['sh'], j['el'], 170, 132)
         a = smin(a, sph(p, j['sh'] + V(s*5, 15, 0), 192), 40)                            # deltoid
         mid = (j['sh'] + j['el']) / 2
-        a = smin(a, ell(p, mid + V(0, 10, 70), V(120, 170, 105)), 35)                    # biceps
-        a = smin(a, ell(p, mid + V(s*20, 0, -75), V(115, 180, 100)), 35)                 # triceps
+        a = smin(a, ell(p, mid + V(0, 15, 72), V(175, 112, 100)), 30)                    # biceps
+        a = smin(a, ell(p, mid + V(-s*20, 0, -78), V(185, 108, 95)), 30)                 # triceps
         a = smin(a, rcone(p, j['el'], j['wr'], ra, rb), 30)
         fd = nrm(j['wr'] - j['el'])
-        a = smin(a, ell(p, j['el'] + fd*120 + V(s*30, 0, 20), V(125, 150, 120)), 35)     # forearm bulk
+        a = smin(a, ell(p, j['el'] + fd*125 + V(0, 22, 10), V(155, 118, 122)), 30)       # forearm bulk
         a = smin(a, sph(p, j['el'] + V(0, 0, -45), 100), 30)                             # elbow
         d = a if d is None else np.minimum(d, a)
     return d
@@ -126,7 +129,7 @@ def body(p):
     rope = torus(p, JR['knee'] + V(4, -105, 12), nrm(V(0.05, 1, 0.12)), 138, 11)           # cord under the knee
     rope = np.minimum(rope, torus(p, JR['knee'] + V(4, -128, 10), nrm(V(-0.04, 1, 0.1)), 134, 11))
     return {SKIN: sk, PANTS: lg, BOOT: bt, SOLE: so, LEATHER: mn(ap, bl, bst, kp, rope), IRON: np.minimum(bk, bbk)}
-BODY_BOX = (V(-900, -5, -470), V(860, 2060, 560))
+BODY_BOX = (V(-1420, -5, -480), V(1420, 2080, 560))
 
 # ---- mask ----------------------------------------------------------------------------------------
 MC = HEAD + V(0, -10, 0)
@@ -174,7 +177,7 @@ def mask(p):
 MASK_BOX = (HEAD - V(190, 235, 185), HEAD + V(190, 190, 215))
 
 # ---- hands ---------------------------------------------------------------------------------------
-HDIR = nrm(V(-0.16, -0.60, -0.78))                 # weapon: from the grip to the anvil
+HDIR = nrm(V(0, 0, -1))                            # weapon: from the grip to the anvil (bind: straight back)
 FD_R = nrm(JR['wr'] - JR['el']); GRIP = JR['wr'] + FD_R * 105
 def fist(p):
     d = ell(p, GRIP - FD_R * 22, V(86, 92, 84))
@@ -190,7 +193,7 @@ def fist(p):
     return {SKIN: smin(d, th, 14)}
 FD_L = nrm(JL['wr'] - JL['el'])
 def claw(p):
-    n = V(0.15, -0.75, 0.5); n = nrm(n - FD_L * (n @ FD_L)); w = np.cross(FD_L, n)
+    n = V(0, -1, 0.12); n = nrm(n - FD_L * (n @ FD_L)); w = np.cross(FD_L, n)
     R = np.stack([w, FD_L, n])
     d = rbox(p, JL['wr'] + FD_L * 95 + n * 4, V(82, 90, 36), 32, R)
     d = smin(d, rcone(p, JL['wr'] - FD_L * 60, JL['wr'] + FD_L * 30, 100, 92), 30)
@@ -217,7 +220,7 @@ def claw(p):
     return {SKIN: d}
 def box_of(pts, m):
     pts = np.array(pts); return (pts.min(0) - m).astype(f32), (pts.max(0) + m).astype(f32)
-FIST_BOX = box_of([GRIP], 150); CLAW_BOX = box_of([JL['wr'], JL['wr'] + FD_L * 300 + V(0, -90, 60)], 150)
+FIST_BOX = box_of([GRIP], 150); CLAW_BOX = box_of([JL['wr'], JL['wr'] + FD_L * 300 + V(0, -90, 0)], 150)
 
 # ---- accessories ---------------------------------------------------------------------------------
 def acc(p):
@@ -233,15 +236,15 @@ def acc(p):
         c = np.minimum(c, rbox(p, j['wr'] - fd * 60 + side * (rb + 30) * s, V(26, 34, 22), 6, frame(side, fd)))   # lock block
         iron = U(iron, c)
     # broken chain hanging from the left shackle
-    a = JL['wr'] - FD_L * 60 + V(0, -(fore_r(JL, 1)[1] + 34), 0)
+    a = JL['wr'] - FD_L * 60 + V(0, 0, -(fore_r(JL, 1)[1] + 34))             # lies along the arm (bind)
     for i in range(5):
-        c = a + V(0, -26 - i * 62, 0) + V(7 * math.sin(i * 1.3), 0, 6 * math.cos(i * 0.9))
-        nrm_ = V(1, 0, 0) if i % 2 == 0 else V(0, 0, 1)
-        lk = torus(p * V(1, 0.68, 1), c * V(1, 0.68, 1), nrm_, 27, 10.5)
+        c = a + FD_L * (26 + i * 62) + V(0, 6 * math.sin(i * 1.3), 5 * math.cos(i * 0.9))
+        nrm_ = V(0, 1, 0) if i % 2 == 0 else V(0, 0, 1)
+        lk = torus(p * V(0.68, 1, 1), c * V(0.68, 1, 1), nrm_, 27, 10.5)
         chain = U(chain, lk)
     # right pauldron: three layered plates
     c = JR['sh'] + V(-5, 15, 0)
-    for k, (R_, lo, hi) in enumerate(((201, 100, 400), (210, 30, 122), (219, -50, 52))):
+    for k, (R_, lo, hi) in enumerate(((212, 100, 400), (222, 30, 122), (232, -50, 52))):
         ax = nrm(V(-0.55, 0.8, 0.05))
         h = (p - c) @ ax
         pl = np.maximum(sph(p, c, R_) - 6, np.maximum(lo - h, h - hi))
@@ -277,7 +280,7 @@ def acc(p):
     # pouch at the back right
     lea = U(lea, rbox(p, V(-250, 1030, -235), V(85, 75, 45), 22, frame(nrm(V(0.75, 0, -0.66)), V(0, 1, 0))))
     return {IRON: iron, CHAIN: chain, LEATHER: lea, HOT: hot}
-ACC_BOX = (V(-760, 520, -330), V(760, 1990, 620))
+ACC_BOX = (V(-1400, 640, -330), V(1760, 1990, 620))
 
 # ---- weapon: an anvil chained to a beam -----------------------------------------------------------
 WB = np.stack([HDIR, nrm(np.cross(np.cross(HDIR, V(0, 1, 0)), HDIR)), np.cross(HDIR, nrm(np.cross(np.cross(HDIR, V(0, 1, 0)), HDIR)))])
@@ -334,7 +337,7 @@ def wbox():
     c = [GRIP + WB.T @ V(x, y, z) for x in (-200, BEAM_L + 330) for y in (-110, 400) for z in (-170, 170)]
     return box_of(c, 12)
 WEAPON_BOX = wbox()
-PARTS = [('body', body, BODY_BOX, 6.0, 7900), ('mask', mask, MASK_BOX, 2.5, 1500), ('fist', fist, FIST_BOX, 3.0, 520),
+PARTS = [('body', body, BODY_BOX, 6.0, 8000), ('mask', mask, MASK_BOX, 2.5, 1500), ('fist', fist, FIST_BOX, 3.0, 520),
          ('claw', claw, CLAW_BOX, 2.5, 1150), ('acc', acc, ACC_BOX, 3.0, 1500), ('weapon', weapon, WEAPON_BOX, 3.0, 2480)]
 def field(fn, p):
     g = fn(p); mats = list(g.keys()); D = np.stack([g[m] for m in mats])

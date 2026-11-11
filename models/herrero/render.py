@@ -5,7 +5,7 @@ def look(eye, tgt, up=(0, 1, 0)):
     eye = np.array(eye, float); tgt = np.array(tgt, float)
     f = tgt - eye; f /= np.linalg.norm(f); r = np.cross(f, up); r /= np.linalg.norm(r); u = np.cross(r, f)
     return eye, np.stack([r, u, f])
-def render(parts, eye, tgt, fov=32, W=900, H=1200, ss=2, bg=(0.012, 0.012, 0.014)):
+def render(parts, eye, tgt, fov=32, W=900, H=1200, ss=2, bg=(0.012, 0.012, 0.014), texs=None):
     w, h = W * ss, H * ss
     eye, R = look(eye, tgt); fl = 0.5 * h / math.tan(math.radians(fov) / 2)
     zb = np.full((h, w), 1e9, np.float32); img = np.zeros((h, w, 3), np.float32)
@@ -42,7 +42,13 @@ def render(parts, eye, tgt, fov=32, W=900, H=1200, ss=2, bg=(0.012, 0.012, 0.014
             b0 = (w0 / z[0] * zz)[m]; b1 = (w1 / z[1] * zz)[m]; b2 = (w2 / z[2] * zz)[m]
             n = b0[:, None] * p['cn'][i, 0] + b1[:, None] * p['cn'][i, 1] + b2[:, None] * p['cn'][i, 2]
             n /= np.linalg.norm(n, axis=1)[:, None] + 1e-9
-            c = b0[:, None] * p['col'][t[0]] + b1[:, None] * p['col'][t[1]] + b2[:, None] * p['col'][t[2]]
+            if texs is not None:
+                uv = b0[:, None] * p['uv'][i, 0] + b1[:, None] * p['uv'][i, 1] + b2[:, None] * p['uv'][i, 2]
+                T = texs[p['atlas']]; ux = np.clip(uv[:, 0] - 0.5, 0, T.shape[1] - 1.001); uy = np.clip(uv[:, 1] - 0.5, 0, T.shape[0] - 1.001)
+                xi = ux.astype(int); yi = uy.astype(int); fx = (ux - xi)[:, None]; fy = (uy - yi)[:, None]
+                c = (T[yi, xi] * (1 - fx) + T[yi, xi + 1] * fx) * (1 - fy) + (T[yi + 1, xi] * (1 - fx) + T[yi + 1, xi + 1] * fx) * fy
+            else:
+                c = b0[:, None] * p['col'][t[0]] + b1[:, None] * p['col'][t[1]] + b2[:, None] * p['col'][t[2]]
             me = b0 * metal[t[0]] + b1 * metal[t[1]] + b2 * metal[t[2]]
             pos = b0[:, None] * v[t[0]] + b1[:, None] * v[t[1]] + b2[:, None] * v[t[2]]
             vd = eye - pos; vd /= np.linalg.norm(vd, axis=1)[:, None]
@@ -50,7 +56,7 @@ def render(parts, eye, tgt, fov=32, W=900, H=1200, ss=2, bg=(0.012, 0.012, 0.014
             hv = L1 + vd; hv /= np.linalg.norm(hv, axis=1)[:, None]
             sp = np.clip((n * hv).sum(1), 0, 1) ** (18 + 50 * me) * (0.10 + 0.55 * me)
             rim = (1 - np.clip((n * vd).sum(1), 0, 1)) ** 3
-            lit = 0.07 + 1.25 * d1[:, None] * np.array([1.0, 0.93, 0.82]) + 0.22 * d2[:, None] * np.array([0.55, 0.65, 0.9]) + 0.75 * d3[:, None] * np.array([0.9, 0.5, 0.3])
+            lit = (0.45 if texs is not None else 0.07) + (0.85 if texs is not None else 1.25) * d1[:, None] * np.array([1.0, 0.93, 0.82]) + 0.22 * d2[:, None] * np.array([0.55, 0.65, 0.9]) + 0.75 * d3[:, None] * np.array([0.9, 0.5, 0.3])
             col = c * lit + sp[:, None] * np.array([1.0, 0.95, 0.85]) + (0.22 * rim * (0.3 + d3))[:, None] * np.array([0.9, 0.55, 0.35])
             ho = (b0 * hot[t[0]] + b1 * hot[t[1]] + b2 * hot[t[2]])[:, None]; col = col * (1 - ho) + c * 2.2 * ho
             sub[m] = zz[m]; img[ya:yb + 1, xa:xb + 1][m] = col

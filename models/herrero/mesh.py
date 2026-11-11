@@ -40,10 +40,11 @@ def ev(fn, P, mats=False):
     d = np.empty(len(P), np.float32); mm = np.empty(len(P), np.int32)
     for i in range(0, len(P), 300000): d[i:i + 300000], mm[i:i + 300000] = model.field(fn, P[i:i + 300000])
     return (d, mm) if mats else d
+NOCULL = {'body': ('acc', 'fist', 'claw', 'weapon'), 'acc': ('fist', 'claw', 'weapon', 'mask'), 'fist': ('acc',), 'claw': ('acc',), 'weapon': ('acc', 'body'), 'mask': ('acc',)}
 def others(name, P):
     d = np.full(len(P), 1e3, np.float32)
     for n2, fn, box, vox, bud in model.PARTS:
-        if n2 == name: continue
+        if n2 == name or n2 in NOCULL.get(name, ()): continue
         lo, hi = box; ins = np.all((P > lo) & (P < hi), 1)
         if ins.any(): d[ins] = np.minimum(d[ins], ev(fn, P[ins]))
     return d
@@ -64,7 +65,7 @@ if __name__ == '__main__':
     for name, fn, box, vox, bud in model.PARTS:
         if len(sys.argv) > 1 and name not in sys.argv[1:]: continue
         v, f = build(name, fn, box, vox)
-        v, f = cull(name, v, f, -7.0)
+        v, f = cull(name, v, f, -14.0 if name == 'acc' else -7.0)
         _, mat = ev(fn, v, True)
         v, f, mat = decimate(v, f, mat, bud)
         np.savez('dec_%s.npz' % name, v=v, f=f, mat=mat)

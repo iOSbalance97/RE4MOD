@@ -28,7 +28,7 @@ def corner_normals(v, f, ang=42.0):
             nb = vf[t[k]]; w = fu[nb] @ fu[i] > cs
             n = (fn[nb][w]).sum(0); out[i, k] = n / (np.linalg.norm(n) + 1e-12)
     return out
-BASE = {SKIN: (0.36, 0.31, 0.285), PANTS: (0.105, 0.095, 0.085), BOOT: (0.06, 0.048, 0.04), SOLE: (0.025, 0.025, 0.025), HOT: (1.0, 0.42, 0.06),
+BASE = {SKIN: (0.33, 0.295, 0.265), PANTS: (0.105, 0.095, 0.085), BOOT: (0.06, 0.048, 0.04), SOLE: (0.025, 0.025, 0.025), HOT: (1.0, 0.42, 0.06),
         LEATHER: (0.165, 0.10, 0.055), IRON: (0.13, 0.13, 0.14), CHAIN: (0.085, 0.085, 0.095), WOOD: (0.15, 0.105, 0.065)}
 def colour(name, v, mat, n):
     c = np.array([BASE[m] for m in mat], np.float32)
@@ -41,7 +41,7 @@ def colour(name, v, mat, n):
         dist = np.linalg.norm(v - j['wr'], axis=1); soot = np.clip(1 - dist / 420, 0, 1)[:, None] * sk[:, None]
         c = c * (1 - 0.62 * soot) + np.array([0.05, 0.045, 0.04], np.float32) * 0.62 * soot
     burn = np.clip((n3 - 0.56) * 9, 0, 1)[:, None] * sk[:, None]
-    c = c * (1 - 0.6 * burn) + np.array([0.30, 0.09, 0.075], np.float32) * (0.75 + 0.5 * n2[:, None]) * 0.6 * burn
+    c = c * (1 - 0.4 * burn) + np.array([0.24, 0.10, 0.085], np.float32) * (0.75 + 0.5 * n2[:, None]) * 0.4 * burn
     vein = np.clip(1 - np.abs(fbm(v + 300, 60.0) - 0.5) * 22, 0, 1)[:, None] * sk[:, None] * 0.35
     c = c * (1 - vein) + np.array([0.20, 0.16, 0.24], np.float32) * vein
     le = mat == LEATHER
@@ -76,7 +76,7 @@ def load():
     parts = []
     for name, fn, box, vox, bud in model.PARTS:
         z = np.load('dec_%s.npz' % name); v, f, mat = z['v'], z['f'], z['mat']
-        v, f2 = mesh.cull(name, v, f, -4.0)
+        v, f2 = mesh.cull(name, v, f, -10.0 if name == 'acc' else -4.0)
         if len(f2) != len(f):
             _, mat = mesh.ev(fn, v, True); f = f2
         # smooth vertex normal for colouring / AO

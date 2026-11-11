@@ -216,12 +216,21 @@ Reglas de trabajo del usuario:
 4. Ganados más listos (que investiguen ruidos antes de detectarte), opcional.
 5. Usar el cadáver que se queda tras el sigilo (idea del usuario, sin concretar).
 5b. **Enemigo nuevo "El Herrero"** (diseño propio; el usuario pidió copiar el Bruto del remake y otro
-   personaje: no se copian diseños ajenos). models/herrero/: modelo procedural (campos de distancia →
-   marching cubes → decimado QEM en C, `qem.cpp`), 14.684 triángulos, 6 piezas (body, mask, fist, claw,
-   acc, weapon), colores por vértice con oclusión; `python3 mesh.py && python3 finish.py && python3
-   render.py && python3 export.py` (g++ -O2 -o qem qem.cpp). v1 SIN UV/texturas, SIN esqueleto y sin
-   convertir al formato del juego: falta estudiar el formato de modelos de em (em10) y su límite real
-   de polígonos.
+   personaje: no se copian diseños ajenos; le gusta el diseño). models/herrero/, todo procedural:
+   `g++ -O2 -o qem qem.cpp; python3 mesh.py && python3 finish.py && python3 tex.py && python3 show.py
+   && python3 export2.py`. Campos de distancia (model.py) → marching cubes → decimado QEM → 14.835
+   triángulos en 6 piezas (body, mask, fist, claw, acc, weapon).
+   - v2: espalda redondeada (joroba en cúpula, dorsales en cuña, vértebras), bultos de Plaga en cuello/
+     hombro izq., **pose de enlace en T** (como el esqueleto del juego: brazos en ±x, rotaciones
+     identidad), **UV + 2 texturas 1024²** (tex.py: cartas por proyección de caja, empaquetado skyline,
+     textura horneada con AO, relieve y detalle procedural; 0 = cuerpo/manos, 1 = máscara/hierros/arma),
+     **esqueleto y pesos** (rig.py: partes 0–25 con la numeración y jerarquía del juego, máx. 2 huesos
+     por vértice; máscara→4, puño y arma→10, garra→16, hombrera→5, accesorios rígidos), pose de muestra
+     por skinning. Export: herrero.glb (malla + piel + texturas) y OBJ+MTL.
+   - PENDIENTE (paso 4): formato del juego. em10.drs entrada 0 NO es el modelo (es un sub-archivo de 11
+     entradas); hay que localizar y descifrar el modelo/texturas de un ganado (BIN/TPL), ver si admite
+     pesos o es rígido por parte, su límite de polígonos (20.550 vértices tras partir por costuras UV:
+     probablemente haya que bajar) y cómo registrar un enemigo nuevo o sustituir uno.
 6. Más adelante: gesto de cambio de arma corriendo, interruptor Moderno/Clásico, tabla de controles
    para Dolphin, revisar puertas, suavizar la entrada del stick.
 
