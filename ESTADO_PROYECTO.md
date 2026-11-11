@@ -215,6 +215,13 @@ Reglas de trabajo del usuario:
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
 4. Ganados más listos (que investiguen ruidos antes de detectarte), opcional.
 5. Usar el cadáver que se queda tras el sigilo (idea del usuario, sin concretar).
+5b. **Enemigo nuevo "El Herrero"** (diseño propio; el usuario pidió copiar el Bruto del remake y otro
+   personaje: no se copian diseños ajenos). models/herrero/: modelo procedural (campos de distancia →
+   marching cubes → decimado QEM en C, `qem.cpp`), 14.684 triángulos, 6 piezas (body, mask, fist, claw,
+   acc, weapon), colores por vértice con oclusión; `python3 mesh.py && python3 finish.py && python3
+   render.py && python3 export.py` (g++ -O2 -o qem qem.cpp). v1 SIN UV/texturas, SIN esqueleto y sin
+   convertir al formato del juego: falta estudiar el formato de modelos de em (em10) y su límite real
+   de polígonos.
 6. Más adelante: gesto de cambio de arma corriendo, interruptor Moderno/Clásico, tabla de controles
    para Dolphin, revisar puertas, suavizar la entrada del stick.
 
