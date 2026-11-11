@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B73** (11-11-2026). Responder **siempre en español**.
+Última versión entregada: **B74** (11-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -177,6 +177,13 @@ Reglas de trabajo del usuario:
      frames 18–67) y tk_neck (altura esperada); stealth.c NeckMeasure mide la altura real (partes 3/4
      del ganado − pos.y, filtrada) y crouch.c ClipQ mezcla hacia la variante (StealthNeckK ±1). Se
      mantiene ScaleOne.
+   - **B74**: bandas otra vez solo en partida (preset "gameplay"): el usuario vio que en menús e
+     inventario las barras tapan fallos a arreglar (pendiente). Se mantiene el ocultado del HUD de la
+     franja de arriba (solo actúa con System_flg 0x800). Cuchillo (vídeo B73: "casi"; el brazo se
+     doblaba hacia dentro): corte más corto θ +15°→−30° (con −70° la muñeca se metía en el pecho de
+     León), arm_free premia el codo hacia fuera (lado derecho de León) y León se inclina 9 cm hacia el
+     ganado en 28–56 (el cuerpo de HUNK se aleja y el brazo no llegaba); salida: mano hacia fuera y
+     abajo. Codo fuera en todo el corte, punta en el cuello 30–42 (13 mm), muñeca ≤ 25°.
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.

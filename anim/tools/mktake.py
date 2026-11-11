@@ -259,7 +259,7 @@ def arm(Wrot, P_sh, wrist, hand_R, side, pole):
     for p in (up, tw_u): Wrot[p] = Ru
     for p in (fore, tw_f, mid): Wrot[p] = Rf
     Wrot[hand] = hand_R
-def arm_free(Wrot, P_sh, wrist, hand_fn, side, fd):
+def arm_free(Wrot, P_sh, wrist, hand_fn, side, fd, out=None, w_out=0.0):
     """two-bone arm with the elbow picked round its circle so the forearm points along fd (the
     hand then continues the forearm: hand_fn(forearm dir) -> hand rotation); returns the forearm dir"""
     la = np.linalg.norm(OFF[8]); lb = np.linalg.norm(OFF[9]) + np.linalg.norm(OFF[10])
@@ -269,7 +269,8 @@ def arm_free(Wrot, P_sh, wrist, hand_fn, side, fd):
         a = 2 * math.pi * i / 72
         pole = math.cos(a) * ref + math.sin(a) * np.cross(axis, ref)
         E, Wp = two_bone(P_sh, wrist, la, lb, pole)
-        sc = nrm(Wp - E) @ fd - 0.004 * max(0.0, E[1] - P_sh[1] - 40.0)   # no chicken wing
+        sc = nrm(Wp - E) @ fd - 0.004 * max(0.0, E[1] - P_sh[1] - 120.0)  # not over the shoulder
+        if out is not None: sc += w_out * (nrm(E - P_sh) @ out)          # B74: the elbow out, not in
         if best is None or sc > best[0]: best = (sc, pole)
     hand_R = None
     E, Wp = two_bone(P_sh, wrist, la, lb, best[1])
@@ -277,11 +278,12 @@ def arm_free(Wrot, P_sh, wrist, hand_fn, side, fd):
     hand_R = hand_fn(fdir)
     arm(Wrot, P_sh, wrist, hand_R, side, best[1])
     return fdir
+LEAN = 90.0
 DY = 0.0                  # auto-fit variants (the neck higher / lower than this Ganado's)
 NECK_UP = 0.62            # the throat: 62 % up from the neck base to the head (B72 0.55: a bit low)
 R_NECK = 58.0             # neck radius at the throat
 INS = 45.0                # how far the tip is in
-TH0, TH1 = 30.0, -70.0    # the cut: from the front-left round to its right (Leon's) side (reach)
+TH0, TH1 = 15.0, -30.0    # the cut round the front of the neck (B73 +30/-70 folded the arm in)
 def knife_hand(d, fingers):
     return frame([0, 0, 1], d, [-1, 0, 0], fingers)
 
@@ -290,6 +292,12 @@ def leon(f):
     W, root = hunk(fh)
     gR, gP = ganado(min(f, 70))
     _, P = fk(W, root)
+    # B74: HUNK's body turns away during the cut (the arm ran out of reach): Leon leans in ~9 cm
+    w_sh = ramp(f, 28, 35) * (1 - ramp(f, 46, 56))
+    if w_sh > 0:
+        dv = gP[3] - P[7]; dv[1] = 0.0
+        root = root + nrm(dv) * LEAN * w_sh
+        _, P = fk(W, root)
     # the knife hand: HUNK's (front of the face) -> across the throat -> away -> down by the side
     # B70: lower and closer in (B69's blade went past the chin, in the air): the throat, 45 mm in
     # front of the neck's middle, just under the jaw
@@ -312,7 +320,7 @@ def leon(f):
     u = math.cos(th) * fw + math.sin(th) * lat                    # out of the neck at the blade
     tg = nrm(-math.sin(th) * fw + math.cos(th) * lat)             # round the neck, to its left
     ins = lerp(-40.0, INS, ramp(f, 26, 31))                       # the tip goes in, then stays in
-    tip = A + u * (R_NECK - ins) + u * 160.0 * t_out + np.array([0.0, -120.0, 0.0]) * t_out
+    tip = A + u * (R_NECK - ins) + (u * 90.0 - lat * 80.0 + np.array([0.0, -150.0, 0.0])) * t_out
     b = nrm(-u + np.array([0.0, -0.6, 0.0]) * t_out)              # pulled out: blade down
     wrist = tip - b * KNIFE
     w_ik = t_in * (1 - ramp(f, F_OUT[1], F_REL[1]))
@@ -324,7 +332,8 @@ def leon(f):
         def hand_fn(fdir):
             hs = frame([0, 0, 1], b, [-1, 0, 0], fdir)             # blade out of the thumb side, wrist straight
             return slerpR(W[10], hs, w_ik)
-        arm_free(Wk, P[7], wr, hand_fn, -1, fd)
+        out = P[7] - P[13]; out[1] = 0.0; out = nrm(out)               # Leon's right, outwards
+        arm_free(Wk, P[7], wr, hand_fn, -1, fd, out, 0.8 * w_ik)
         W = Wk
     # left hand (mirrored HUNK's right): palm on the back of the head, in line with the forearm
     w_l = ramp(f, TK_S0 + 3, TK_S0 + 9) * (1 - ramp(f, *F_REL))
