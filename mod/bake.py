@@ -69,7 +69,7 @@ for k,a in HOOKS:
 # ---- C part (clang for the 750 + binutils ld), linked right after the asm blocks
 CMOD=TEXT_ADDR+len(text)
 C_SRCS=['c/item.c','c/pad.c','c/weapon.c','c/hud.c','c/icon.c','c/sil_data.c','c/mot_data.c','c/prefetch.c','c/legs.c','c/stealth.c','c/crouch.c']; C_ASM=['c/hooks.s']
-C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame'),(0x80124A44,'hook_draw'),(0x800C5E84,'hook_dvdread'),(0x80169718,'hook_mesbar'),(0x8003EB6C,'hook_laser'),(0x80145A0C,'hook_hitchk'),(0x801472DC,'hook_sway'),(0x8003EA48,'hook_laserray'),(0x800BCD54,'hook_aimcam'),(0x800BDB00,'hook_cam')]
+C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame'),(0x80124A44,'hook_draw'),(0x800C5E84,'hook_dvdread'),(0x80169718,'hook_mesbar'),(0x8003EB6C,'hook_laser'),(0x80145A0C,'hook_hitchk'),(0x801472DC,'hook_sway'),(0x8003EA48,'hook_laserray'),(0x800BCD54,'hook_aimcam'),(0x800BDB00,'hook_cam'),(0x8011D47C,'hook_hud')]
 def build_c(addr):
     objs=[]
     for f in C_SRCS:
@@ -99,13 +99,19 @@ W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x8014700
      0x80146D8C:0xC0091FA8,0x800BCD5C:0x813E0788,0x800BCD64:0xC0090030,0x80157A20:0x60000000,0x80157A2C:0x48000060,
      0x8003EB68:0x60000000,   # no laser dot on enemies (reticle instead)
      0x80146F48:0x48000010,   # aim pitch: up as fast as down (no 0.8 when aiming upwards)
-     # B68: no letterbox. SetScissorState (0x8012641C) always takes the no-scissor branch, and the two
-     # screen filters (09 / 0b) draw full height instead of the band y 56, h - 111
-     0x80126434:0x480000A0,
-     0x80117A90:0x38C60000,0x80117A94:0x38800000,0x80190708:0x38C60000,0x8019070C:0x38800000,
-     # B69: the bars themselves: CinescoMove asks for them every frame and Draw_cinesco (0x801758C4)
-     # paints them - it now always takes its 'alpha 0' exit
-     0x801758DC:0x48000280}
+     # B72: no letterbox in gameplay (port to PAL of jrupinski/RE4-gamecube-letterbox-patch, preset
+     # "gameplay"). Three sources: Draw_cinesco quads, the HUD bar sprites (group 0x30) and the
+     # letterbox-mode flag (System_flg 0x800) that scissors the 3D render to rows 56-392.
+     # 1) HUD sprite loop (0x8011DF9C): also skip group 0x30
+     0x8011DF9C:0x28000030,0x8011DFA0:0x41820050,0x8011DFA4:0x5409EEFA,0x8011DFA8:0x7D69E02E,0x8011DFAC:0x5D6B0001,
+     # 2) andi. rX,r0,0x800 -> andi. rX,r0,0: render loop scissor + screen effects take the full path
+     0x801695F0:0x700B0000,0x800FC6B8:0x70090000,0x8017C608:0x70090000,0x8017CA28:0x70090000,
+     0x80180760:0x70090000,0x80186C58:0x70090000,
+     # 3) fade-to-black overlay top 56.0 -> 0.0
+     0x801F0184:0x00000000,
+     # 4) cine_polling (0x8017579C): bars only when Stop_flg (menus, inventory, cutscenes, movies) or title
+     0x801757A0:0x80090170,0x801757A4:0x81895020,0x801757A8:0x558C8FFE,0x801757AC:0x7C006378,
+     0x801757B0:0x3180FFFF,0x801757B4:0x7D6C0110,0x801757B8:0x88030002}
 # __ArenaLo: lis r3,hi / addi r3,r3,lo at both sites
 ha=(END+0x8000)>>16; lo=END-(ha<<16)
 W04[0x80069160]=0x3C600000|ha; W04[0x80069164]=0x38630000|(lo&0xFFFF)

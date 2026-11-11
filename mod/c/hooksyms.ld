@@ -14,3 +14,4 @@ ret_sway_recentre  = 0x801472E0;
 ret_laserray       = 0x8003EA4C;
 ret_aimcam         = 0x800BCD58;
 ret_cam            = 0x800BDB04;
+ret_hud            = 0x8011D480;

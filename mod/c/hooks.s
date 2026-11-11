@@ -186,3 +186,27 @@ hook_cam:
     addi  r1,r1,48
     mr    r31,r5              # original instruction
     b     ret_cam
+
+# B72: health meter to the screen edge in gameplay (bars removed). idSysMove00 after pos = pos0 + anim
+# (0x8011D47C, r31 = ID_UNIT): class 0x21 (IDC_LIFE_METER), no parent, Stop_flg == 0 -> pos.y -= 60
+    .globl hook_hud
+hook_hud:
+    lbz   r12,2(r31)
+    cmpwi r12,0x21
+    bne   1f
+    lwz   r12,0x68(r31)
+    cmpwi r12,0
+    bne   1f
+    lwz   r12,-29912(r13)
+    lwz   r12,0x170(r12)
+    cmpwi r12,0
+    bne   1f
+    lfs   f0,0x98(r31)
+    lis   r12,hud_dy@ha
+    lfs   f1,hud_dy@l(r12)
+    fsubs f0,f0,f1
+    stfs  f0,0x98(r31)
+1:  lbz   r0,4(r31)           # original instruction
+    b     ret_hud
+    .balign 4
+hud_dy: .float 60.0

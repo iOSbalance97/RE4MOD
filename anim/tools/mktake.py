@@ -270,13 +270,18 @@ def leon(f):
     # the knife hand: HUNK's (front of the face) -> across the throat -> away -> down by the side
     # B70: lower and closer in (B69's blade went past the chin, in the air): the throat, 45 mm in
     # front of the neck's middle, just under the jaw
-    throat_far = gP[3] + np.array([65.0, 45.0, 52.0])            # the Ganado's left (B71: +40 up)
-    throat_near = gP[3] + np.array([-75.0, 40.0, 48.0])          # its right (Leon's side)
+    # B72: the throat from the neck itself (55 % up from the neck base to the head, 60 mm in front of
+    # its axis), so the blade follows it; the Ganado is drawn at scale 1 during the kill (stealth.c),
+    # earlier builds missed by its random 1.01-1.1 body scale (up to ~140 mm at the neck)
+    ax_n = nrm(gP[4] - gP[3])
+    fw = np.array([0.0, 0.0, 1.0]); fw = nrm(fw - ax_n * (fw @ ax_n))
+    throat = gP[3] + (gP[4] - gP[3]) * 0.55 + fw * 60.0
     d = nrm(np.array([1.0, -0.10, -0.25]))                       # blade: tip to the far side, pressed in
     hand_s = knife_hand(d, [0.0, -0.4, 1.0])
-    start = throat_far - d * KNIFE
-    end = throat_near - d * KNIFE + np.array([-60.0, -20.0, 0.0])
-    away = end + np.array([-120.0, -160.0, 40.0])
+    CONTACT = 0.62 * KNIFE                                        # the blade's middle on the throat
+    start = throat + np.array([70.0, 0.0, 0.0]) - d * CONTACT     # contact on its left
+    end = throat + np.array([-80.0, -10.0, 0.0]) - d * CONTACT    # drawn across to its right
+    away = end + np.array([-30.0, -200.0, -40.0])                 # B72: down, close in (B71 swung out)
     t_in = ramp(f, 22, 28)                                        # B70: knife on the throat early, held there until the cut
     t_cut = min(1.0, max(0.0, (f - F_SLIT[0]) / float(F_SLIT[1] - F_SLIT[0])))
     t_cut = t_cut * t_cut * (3 - 2 * t_cut)
@@ -318,9 +323,10 @@ for f in range(NF):
     # from the crouch idle (arms first) and, after HUNK, back to it (the sheath on the way)
     a_b = 1.0 - ramp(f, TK_S0, F_IN); a_a = 1.0 - ramp(f, TK_S0, F_IN - 3)
     b = ramp(f, F_HUNK, F_END - 6)
+    b_arm = ramp(f, F_OUT[1], F_REL[1] + 4)                            # B72: arms straight to the idle
     root = root.copy(); root[1] = lerp(root[1], IDLE_Y, b)             # height goes with the pose
     for p in BODY:
-        k = max(a_a if p in ARM_PARTS else a_b, b)
+        k = max(a_a if p in ARM_PARTS else a_b, b, b_arm if p in ARM_PARTS else 0.0)
         if k > 0: L[p] = slerpR(L[p], IDLE_L[p], k)
     # sheath: right hand to the left of the chest, blade down (on top of the idle blend), then back
     w_s = ramp(f, *F_SHEATH) * (1 - ramp(f, F_SHEATH[1] + 2, F_END - 2))

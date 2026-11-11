@@ -202,6 +202,18 @@ static void KillEnd(u8* pl)
     kill_k = -1; take_f = -1.0f; victim = 0;
 }
 
+/* B72: the Ganado at scale 1 during the kill (em10 picks a random body scale 1.01-1.1 at init and
+ * eases cModel scale +0xAC towards its work Scale +0x9DC every frame): the take's poses are worked out
+ * on the unscaled skeleton, a 1.1 Ganado had its throat ~140 mm above Leon's knife */
+static void ScaleOne(u8* e)
+{
+    int i;
+    for (i = 0; i < 3; i++) {
+        f32* sc = (f32*)(e + 0xAC) + i;
+        ((f32*)(e + 0x9DC))[i] = 1.0f;
+        *sc = *sc * 0.8f + 0.2f;
+    }
+}
 void StealthKillFrame(void)
 {
     u8* pl = pPL;
@@ -211,6 +223,7 @@ void StealthKillFrame(void)
         target = 0;
         kill_k++;
         if (!pl || !victim || (*(u32*)victim & 1) == 0) { KillEnd(pl); return; }
+        ScaleOne(victim);
         /* B69: slower, slowest round the cut (the Ganado's Seq_speed, Leon follows its frame) */
         {
             f32 sp = TK_SPD_BASE - (TK_SPD_BASE - TK_SPD_CUT) * (Sm((kill_f - 26.0f) / 6.0f) - Sm((kill_f - 44.0f) / 6.0f));
@@ -273,6 +286,7 @@ int StealthPress(void)
     e[0xFC] = 2; e[0xFD] = 0x15; e[0xFE] = 1; e[0xFF] = 0;
     kill_k = TK_S0; kill_f = prev_f = (f32)TK_S0; take_f = (f32)TK_S0; target = 0;
     SEQ_SPEED(e) = TK_SPD_BASE;
+    ScaleOne(e);
     return 1;
 }
 /* pad.c, every frame of a takedown: the knife stays drawn (L) and nothing else gets through */

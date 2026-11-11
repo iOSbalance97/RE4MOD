@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B71** (10-11-2026). Responder **siempre en español**.
+Última versión entregada: **B72** (11-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -148,6 +148,22 @@ Reglas de trabajo del usuario:
      encontrar. B71 = prueba: pone el color de borrado de la copia EFB en rojo oscuro (FIFO BP 0x4F/
      0x50, una vez, ClearRedTest en hud.c): rojo = zona sin dibujar; negro = algo la pinta.
    - B71: cuchillo +40 mm (B70 quedaba por debajo de la garganta).
+   - **B72 – bandas resueltas**: el vídeo de B71 (rojo solo en la carga, negro en partida) y el parche
+     público jrupinski/RE4-gamecube-letterbox-patch (NTSC) explican el origen: son TRES cosas:
+     Draw_cinesco, los sprites de barra del HUD (grupo 0x30) y la bandera "modo letterbox"
+     (System_flg 0x800, pG+0x54) que recorta el render 3D a las filas 56–392. Portado a PAL (preset
+     "gameplay": barras solo con Stop_flg≠0 = menús, inventario, escenas, vídeos, o en el título):
+     HUD 0x8011DF9C (5 palabras), andi.0x800→0 en 0x801695F0 (bucle de render), 0x800FC6B8,
+     0x8017C608, 0x8017CA28, 0x80180760, 0x80186C58 (efectos), float 56→0 en 0x801F0184 (fundido),
+     cine_polling 0x801757A0–B8 (7 palabras). Revertidos los parches B68/B69 (tijera, filtros,
+     Draw_cinesco). Medidor de vida bajado 60 u (56 px) en partida: hook_hud 0x8011D47C (idSysMove00,
+     clase 0x21 sin padre, Stop_flg==0). Quitado ClearRedTest.
+   - **B72 – cuchillo**: causa real de que unas veces quedara alto y otras bajo: em10 da a cada ganado
+     una escala aleatoria 1.01–1.1 (cModel scale +0xAC, work Scale +0x9DC) y la toma está calculada
+     a escala 1 (hasta ~140 mm de diferencia en el cuello). Ahora durante la muerte ScaleOne() lleva
+     el ganado a escala 1. mktake: la garganta se calcula del propio cuello (55 % entre base del cuello
+     y cabeza, 60 mm delante de su eje), el centro de la hoja sobre ella; tras el corte la mano baja
+     pegada (no se abre hacia fuera) y los brazos van directos a la pose agachada (no a la de HUNK).
 2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
