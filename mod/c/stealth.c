@@ -104,6 +104,7 @@ void EstSet(void* model, int no, Vec* pos, Vec* rot, int owner, int id, int core
 int CrouchActive(void);
 static u8* target;
 static u8* victim;
+#define TK_EM_LAST 129                  /* last frame of the Ganado's motion (130 frames) */
 static u8* corpse;                       /* B76: the last takedown victim, watched until it is down */
 static int kill_k = -1;
 static f32 kill_f, prev_f;               /* takedown frame (motion frames, slowed) */
@@ -252,6 +253,14 @@ void StealthKillFrame(void)
         if ((*(u32*)corpse & 1) == 0 || corpse[0xFC] < 2 || corpse[0xFC] > 3) corpse = 0;
         else {
             *(u32*)(corpse + 0x3C8) |= 0x10000000u;
+            /* B78: the one-frame figure standing next to the body (B77 video, ~0.8 s after it lands):
+             * the neck-break motion running past its last frame (130) before Dm_NeckBreak sees the end.
+             * Two frames before that it is held (Seq_speed 0) and sent to Die_Cramp (3,0,0,1) here,
+             * as Dm_NeckBreak would; Die_Cramp's MotionMove then holds the last pose */
+            if (corpse[0xFC] == 2 && corpse[0xFD] == 0x15 && SEQ_FRAME(corpse) >= (f32)(TK_EM_LAST - 2)) {
+                SEQ_SPEED(corpse) = 0.0f;
+                corpse[0xFC] = 3; corpse[0xFD] = 0; corpse[0xFE] = 0; corpse[0xFF] = 1;
+            }
             if (corpse[0xFC] == 3 && corpse[0xFD] == 3 && corpse[0xFE] == 0) {
                 corpse[0xFD] = 0; corpse[0xFE] = 2; corpse[0xFF] = 0;
             }

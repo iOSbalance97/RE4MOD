@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B77** (11-11-2026). Responder **siempre en español**.
+Última versión entregada: **B78** (11-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -203,11 +203,19 @@ Reglas de trabajo del usuario:
      igualmente). Ahora StealthKillFrame vigila `corpse` cada frame y si la ve en Die_Lost sin empezar
      (r_no 3,3,0) la devuelve a Die_Cramp reposo (3,0,2). Si aun así parpadea, no es Die_Lost: pedir
      vídeo a velocidad normal con la cámara en el cuerpo.
-2. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
+   - **B78** (vídeo B77): el cadáver ya se queda en el suelo (B77 funciona), pero ~0,8 s después de caer
+     aparece 1 fotograma una figura encorvada de pie junto al cuerpo = el final del movimiento del
+     ganado (130 frames): se pasa del último frame antes de que Dm_NeckBreak vea el final. El vigilante
+     `corpse` lo para 2 frames antes (Seq_speed 0) y lo manda a Die_Cramp (3,0,0,1). El usuario acepta
+     que se disuelva si eso lo arreglara; de momento se conserva el cadáver (lo quiere para otra cosa).
+2. **Fallos tapados por las bandas en menús e inventario** (el usuario los vio con B73 sin bandas):
+   pedir capturas y arreglarlos; luego se podrán quitar las bandas también ahí.
+3. **Rastro del cuchillo**: el efecto del tajo sigue a la animación de pie del juego. Para que siga a
    la nuestra hay que aplicar las poses (legs.c/crouch.c) al final del movimiento de León (antes de
    los efectos) en vez de en ModFrame. Pendiente de encontrar ese punto en el dol PAL.
-3. Ganados más listos (que investiguen ruidos antes de detectarte), opcional.
-4. Más adelante: gesto de cambio de arma corriendo, interruptor Moderno/Clásico, tabla de controles
+4. Ganados más listos (que investiguen ruidos antes de detectarte), opcional.
+5. Usar el cadáver que se queda tras el sigilo (idea del usuario, sin concretar).
+6. Más adelante: gesto de cambio de arma corriendo, interruptor Moderno/Clásico, tabla de controles
    para Dolphin, revisar puertas, suavizar la entrada del stick.
 
 ## 5. Direcciones PAL útiles (verificadas)
