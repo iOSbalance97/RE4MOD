@@ -1,7 +1,7 @@
 """UV atlas (box-projection charts, shelf packed) + baked diffuse texture (procedural detail, AO, soft top light)"""
 import numpy as np, pickle, sys, math, cv2
 import model, mesh, finish
-from model import SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, HOT
+from model import SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, HOT, PLAGA, EYE
 from finish import vnoise, fbm, allsdf
 SZ = 1024; PAD = 3
 ATLAS = {'body': 0, 'fist': 0, 'claw': 0, 'mask': 1, 'acc': 1, 'weapon': 1}
@@ -86,13 +86,32 @@ def texcolour(name, fn, P, N):
     for k, (a, off) in enumerate(((0.9, 0.0), (0.75, 2.1), (-0.8, 4.0), (1.05, 5.5))):
         t = (P[:, 0] * a + y + 55 * vnoise(P, 140.0)) * 0.016 + off
         ln_ = np.clip(1 - np.abs(np.mod(t, 6.283) - 3.14) * 9, 0, 1) * back * (vnoise(P + k * 31, 200.0) > 0.42)
-        c = c * (1 - 0.75 * ln_[:, None]) + np.array([0.40, 0.17, 0.15], np.float32) * 0.75 * ln_[:, None]
-    g = np.zeros(len(P), np.float32)
-    for cc, r in model.GROWTH: g = np.maximum(g, np.clip(1.9 - np.linalg.norm(P - np.array(cc, np.float32), axis=1) / r, 0, 1))
-    g *= sk
-    veins = np.clip(1 - np.abs(fbm(P + 123, 34.0) - 0.5) * 16, 0, 1)
-    gg = np.clip(g * 1.2, 0, 1) * (0.45 + 0.55 * veins)
-    c = c * (1 - gg[:, None]) + np.array([0.16, 0.07, 0.13], np.float32) * (0.6 + 0.8 * vnoise(P, 12.0))[:, None] * gg[:, None]
+        c = c * (1 - 0.75 * ln_[:, None]) + np.array([0.33, 0.14, 0.12], np.float32) * 0.75 * ln_[:, None]
+    # --- the infection: spreads from the growths; black veins, grey necrotic skin, an inflamed rim
+    G = np.array([c_ for c_, r_ in model.GROWTH], np.float32); GR = np.array([r_ for c_, r_ in model.GROWTH], np.float32)
+    dg = np.full(len(P), 1e9, np.float32)
+    for c_, r_ in zip(G, GR): dg = np.minimum(dg, np.linalg.norm(P - c_, axis=1) - r_)
+    inf = np.clip(1 - dg / 430.0, 0, 1) ** 1.3                                   # 1 on a growth -> 0 at ~45 cm
+    inf = np.clip(inf * (0.75 + 0.6 * fbm(P + 222, 120.0)), 0, 1) * sk
+    v1 = np.abs(fbm(P + 123, 46.0) - 0.5); v2 = np.abs(fbm(P + 611, 19.0) - 0.5); v3 = np.abs(fbm(P + 37, 95.0) - 0.5)
+    wv = 0.012 + 0.05 * inf                                                      # veins thicken towards the source
+    veins = np.maximum(np.clip(1 - v1 / wv, 0, 1), np.maximum(0.8 * np.clip(1 - v2 / (wv * 0.7), 0, 1) * (inf > 0.35), np.clip(1 - v3 / (wv * 1.3), 0, 1)))
+    veins = veins * np.clip(inf * 2.2, 0, 1)
+    nec = np.clip((inf - 0.45) * 2.6, 0, 1) * (0.55 + 0.45 * vnoise(P, 22.0))
+    c = c * (1 - nec[:, None]) + np.array([0.075, 0.062, 0.066], np.float32) * (0.7 + 0.6 * vnoise(P + 9, 9.0))[:, None] * nec[:, None]
+    rim = np.clip(1 - np.abs(inf - 0.40) * 6, 0, 1)[:, None] * 0.45
+    c = c * (1 - rim) + np.array([0.26, 0.085, 0.07], np.float32) * rim
+    c = c * (1 - 0.92 * veins[:, None]) + np.array([0.016, 0.006, 0.018], np.float32) * 0.92 * veins[:, None]
+    far = np.clip(1 - np.abs(fbm(P + 300, 70.0) - 0.5) * 40, 0, 1)[:, None] * sk[:, None] * 0.30   # faint veins everywhere
+    c = c * (1 - far) + np.array([0.06, 0.04, 0.06], np.float32) * far
+    pg = mat == PLAGA
+    if pg.any():
+        ring = 0.55 + 0.45 * np.sin(P[pg][:, 0] * 0.21 + P[pg][:, 1] * 0.17 + P[pg][:, 2] * 0.19)
+        c[pg] = np.array([0.17, 0.035, 0.035], np.float32) * (0.45 + 0.75 * ring)[:, None] * (0.8 + 0.4 * vnoise(P[pg], 8.0))[:, None]
+    # black ichor run down from the mask's breathing slots onto the bib and the chest
+    drip = (np.abs(P[:, 0]) < 125) & (y > 1330) & (y < 1730) & (P[:, 2] > 230) & ((mat == LEATHER) | sk)
+    st_ = np.clip((vnoise(P * np.array([1, 0.06, 1], np.float32), 13.0) - 0.42) * 6, 0, 1) * np.clip((y - 1330) / 300, 0, 1) * drip
+    c = c * (1 - 0.9 * st_[:, None]) + np.array([0.03, 0.006, 0.008], np.float32) * 0.9 * st_[:, None]
     # leather: stitching round the apron's edge is too fine for 4 mm texels -> seams as darker bands
     le = mat == LEATHER
     c[le] *= (0.85 + 0.3 * vnoise(P[le], 6.0))[:, None]
@@ -115,9 +134,12 @@ def texcolour(name, fn, P, N):
     shade = (0.62 + 0.38 * np.clip(N @ L, -0.3, 1)) * ao ** 1.15 * bump
     hot = mat == HOT
     shade[hot] = 1.0
+    ey = mat == EYE; shade[ey] = 1.6
+    shade[pg] *= 1.25
     c[hot] = np.array([1.0, 0.36, 0.05], np.float32) * (0.8 + 0.5 * vnoise(P[hot], 15.0))[:, None]
     grime = (0.80 + 0.35 * fbm(P + 400, 45.0))[:, None]
-    return np.clip(c * shade[:, None] * grime * 1.0, 0, 1) ** (1 / 2.2)   # display space
+    grime[hot | ey] = 1.0
+    return np.clip(c * shade[:, None] * grime * 1.2, 0, 1) ** (1 / 2.2)   # display space
 def bake(parts, uvs):
     imgs = [np.zeros((SZ, SZ, 3), np.float32) for _ in (0, 1)]; msk = [np.zeros((SZ, SZ), bool) for _ in (0, 1)]
     for p, uv, (name, fn, box, vox, bud) in zip(parts, uvs, model.PARTS):

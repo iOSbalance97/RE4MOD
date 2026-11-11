@@ -1,6 +1,6 @@
 import numpy as np, struct, json, sys, math
 import model, mesh
-from model import SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, HOT
+from model import SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, HOT, PLAGA, EYE
 rng = np.random.default_rng(7)
 NG = rng.random((32, 32, 32)).astype(np.float32)
 def vnoise(p, sc):
@@ -28,8 +28,9 @@ def corner_normals(v, f, ang=42.0):
             nb = vf[t[k]]; w = fu[nb] @ fu[i] > cs
             n = (fn[nb][w]).sum(0); out[i, k] = n / (np.linalg.norm(n) + 1e-12)
     return out
-BASE = {SKIN: (0.33, 0.295, 0.265), PANTS: (0.105, 0.095, 0.085), BOOT: (0.06, 0.048, 0.04), SOLE: (0.025, 0.025, 0.025), HOT: (1.0, 0.42, 0.06),
-        LEATHER: (0.165, 0.10, 0.055), IRON: (0.13, 0.13, 0.14), CHAIN: (0.085, 0.085, 0.095), WOOD: (0.15, 0.105, 0.065)}
+BASE = {SKIN: (0.235, 0.16, 0.11), PANTS: (0.085, 0.078, 0.058), BOOT: (0.05, 0.04, 0.032), SOLE: (0.022, 0.022, 0.022), HOT: (1.0, 0.42, 0.06),
+        LEATHER: (0.125, 0.075, 0.042), IRON: (0.10, 0.097, 0.095), CHAIN: (0.07, 0.068, 0.07), WOOD: (0.13, 0.09, 0.055),
+        PLAGA: (0.20, 0.045, 0.04), EYE: (1.0, 0.07, 0.02)}
 def colour(name, v, mat, n):
     c = np.array([BASE[m] for m in mat], np.float32)
     n1 = fbm(v, 90.0); n2 = fbm(v + 500, 30.0); n3 = fbm(v + 900, 220.0)
@@ -69,7 +70,7 @@ def colour(name, v, mat, n):
     ao = np.zeros(len(v), np.float32)
     for h in (12.0, 35.0, 80.0, 170.0): ao += np.clip(allsdf(v + n * h) / h, 0, 1)
     ao = 0.12 + 0.88 * (ao / 4) ** 1.5
-    ao[mat == HOT] = 1.0
+    ao[(mat == HOT) | (mat == EYE)] = 1.0
     # cavities: the visor slit
     return np.clip(c * ao[:, None], 0, 1), ao
 def load():

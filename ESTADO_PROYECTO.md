@@ -227,6 +227,11 @@ Reglas de trabajo del usuario:
      **esqueleto y pesos** (rig.py: partes 0–25 con la numeración y jerarquía del juego, máx. 2 huesos
      por vértice; máscara→4, puño y arma→10, garra→16, hombrera→5, accesorios rígidos), pose de muestra
      por skinning. Export: herrero.glb (malla + piel + texturas) y OBJ+MTL.
+   - v3 (el usuario: antes del formato, más realismo, tono de ganado y que se note la infección): piel
+     más oscura/tostada, ropa y hierros más oscuros; infección desde los bultos (lado izquierdo: cuello,
+     hombro, brazo, pecho): venas negras que engordan hacia el foco, piel necrosada gris, borde
+     inflamado; 4 tentáculos de Plaga saliendo del cuello (material PLAGA, en body); ojos rojos tras la
+     rendija (EYE, en mask); icor negro chorreando de las ranuras de la máscara al peto.
    - PENDIENTE (paso 4): formato del juego. em10.drs entrada 0 NO es el modelo (es un sub-archivo de 11
      entradas); hay que localizar y descifrar el modelo/texturas de un ganado (BIN/TPL), ver si admite
      pesos o es rígido por parte, su límite de polígonos (20.550 vértices tras partir por costuras UV:

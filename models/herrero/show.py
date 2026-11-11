@@ -19,7 +19,7 @@ P1 = posed(rig.POSE)
 allv = np.concatenate([p['v'] for p in P1]); print('posed bbox', allv.min(0).round(), allv.max(0).round())
 V = {'front': ((1300, 1450, 4100), (-60, 1000, 0)), 'q2': ((3000, 1300, 2900), (-60, 1000, 0)), 'side': ((-4300, 1300, 500), (-60, 1000, -150)),
      'back': ((-1800, 1700, -3900), (-150, 1000, -100)), 'face': ((650, 1750, 1900), (-30, 1580, 250)), 'anvil': ((-2300, 900, -2300), (-650, 380, -560))}
-V['bback'] = ((-1800, 1700, -3900), (-150, 1300, -100))
+V['inf'] = ((1700, 2150, 1300), (230, 1680, 0)); V['bback'] = ((-1800, 1700, -3900), (-150, 1300, -100))
 sel = sys.argv[1:] or list(V)
 for k in sel:
     render.render(parts if k == 'bback' else P1, *V[k], texs=texs).save('p_%s.png' % k)

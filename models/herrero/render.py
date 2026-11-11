@@ -56,7 +56,7 @@ def render(parts, eye, tgt, fov=32, W=900, H=1200, ss=2, bg=(0.012, 0.012, 0.014
             hv = L1 + vd; hv /= np.linalg.norm(hv, axis=1)[:, None]
             sp = np.clip((n * hv).sum(1), 0, 1) ** (18 + 50 * me) * (0.10 + 0.55 * me)
             rim = (1 - np.clip((n * vd).sum(1), 0, 1)) ** 3
-            lit = (0.45 if texs is not None else 0.07) + (0.85 if texs is not None else 1.25) * d1[:, None] * np.array([1.0, 0.93, 0.82]) + 0.22 * d2[:, None] * np.array([0.55, 0.65, 0.9]) + 0.75 * d3[:, None] * np.array([0.9, 0.5, 0.3])
+            lit = (0.34 if texs is not None else 0.07) + (0.95 if texs is not None else 1.25) * d1[:, None] * np.array([1.0, 0.93, 0.82]) + 0.22 * d2[:, None] * np.array([0.55, 0.65, 0.9]) + 0.75 * d3[:, None] * np.array([0.9, 0.5, 0.3])
             col = c * lit + sp[:, None] * np.array([1.0, 0.95, 0.85]) + (0.22 * rim * (0.3 + d3))[:, None] * np.array([0.9, 0.55, 0.35])
             ho = (b0 * hot[t[0]] + b1 * hot[t[1]] + b2 * hot[t[2]])[:, None]; col = col * (1 - ho) + c * 2.2 * ho
             sub[m] = zz[m]; img[ya:yb + 1, xa:xb + 1][m] = col

@@ -1,7 +1,7 @@
 """EL HERRERO - original heavy enemy (village blacksmith). mm, y up, faces +z, its right = -x."""
 import numpy as np, math
 from sdf import *
-SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, CLOTH, HOT = range(10)
+SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, CLOTH, HOT, PLAGA, EYE = range(12)
 
 # ---- skeleton -----------------------------------------------------------------------------------
 def J(s):
@@ -9,7 +9,23 @@ def J(s):
              sh=V(s*465, 1690, 75))
     d.update(sh=V(s*455, 1665, 60)); d.update(el=d['sh'] + V(s*442, 0, 0)); d.update(wr=d['el'] + V(s*400, 0, 0))   # T-pose (bind)
     return d
-GROWTH = [((165, 1835, 30), 62), ((235, 1800, -55), 50), ((115, 1880, -45), 44), ((285, 1770, 40), 40), ((95, 1820, 120), 36), ((200, 1870, -10), 30)]
+GROWTH = [((165, 1835, 30), 66), ((235, 1800, -55), 54), ((115, 1880, -45), 46), ((285, 1770, 40), 44), ((95, 1820, 120), 38), ((200, 1870, -10), 34),
+          ((330, 1740, -150), 46), ((250, 1640, -250), 40), ((560, 1745, 80), 44), ((640, 1700, -40), 36), ((760, 1760, 70), 30),
+          ((1010, 1740, 90), 40), ((1090, 1690, -20), 34), ((1180, 1745, 60), 28), ((300, 1560, 250), 34)]
+# the Plaga breaking out of the neck: tendrils (bind pose)
+TENDRILS = [[(170, 1850, 20), (225, 1965, -10), (325, 2040, 10), (425, 2020, 60), (462, 1955, 95)],
+            [(220, 1820, -60), (300, 1890, -160), (365, 1840, -255), (355, 1735, -295), (300, 1690, -300)],
+            [(120, 1850, 110), (160, 1955, 190), (245, 1995, 262), (318, 1945, 302)],
+            [(250, 1790, 30), (345, 1845, 62), (410, 1805, 115), (420, 1740, 150)]]
+def plaga(p):
+    d = None
+    for path in TENDRILS:
+        n = len(path) - 1
+        for i in range(n):
+            r0 = 34 - 24 * i / n; r1 = 34 - 24 * (i + 1) / n
+            seg = rcone(p, V(*path[i]), V(*path[i + 1]), r0, r1)
+            d = seg if d is None else smin(d, seg, 9)
+    return d + 2.5 * np.sin(p[:, 0] * 0.21 + p[:, 1] * 0.17 + p[:, 2] * 0.19)                # ringed, like a worm
 JR, JL = J(-1), J(1)
 HEAD = V(0, 1872, 352)
 def fore_r(j, s): return (150 if s < 0 else 142), (104 if s < 0 else 98)
@@ -28,7 +44,6 @@ def torso(p):
         d = smin(d, ell(p, V(s*290, 1250, -40), V(150, 130, 220)), 50)     # love handles
     for i in range(9):                                                     # vertebrae showing through
         d = smin(d, sph(p, V(0, 1240 + i * 62, -322 - 22 * math.sin(i * 0.42) + (i > 6) * 14 * (i - 6)), 21), 10)
-    for c, r in GROWTH: d = smin(d, sph(p, V(*c), r), 22)                  # Plaga growths, left neck / shoulder
     return d
 def pelvis(p): return ell(p, V(0, 1085, 5), V(335, 205, 250))
 def arms(p):
@@ -53,7 +68,10 @@ def neck_head(p):
     h = smin(h, ell(p, HEAD + V(0, -75, 30), V(102, 85, 105)), 30)                        # jaw
     for s in (-1, 1): h = smin(h, ell(p, HEAD + V(s*118, -5, -15), V(18, 38, 26)), 12)    # ears
     return smin(d, h, 35)
-def skin(p): return su(38, torso(p), arms(p), neck_head(p))
+def skin(p):
+    d = su(38, torso(p), arms(p), neck_head(p))
+    for c, r in GROWTH: d = smin(d, sph(p, V(*c), r), 22)                  # Plaga growths, left neck / shoulder / arm
+    return d
 def legs(p):
     d = pelvis(p)
     for s, j in ((-1, JR), (1, JL)):
@@ -128,8 +146,8 @@ def body(p):
     kp = np.maximum(lg - 11, sph(p, JL['knee'] + V(0, 5, 70), 112))                        # knee patch
     rope = torus(p, JR['knee'] + V(4, -105, 12), nrm(V(0.05, 1, 0.12)), 138, 11)           # cord under the knee
     rope = np.minimum(rope, torus(p, JR['knee'] + V(4, -128, 10), nrm(V(-0.04, 1, 0.1)), 134, 11))
-    return {SKIN: sk, PANTS: lg, BOOT: bt, SOLE: so, LEATHER: mn(ap, bl, bst, kp, rope), IRON: np.minimum(bk, bbk)}
-BODY_BOX = (V(-1420, -5, -480), V(1420, 2080, 560))
+    return {SKIN: sk, PANTS: lg, BOOT: bt, SOLE: so, LEATHER: mn(ap, bl, bst, kp, rope), IRON: np.minimum(bk, bbk), PLAGA: plaga(p)}
+BODY_BOX = (V(-1420, -5, -480), V(1420, 2110, 560))
 
 # ---- mask ----------------------------------------------------------------------------------------
 MC = HEAD + V(0, -10, 0)
@@ -173,7 +191,8 @@ def mask(p):
     s2 = np.maximum(st, np.maximum(np.abs(X) - 20, np.maximum(Z - (HEAD[2] + 40), (HEAD[1] + 20) - Y)))
     s3 = np.maximum(st, np.maximum(np.abs(Y - (HEAD[1] - 95) - 0.35 * (Z - HEAD[2])) - 17, Z - (HEAD[2] + 30)))
     s3 = np.maximum(s3, (HEAD[2] - 150) - Z)
-    return {IRON: pl, CHAIN: rv, LEATHER: mn(s1, s2, s3)}
+    eye = np.minimum(sph(p, onplate(-46, 27, -15), 11.5), sph(p, onplate(46, 27, -15), 11.5))
+    return {IRON: pl, CHAIN: rv, LEATHER: mn(s1, s2, s3), EYE: eye}
 MASK_BOX = (HEAD - V(190, 235, 185), HEAD + V(190, 190, 215))
 
 # ---- hands ---------------------------------------------------------------------------------------
@@ -337,8 +356,8 @@ def wbox():
     c = [GRIP + WB.T @ V(x, y, z) for x in (-200, BEAM_L + 330) for y in (-110, 400) for z in (-170, 170)]
     return box_of(c, 12)
 WEAPON_BOX = wbox()
-PARTS = [('body', body, BODY_BOX, 6.0, 8000), ('mask', mask, MASK_BOX, 2.5, 1500), ('fist', fist, FIST_BOX, 3.0, 520),
-         ('claw', claw, CLAW_BOX, 2.5, 1150), ('acc', acc, ACC_BOX, 3.0, 1500), ('weapon', weapon, WEAPON_BOX, 3.0, 2480)]
+PARTS = [('body', body, BODY_BOX, 6.0, 8250), ('mask', mask, MASK_BOX, 2.5, 1500), ('fist', fist, FIST_BOX, 3.0, 520),
+         ('claw', claw, CLAW_BOX, 2.5, 1150), ('acc', acc, ACC_BOX, 3.0, 1500), ('weapon', weapon, WEAPON_BOX, 3.0, 2250)]
 def field(fn, p):
     g = fn(p); mats = list(g.keys()); D = np.stack([g[m] for m in mats])
     return D.min(0), np.array(mats)[D.argmin(0)]
