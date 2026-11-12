@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B96** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B97** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -459,6 +459,15 @@ Reglas de trabajo del usuario:
        al acabar (21 frames) beginEvent otra vez (idle) mirando exacto a la puerta. Fin: endEvent(2).
      · Cámara del Herrero: FIJA, 2,2 m más allá de León (lejos de la puerta) y 0,9 m hacia dentro, a 2,2 m
        de alto, fovy 42, siguiendo con la mirada; la escena termina sola si él se acerca a < 3,6 m.
+   - **B97** (vídeo B96: música y golpe OK, León bloqueado y gira; pero el Herrero no se ve y la escena se
+     corta al cambiar de plano). CAUSA, sacada del vídeo y no supuesta: la "puerta" (−13650, +2300) de
+     B89 estaba 4 m FUERA del granero —el vídeo empieza con León recién entrado en (−13426, −1833), y la
+     abertura está en z ≈ −1770—. El Herrero nacía fuera, tardaba ~4 s en llegar a la puerta, y la cámara
+     de B96 (pegada a la pared izquierda, 0,9 m de lado) no tenía la puerta en el plano; su comprobación
+     "a < 3,6 m" saltaba justo cuando él llegaba a la puerta → corte. B97: nace a 0,9 m fuera de la
+     abertura (−13450, −900, y 163), en la línea por la que entra León; cámara FIJA en el camino por el que
+     León entró (−13600, 2000, −6300), 4,5 m delante de la abertura, bajo el altillo, mirándole; corte
+     solo si se acerca a < 2,6 m; plano hasta t 290 (A lo salta).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

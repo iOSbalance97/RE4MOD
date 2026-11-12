@@ -43,8 +43,11 @@ typedef f32 (*Atan2F)(f32, f32);
  * from the ladder) */
 #define DOOR_KNOWN 1                     /* B89: guess from the user's screenshot (Leon at the side door -13562,-12198 looking +z
                                             at the opening in the far wall, under the Ganado at z -1770) */
-#define DOOR_X (-13650.0f)
-#define DOOR_Z 2300.0f
+#define DOOR_X (-13450.0f)                /* B97: the B96 video: Leon walks in through the big door at (-13426, -1833)
+                                            and the opening is at z ~ -1770 (B89). B89-B96 put him at z +2300:
+                                            4 m OUTSIDE, ~4 s of walking before the door, and the scene was over */
+#define DOOR_Z (-900.0f)                 /* spawn: ~0.9 m outside the opening, on Leon's way in */
+#define DOOR_IN (-1770.0f)               /* the opening (camera's first aim) */
 
 static int st, t, list_no = -1, seen, lock_n;
 static u8* upper;                       /* the Ganado upstairs (live work) */
@@ -276,8 +279,13 @@ void BarnFrame(void)
                 f32 fx = lx - dx, fz = lz - dz, n = Sq(fx * fx + fz * fz), px, pz;
                 if (n < 1.0f) n = 1.0f;
                 fx /= n; fz /= n; px = fz; pz = -fx; if (px < 0.0f) { px = -px; pz = -pz; }
-                cex = lx + fx * 2200.0f + px * 900.0f; cey = 2200.0f; cez = lz + fz * 2200.0f + pz * 900.0f;
-                ctx = dx; cty = 1200.0f; ctz = dz;
+                (void)px; (void)pz;
+                /* B97: on Leon's own way in (x -13426..-13892 from z -1833 to -5993: walked, nothing in
+                 * between), 4.5 m in front of the opening, under the loft. B96's was 0.9 m off to the side,
+                 * against the left wall: the doorway was out of its view, and its "too close" check fired
+                 * just as he got to the door. */
+                cex = -13600.0f; cey = 2000.0f; cez = -6300.0f;
+                ctx = dx; cty = 1300.0f; ctz = DOOR_IN;
             }
         }
         STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN;
@@ -293,7 +301,7 @@ void BarnFrame(void)
     case 3: {                                            /* the scene */
         f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C);
         t++;
-        if (t == 36 && !herrero) herrero = HerreroSpawn(dx, 0.0f, dz, atan2f_(lx - dx, lz - dz));
+        if (t == 36 && !herrero) herrero = HerreroSpawn(dx, 163.0f, dz, atan2f_(lx - dx, lz - dz));
         /* B91: SPF_EM stops every character (the Ganado outside would see Leon): the game's own emMove
          * (PAL 0x800C9D5C, what cEmMgr::move runs on each work) for Leon and El Herrero only */
         if (herrero && (*(u32*)herrero & 0x201) == 1) {
@@ -327,9 +335,9 @@ void BarnFrame(void)
             ctx += (hx - ctx) * 0.15f; cty += (hy + 1150.0f - cty) * 0.15f; ctz += (hz - ctz) * 0.15f;
             Cam(cex, cey, cez, ctx, cty, ctz, 42.0f);
             ddx = hx - cex; ddz = hz - cez;
-            if (t > 150 && ddx * ddx + ddz * ddz < 3600.0f * 3600.0f) t = 400;   /* close: the scene ends before he is */
+            if (t > 150 && ddx * ddx + ddz * ddz < 2600.0f * 2600.0f) t = 400;   /* close: the scene ends before he is */
         }
-        if (t >= 330 || (t > 120 && (press & PAD_A))) {
+        if (t >= 290 || (t > 120 && (press & PAD_A))) {
             PlVirt(pl, 24, 2);                            /* B96: cPlayer::endEvent(2): routine 0, pad back */
             STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN); STA1 &= ~STA_SUSPEND; *(u32*)pl &= ~0x800u;
             if (herrero && (*(u32*)herrero & 0x201) == 1) *(u32*)herrero &= ~0x800u;
