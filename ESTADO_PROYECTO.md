@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B95** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B96** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -444,6 +444,21 @@ Reglas de trabajo del usuario:
      (SPF_CINESCO, el juego no lo usa) → barras; 8 frames de margen. cine_polling: el bit 0x100
      (ACTBTN, nuestro bloqueo de la ventana) ya no pone barras: rlwimi r0,r12,25,23,23 mete ahí el bit
      del título (antes rlwinm+or).
+   - **B96** (vídeo B95: bandas OK; sin música; el Herrero "desaparece": en el vídeo se ve que camina
+     HASTA la cámara y la vista acaba dentro de él; León se podía mover y el giro era robótico):
+     · Música: la de la granja (stream 0/8) ya no se para nunca: se BAJA a volumen 1 (SndStrReq por id,
+       PAL 0x800573E8, flg 4) del cartel a la escena y se SUBE a su volumen al aparecer él (t 80, y cada
+       1,5 s mientras vive); se apaga al morir. B95 la paraba (fundido a 0 = petición de stop) y luego
+       pedía arrancarla: un stream que se está parando no vuelve → sonaba "en silencio" (el overlay
+       decía 1 todo el rato). 6º número de prueba ahora: 1SVVV (slot, stop_req, volumen actual).
+     · Golpe de la puerta: SndCall(1,0x1E) (patada a puerta de madera, banco de León, siempre cargado).
+       El 6/0x37 de B88-B95 es del banco de sala y r103 no lo tiene → no sonaba nada.
+     · León: cPlayer::beginEvent(0) por vtable (+16; endEvent +24, entradas de 8 bytes) → rutina 5,
+       sin mando. Arranca de espaldas a la puerta y gira con su propio giro rápido de 180°
+       (cPlayer::motionSet PAL 0x8013FA70 con m_MotTbl 0xB/0xC/0x6B/0x6C, como pl_R1_Turn180 0x80052A40);
+       al acabar (21 frames) beginEvent otra vez (idle) mirando exacto a la puerta. Fin: endEvent(2).
+     · Cámara del Herrero: FIJA, 2,2 m más allá de León (lejos de la puerta) y 0,9 m hacia dentro, a 2,2 m
+       de alto, fovy 42, siguiendo con la mirada; la escena termina sola si él se acerca a < 3,6 m.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

@@ -32,7 +32,10 @@ void CrouchStand(void);
 #define SND_STR_STOP ((void (*)(int))0x800587D8)        /* SndRoomStrStop(fade s) */
 #define SPF_CINESCO 0x00004000u          /* unused by the game: our bars request (cine_polling: Stop_flg != 0) */
 u8* StealthTarget(void); int StealthKilling(void);
-#define SND_STR_CK ((int (*)(int, int, int))0x8005748C)    /* SndStrStatusCk(blk, no, mask) */   /* SndRoomStrStart(flag, fade s, play_ck): r103 starts it 30 s in */
+/* B96: SndStrReq(u32 id, flg, time, vol) (PAL 0x800573E8; flg 4 = fade to vol over time/200 s; vol 0 = stop request) */
+#define SND_STR_ID ((int (*)(u32, int, int, int))0x800573E8)
+/* B96: cPlayer::motionSet(m0, seq0, m1, seq1, hokan, frame) (PAL 0x8013FA70, from pl_R1_Turn180 0x80052A40) */
+#define PL_MOTSET ((void (*)(u8*, void*, void*, void*, void*, int, int))0x8013FA70)
 typedef f32 (*Atan2F)(f32, f32);
 #define atan2f_ ((Atan2F)0x8005FFE8)
 
@@ -53,7 +56,8 @@ static u16 pad_old;
 static int dbg;
 static u32 mod_t;
 static int music;                       /* 1 = his music is on */
-static f32 cex, cey, cez;               /* tracking camera */                         /* test: 1 create failed, 2 bad archive, 3 created; +10*routine */
+static f32 cex, cey, cez, ctx, cty, ctz; /* camera position, smoothed target */
+static int turn_t;                      /* B96: frame Leon's turn motion started */               /* tracking camera */                         /* test: 1 create failed, 2 bad archive, 3 created; +10*routine */
 
 static f32 Sin(f32 a)
 {
@@ -65,13 +69,46 @@ static f32 Sin(f32 a)
     return a * (1.0f - a2 / 6.0f * (1.0f - a2 / 20.0f * (1.0f - a2 / 42.0f)));
 }
 static f32 Cos(f32 a) { return Sin(a + 1.57079633f); }
-static f32 Sm(f32 x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) return 1.0f; return x * x * (3.0f - 2.0f * x); }
 static f32 Sq(f32 x) { f32 r = x > 1.0f ? x : 1.0f; int i; if (x <= 0.0f) return 0.0f; for (i = 0; i < 14; i++) r = 0.5f * (r + x / r); return r; }
 static f32 Wrap(f32 a) { while (a > 3.14159265f) a -= 6.2831853f; while (a < -3.14159265f) a += 6.2831853f; return a; }
 static void SetMat(u8* m, f32 x, f32 z, f32 a)
 {
     f32* q = (f32*)(m + 0x0C); f32 s = Sin(a), c = Cos(a);
     q[0] = c; q[1] = 0.0f; q[2] = s; q[3] = x; q[4] = 0.0f; q[5] = 1.0f; q[6] = 0.0f; q[8] = -s; q[9] = 0.0f; q[10] = c; q[11] = z;
+}
+
+/* ---- B96: the room stream (r103: battle music 0/8) handled by volume, never stopped while the scene
+ * needs it. B95 stopped it (fade to 0 = stop request) and then asked SndRoomStrStart for it again: a
+ * stream already being stopped is not brought back, so it went on silent (the test overlay read
+ * "playing" the whole time). Slots: pSnd + 0x44, 16 bytes: busy +0, stop_req +1, now vol +2, file vol +3,
+ * id +4, no +8, blk +0xA. */
+static u8* RoomStr(void)
+{
+    u8* s = *(u8**)0x802B7E54; int i, no;
+    if (!s || !(*(u32*)(s + 2760) & 0x8000)) return 0;
+    no = s[2763];
+    for (i = 0; i < 4; i++) {
+        u8* w = s + 0x44 + 16 * i;
+        if (w[0] && *(s16*)(w + 8) == no && *(u16*)(w + 10) == 0) return w;
+    }
+    return 0;
+}
+static void MusicQuiet(void)            /* down to volume 1 (kept alive, no stop request) */
+{
+    u8* w = RoomStr();
+    if (w && !w[1] && (s8)w[2] > 1) SND_STR_ID(*(u32*)(w + 4), 4, 100, 1);
+}
+static void MusicOn(void)               /* up to its own volume, started when it is not there */
+{
+    u8* w = RoomStr();
+    if (!w) SND_STR_START(1, 0, 1);
+    else if (w[1] || (s8)w[2] < (s8)w[3] - 2) SND_STR_ID(*(u32*)(w + 4), 4, 160, (s8)w[3]);
+}
+/* cPlayer virtuals (vptr at +8, GCC 2.95 entries {s16 delta, s16, fn}): beginEvent +16, endEvent +24 */
+static void PlVirt(u8* pl, int off, u32 arg)
+{
+    u8* vt = *(u8**)(pl + 8);
+    ((void (*)(u8*, u32))*(void**)(vt + off + 4))(pl + *(s16*)(vt + off), arg);
 }
 
 /* ---- scene areas (SceAt ordering table, pS + 140 on PAL; records: be_flg +0x34, id +0x35, act_type +0x4A) */
@@ -168,7 +205,10 @@ int BarnCoords(int i)
     if (i == 5) {                                        /* test: the room stream table word, + 1 if playing */
         u8* snd = *(u8**)0x802B7E54;
         if (!snd) return -1;
-        return (int)(*(u32*)(snd + 2760) & 0xFFFF) * 10 + (SND_STR_CK(0, (int)(*(u32*)(snd + 2760) & 0xFF), 0x10) != 0);
+        {   /* B96: no side effects: 1SVVV = slot found, stop request, volume now */
+            u8* w = RoomStr();
+            return w ? 10000 + w[1] * 1000 + (u8)w[2] : (int)(*(u32*)(snd + 2760) & 0xFF);
+        }
     }
     if (i == 4) return herrero ? dbg * 1000 + herrero[0xFC] * 100 + herrero[0xFD] : dbg;
     return (int)(*(f32*)(pPL + 0xA4) * 57.29578f);
@@ -207,7 +247,7 @@ void BarnFrame(void)
         lx = *(f32*)(pl + 0x94); lz = *(f32*)(pl + 0x9C); ux = *(f32*)(upper + 0x94); uz = *(f32*)(upper + 0x9C);
         if (*(f32*)(pl + 0x98) > 2500.0f && (lx - ux) * (lx - ux) + (lz - uz) * (lz - uz) < 12000.0f * 12000.0f
             && pl[0xFC] == 0 && (pl[0xFD] <= 3 || pl[0xFD] == 6)) {
-            if (++t >= 20) { st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_KEY | SPF_EM | SPF_PL; SND_STR_STOP(2); }
+            if (++t >= 20) { st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_KEY | SPF_EM | SPF_PL; MusicQuiet(); }
         } else t = 0;
         return;
     }
@@ -220,10 +260,7 @@ void BarnFrame(void)
         /* B94: no action prompt at all while up in the loft (the window jumps were still offered):
          * Stop_flg 0x100 = cActionButton::move shows and runs nothing */
         if (*(f32*)(pl + 0x98) > 2500.0f) STOPF |= SPF_ACTBTN; else STOPF &= ~SPF_ACTBTN;
-        {   /* the farm starts its music 30 s in: kept quiet until El Herrero shows up */
-            u8* snd = *(u8**)0x802B7E54;
-            if (snd && (mod_t++ % 30) == 0 && SND_STR_CK(0, (int)(*(u32*)(snd + 2760) & 0xFF), 0x10)) SND_STR_STOP(2);
-        }
+        if ((mod_t++ % 30) == 0) MusicQuiet();  /* the farm starts its music 30 s in: kept down until El Herrero */
         if (e && *(s16*)(e + 0x320) > 0 && e[0xFC] < 3) { upper = e; return; }
         if (pl[0xFC] != 0 || (pl[0xFD] > 3 && pl[0xFD] != 6)) { t = 0; return; }   /* Leon still busy (the takedown) */
         if (++t < 50) return;                            /* let it fall */
@@ -233,16 +270,28 @@ void BarnFrame(void)
             if (DOOR_KNOWN) { dx = DOOR_X; dz = DOOR_Z; }
             else if (Ladder(&la, &lzz, &a)) { dx = la + Sin(a) * 1800.0f - Cos(a) * 2200.0f; dz = lzz + Cos(a) * 1800.0f + Sin(a) * 2200.0f; }
             else { dx = lx + 4000.0f; dz = lz; }
-            a0 = *(f32*)(pl + 0xA4); a1 = atan2f_(dx - lx, dz - lz);
+            a1 = atan2f_(dx - lx, dz - lz); a0 = Wrap(a1 + 3.14159265f);
             ex = lx; ez = lz;
+            {   /* B96: the far camera: past Leon (away from the door) and to the barn's inside, 2.2 m up */
+                f32 fx = lx - dx, fz = lz - dz, n = Sq(fx * fx + fz * fz), px, pz;
+                if (n < 1.0f) n = 1.0f;
+                fx /= n; fz /= n; px = fz; pz = -fx; if (px < 0.0f) { px = -px; pz = -pz; }
+                cex = lx + fx * 2200.0f + px * 900.0f; cey = 2200.0f; cez = lz + fz * 2200.0f + pz * 900.0f;
+                ctx = dx; cty = 1200.0f; ctz = dz;
+            }
         }
         STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN;
-        STA1 |= STA_SUSPEND; *(u32*)pl |= 0x800;          /* B92: the game's own event pause: only Leon and El Herrero move */
         CrouchStand();
+        /* B96: Leon in the game's event routine (cPlayer::beginEvent(0): routine 5, idle, no pad), back to
+         * the door (a cut: the camera is on his face); he turns with his own quick-turn motion */
+        PlVirt(pl, 16, 0);
+        *(f32*)(pl + 0xA4) = a0; SetMat(pl, ex, ez, a0);
+        STA1 |= STA_SUSPEND; *(u32*)pl |= 0x800;          /* B92: the game's own event pause: only Leon and El Herrero move */
+        turn_t = 0;
         return;
     }
     case 3: {                                            /* the scene */
-        f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C), a;
+        f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C);
         t++;
         if (t == 36 && !herrero) herrero = HerreroSpawn(dx, 0.0f, dz, atan2f_(lx - dx, lz - dz));
         /* B91: SPF_EM stops every character (the Ganado outside would see Leon): the game's own emMove
@@ -255,29 +304,33 @@ void BarnFrame(void)
         /* B94: born like B90 (where he WAS seen): his first frames in Wait make him drawn; only then the
          * flag bit 1 (Wait -> setFindPL: he knows where Leon is and comes) */
         if (herrero && t == 42) *(u32*)(herrero + 0x3C8) |= 1u;
-        if (t >= 96 && (t - 96) % 60 == 0) { SND_STR_START(1, 1, 1); music = 1; }   /* the farm's battle music (retried) */
-        if (t == 40) {
-            Vec v; v.x = dx; v.y = 1200.0f; v.z = dz;
-            SndCall(6, 0x37, (int)&v, 0, 0, 0);          /* a door smashed in */
+        if (t >= 80 && (t - 80) % 45 == 0) { MusicOn(); music = 1; }   /* B96: the farm's battle music back up */
+        if (t == 40) SndCall(1, 0x1E, 0, 0, 0, 0);       /* B96: a door kicked in (player bank: always loaded; room
+                                                            bank 6 of r103 has no 0x37, B95 played nothing) */
+        if (t == 48) {                                    /* B96: his quick 180 turn (m_MotTbl 0xB/0xC, hurt 0x6B/0x6C) */
+            void** tb = *(void***)(pl + 0x424);
+            if (tb && tb[0xB] && tb[0x6B]) { PL_MOTSET(pl, tb[0xB], tb[0xC], tb[0x6B], tb[0x6C], 5, 0); turn_t = t; }
         }
-        a = a0;
-        if (t > 52) a = a0 + Wrap(a1 - a0) * Sm((f32)(t - 52) / 34.0f);    /* Leon turns to the noise */
-        *(f32*)(pl + 0xA4) = a; SetMat(pl, ex, ez, a);
+        if (turn_t && t == turn_t + 21) {                 /* the turn is over: idle again, facing the door exactly */
+            PlVirt(pl, 16, 0);
+            *(f32*)(pl + 0xA4) = a1; SetMat(pl, lx, lz, a1);
+        }
         if (t < 96) {                                     /* on Leon's face, from the front */
             f32 sh = (t >= 40 && t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
             f32 fa = Sin(a0), fb = Cos(a0);
             Cam(lx + fa * 1350.0f + fb * 420.0f + sh, ly + 1700.0f + sh, lz + fb * 1350.0f - fa * 420.0f,
                 lx + fa * 60.0f, ly + 1560.0f, lz + fb * 60.0f, 38.0f);
-        } else {                                          /* B95: a camera that backs off in front of him as he comes in */
-            f32 hx = dx, hy = 0.0f, hz = dz, fx = lx - dx, fz = lz - dz, n, ux, uy, uz;
-            if (herrero) { hx = *(f32*)(herrero + 0x94); hy = *(f32*)(herrero + 0x98); hz = *(f32*)(herrero + 0x9C); fx = lx - hx; fz = lz - hz; }
-            n = fx * fx + fz * fz; n = n > 1.0f ? 1.0f / Sq(n) : 0.0f; fx *= n; fz *= n;
-            ux = hx + fx * 2700.0f + fz * 900.0f; uy = hy + 1350.0f; uz = hz + fz * 2700.0f - fx * 900.0f;
-            if (t == 96) { cex = ux; cey = uy; cez = uz; }
-            cex += (ux - cex) * 0.08f; cey += (uy - cey) * 0.08f; cez += (uz - cez) * 0.08f;
-            Cam(cex, cey, cez, hx, hy + 1250.0f, hz, 46.0f);
+        } else {                                          /* B96: a fixed camera far back (B95's came too close: he walked
+                                                             into it and the view ended up inside him) */
+            f32 hx = dx, hy = 0.0f, hz = dz, ddx, ddz;
+            if (herrero) { hx = *(f32*)(herrero + 0x94); hy = *(f32*)(herrero + 0x98); hz = *(f32*)(herrero + 0x9C); }
+            ctx += (hx - ctx) * 0.15f; cty += (hy + 1150.0f - cty) * 0.15f; ctz += (hz - ctz) * 0.15f;
+            Cam(cex, cey, cez, ctx, cty, ctz, 42.0f);
+            ddx = hx - cex; ddz = hz - cez;
+            if (t > 150 && ddx * ddx + ddz * ddz < 3600.0f * 3600.0f) t = 400;   /* close: the scene ends before he is */
         }
-        if (t >= 300 || (t > 120 && (press & PAD_A))) {
+        if (t >= 330 || (t > 120 && (press & PAD_A))) {
+            PlVirt(pl, 24, 2);                            /* B96: cPlayer::endEvent(2): routine 0, pad back */
             STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN); STA1 &= ~STA_SUSPEND; *(u32*)pl &= ~0x800u;
             if (herrero && (*(u32*)herrero & 0x201) == 1) *(u32*)herrero &= ~0x800u;
             WindowsLock(0); st = 4; t = 0;
@@ -286,7 +339,8 @@ void BarnFrame(void)
     }
     default:
         if (herrero && (*(u32*)herrero & 0x201) == 1 && *(s16*)(herrero + 0x320) > 0) { *(u32*)herrero |= 2; *(f32*)(herrero + 0x154) = 1.0f; }
-        else if (music) { SND_STR_STOP(4); music = 0; }   /* B95: he is dead: the music fades out */
+        else if (music) { SND_STR_STOP(4); music = 0; }   /* he is dead: the music fades out */
+        if (music && herrero && (mod_t++ % 45) == 0) MusicOn();   /* B96: kept up while he lives */
         return;
     }
 }
