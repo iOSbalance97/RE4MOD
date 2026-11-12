@@ -93,6 +93,7 @@ static int skill, vs;                    /* B104: the Ganado died by a takedown;
 #define QFPS_DIR (*(f32*)(0x80217104 + 0x204))   /* CamCtrl.m_QuasiFPS (PAL 0x80217104, from resetCameraAngle */
 #define QFPS_DEP (*(f32*)(0x80217104 + 0x200))   /* 0x800078DC): the C-stick look angles */
 static int ls, lt;                       /* B102: Leon's steps in phase 1 */
+static int back_t;                       /* B107: frames until the farm's music comes back */
 /* B106: the shoulder camera places itself from ITS copy of Leon's matrix (CameraQuasiFPS::m_pl_mat +0x174,
  * calcBaseMatrix), which his own routine refreshes (setPlayerLocation) -- frozen under the panel (SPF_PL),
  * so turning him there left it behind his old facing: the camera looked at him from the side. Copied here
@@ -174,6 +175,35 @@ static void MusicOn(void)               /* up to its own volume, started when it
     if (!w) SND_STR_START(1, 0, 1);
     else if (w[1] || (s8)w[2] < (s8)w[3] - 2) SND_STR_ID(*(u32*)(w + 4), 4, 160, (s8)w[3]);
 }
+/* B107 (user): from the window on, a boss theme: room stream 5 of the global stream file (bgm/bio4bgm,
+ * block 0), the El Gigante fight's (r119's room stream, bgmtbl.dat), played as the room's own stream
+ * would be: SndStrReq(blk 0, no, 0x80000003 = loop + room stream, fade, 0, 0.0) (PAL 0x80057080, the
+ * call inside SndRoomStrStart). The farm's stream goes quiet meanwhile (MusicQuiet) and comes back after. */
+#define SND_STR_REQ ((int (*)(int, int, int, int, int, f32))0x80057080)
+#define BOSS_STR 5
+static u8* StrSlot(int no)
+{
+    u8* s = *(u8**)0x802B7E54; int i;
+    if (!s) return 0;
+    for (i = 0; i < 4; i++) {
+        u8* w = s + 0x44 + 16 * i;
+        if (w[0] && *(s16*)(w + 8) == no && *(u16*)(w + 10) == 0) return w;
+    }
+    return 0;
+}
+static void BossOn(void)
+{
+    u8* w = StrSlot(BOSS_STR);
+    MusicQuiet();
+    if (!w) SND_STR_REQ(0, BOSS_STR, (int)0x80000003, 100, 0, 0.0f);
+    else if (w[1] || (s8)w[2] < (s8)w[3] - 2) SND_STR_ID(*(u32*)(w + 4), 4, 100, (s8)w[3]);
+}
+static void BossOff(void)
+{
+    u8* w = StrSlot(BOSS_STR);
+    if (w && !w[1]) SND_STR_ID(*(u32*)(w + 4), 4, 800, 0);   /* 4 s fade, then stopped (vol 0 = stop request) */
+}
+
 /* cPlayer virtuals (vptr at +8, GCC 2.95 entries {s16 delta, s16, fn}): beginEvent +16, endEvent +24 */
 static void PlVirt(u8* pl, int off, u32 arg)
 {
@@ -275,8 +305,26 @@ static void WalkTo(u8* pl, int i)
     *(f32*)(pl + 0x400) = 0.12f; *(u32*)(pl + 0x3E0) = 0;
     pl[0xFC] = 5; pl[0xFD] = 1; pl[0xFE] = 0; pl[0xFF] = 0;
 }
+/* B107: the barn's inside (Leon's own positions in the videos: west -14601, east window -10406, front
+ * -1558 at the window / door -1833, back -7749 at the ladder foot): no scene camera goes through a wall */
+#define BX0 (-14660.0f)
+#define BX1 (-10300.0f)
+#define BZ0 (-7850.0f)
+#define BZ1 (-1500.0f)
+static f32 InMargin(f32 x, f32 z)
+{
+    f32 m = x - BX0, k;
+    k = BX1 - x; if (k < m) m = k;
+    k = z - BZ0; if (k < m) m = k;
+    k = BZ1 - z; if (k < m) m = k;
+    return m;
+}
 static void Cam(f32 cx, f32 cy, f32 cz, f32 tx, f32 ty, f32 tz, f32 fovy)
 {
+    if (cx < BX0 + 60.0f) cx = BX0 + 60.0f;
+    if (cx > BX1 - 60.0f) cx = BX1 - 60.0f;
+    if (cz < BZ0 + 60.0f) cz = BZ0 + 60.0f;
+    if (cz > BZ1 - 60.0f) cz = BZ1 - 60.0f;
     CAMP[0] = cx; CAMP[1] = cy; CAMP[2] = cz; CAMP[3] = tx; CAMP[4] = ty; CAMP[5] = tz; CAMP[6] = 0.0f; CAMP[7] = fovy;
     CAMP[8] = 0.0f; CAMP[9] = 1.0f; CAMP[10] = 0.0f;               /* Up */
     /* B100: THE reason El Herrero (and in B99 Leon) vanished since B88: with SPF_CAMERA, CameraMove builds
@@ -368,15 +416,26 @@ static void Shot0(u8* pl, int tt)
     f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C);
     f32 sh = (tt >= 40 && tt < 52) ? 18.0f * Sin((f32)tt * 2.1f) : 0.0f;
     f32 px, py, pz, qx, qy, qz;
-    if (vs) {
-        f32 fa = Sin(a1), fb = Cos(a1);
-        px = lx - fa * 1500.0f - fb * 520.0f; py = ly + 1650.0f; pz = lz - fb * 1500.0f + fa * 520.0f;
-        qx = lx + fa * 2500.0f; qy = ly + 1300.0f; qz = lz + fb * 2500.0f;
-    } else {
-        f32 ga = Sin(a0), gb = Cos(a0);
-        px = lx + ga * 1350.0f + gb * 420.0f; py = ly + 1700.0f; pz = lz + gb * 1350.0f - ga * 420.0f;
-        qx = lx + ga * 60.0f; qy = ly + 1560.0f; qz = lz + gb * 60.0f;
+    /* B107: four places for the first shot (offsets along his facing f and his side r); the first one far
+     * enough inside the barn is kept for the whole shot (chosen on the scene's first frame): shot by the
+     * wall, B106's camera ended up outside the house */
+    static const f32 CV[4][2] = { { -1500.0f, 520.0f }, { -1500.0f, -520.0f }, { 250.0f, 1400.0f }, { 250.0f, -1400.0f } };
+    static const f32 CT[4][2] = { { 1350.0f, 420.0f }, { 1350.0f, -420.0f }, { 350.0f, 1350.0f }, { 350.0f, -1350.0f } };
+    static int pick;
+    f32 aa = vs ? a1 : a0, fa = Sin(aa), fb = Cos(aa);
+    const f32 (*C)[2] = vs ? CV : CT;
+    if (tt == 0) {
+        int i; f32 best = -1e30f;
+        pick = 0;
+        for (i = 0; i < 4; i++) {
+            f32 x = lx + fa * C[i][0] + fb * C[i][1], z = lz + fb * C[i][0] - fa * C[i][1], m = InMargin(x, z);
+            if (m > 300.0f) { pick = i; break; }
+            if (m > best) { best = m; pick = i; }
+        }
     }
+    px = lx + fa * C[pick][0] + fb * C[pick][1]; pz = lz + fb * C[pick][0] - fa * C[pick][1];
+    if (vs) { py = ly + 1650.0f; qx = lx + fa * 2500.0f; qy = ly + 1300.0f; qz = lz + fb * 2500.0f; }
+    else    { py = ly + 1700.0f; qx = lx + fa * 60.0f; qy = ly + 1560.0f; qz = lz + fb * 60.0f; }
     Cam(px + sh, py + sh, pz, qx, qy, qz, vs ? 44.0f : 38.0f);
     cang = atan2f_(px - lx, pz - lz); crad = Sq((px - lx) * (px - lx) + (pz - lz) * (pz - lz));
     cex = px; cey = py; cez = pz; ctx = qx; cty = qy; ctz = qz;
@@ -521,7 +580,7 @@ void BarnFrame(void)
             } else HerreroSceneMot(e, HR_IDLE);
             hlx = hx; hlz = hz;
         }
-        if (music && (t % 45) == 0) MusicOn();            /* the farm's battle music, from his entrance on */
+        if (music && (t % 45) == 0) BossOn();             /* B107: the boss theme, from the window on */
         {   /* B102: his weapon objects move (and so are drawn) in the event pause too: they are models of
              * their own (cPlWep +0x788 -> m_pWep +0x34, m_pWepHand +0x38), frozen by STA_SUSPEND */
             u8* wp = *(u8**)(pl + 0x788);
@@ -572,7 +631,9 @@ void BarnFrame(void)
                 if (t > lt + 420) ls = 2;
             } else if (ls == 2) {                         /* stops: the yell */
                 PlVirt(pl, 16, 0);
+                SndCall(1, 0x1E, 0, 0, 0, 0);             /* B107 (user): another blow on the door, and the music */
                 HerreroYellAt(DOOR_X, 1900.0f, DOOR_Z, upper, 0x1A);
+                BossOn(); music = 1;
                 ls = 3; lt = t;
             } else if (ls == 3) {                         /* listens, then turns where he stands (the event walk turns on the
                                                              spot past 60 degrees) and goes */
@@ -621,7 +682,7 @@ void BarnFrame(void)
                 herrero = HerreroSpawn(dx, 163.0f, dz, atan2f_(MARK_X - dx, MARK_Z - dz));
                 if (herrero) {
                     *(f32*)(herrero + 0x3CC) = 0.0f; hr_scene_em = herrero; hph = 0; hph_t = t; hlx = dx; hlz = dz;
-                    SndCall(1, 0x1E, 0, 0, 0, 0); MusicOn(); music = 1;
+                    SndCall(1, 0x1E, 0, 0, 0, 0); BossOn(); music = 1;
                 }
             }
             if (t >= ph_t + 100) { ph = 4; ph_t = t; c0x = cex; c0y = cey; c0z = cez; }
@@ -637,6 +698,9 @@ void BarnFrame(void)
         if (t >= 2000 || (t > 120 && (press & PAD_A))) {
             PlVirt(pl, 24, 2);                            /* cPlayer::endEvent(2): routine 0, pad back */
             barn_padlock = 0;
+            /* B107 (user): the game camera right behind him (as after the panel: its copy of his matrix,
+             * the C-stick angles at 0, and the snap flag) */
+            QfpsPlMat(pl); QFPS_DIR = 0.0f; QFPS_DEP = 0.0f; *(u8*)(0x80217104 + 0x1B2) = 1;
             Hud(1);
             {
                 u8* wp = *(u8**)(pl + 0x788);
@@ -649,7 +713,7 @@ void BarnFrame(void)
             STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN); STA1 &= ~STA_SUSPEND; *(u32*)pl &= ~0x800u;
             if (!herrero) {                               /* skipped before he came: he is there anyway */
                 herrero = HerreroSpawn(MARK_X, 163.0f, MARK_Z, atan2f_(lx - MARK_X, lz - MARK_Z));
-                if (herrero && !music) { MusicOn(); music = 1; }
+                if (herrero && !music) { BossOn(); music = 1; }
             }
             if (herrero && (*(u32*)herrero & 0x201) == 1) {
                 *(u32*)herrero &= ~0x800u;
@@ -664,8 +728,9 @@ void BarnFrame(void)
     }
     default:
         if (herrero && (*(u32*)herrero & 0x201) == 1 && *(s16*)(herrero + 0x320) > 0) { *(u32*)herrero |= 2; *(f32*)(herrero + 0x154) = 1.0f; }
-        else if (music) { SND_STR_STOP(4); music = 0; }   /* he is dead: the music fades out */
-        if (music && herrero && (mod_t++ % 45) == 0) MusicOn();   /* B96: kept up while he lives */
+        else if (music) { BossOff(); music = 0; back_t = 150; }   /* he is dead: the boss theme fades out, */
+        if (back_t > 0 && --back_t == 0) MusicOn();       /* B107: and the farm's comes back */
+        if (music && herrero && (mod_t++ % 45) == 0) BossOn();    /* B96: kept up while he lives */
         return;
     }
 }

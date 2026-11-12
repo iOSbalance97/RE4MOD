@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B106** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B107** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -577,6 +577,17 @@ Reglas de trabajo del usuario:
      · La ventana es la del fondo (este) del altillo: "SALTAR SOBRE" con León en (−10406, −1558) en el vídeo
        de las 15:46 (act 5, no 2: B105 no la encontraba y usaba el punto de 0,7 m). Ida por la pared del
        frente (WW, 4 puntos de sus pasos) y vuelta a la escalera en diagonal (WP nuevos, 5 puntos).
+   - **B107** (vídeo B106; usuario: "con esto terminaríamos"):
+     · Combo: el mazazo se une en SU frame 26 (viga ya sobre el hombro derecho; COMBO_SKIP), 6 frames de
+       mezcla: su propio arranque le daba la espalda a León (lo raro). HR_SMASH 89 frames, golpes 15-21 / 40-49.
+     · Cámara dentro del granero: Cam() limita x −14660..−10300, z −7850..−1500 (posiciones de León en los
+       vídeos); el primer plano elige entre 4 sitios (detrás-izq/der o lado-izq/der) el primero a > 30 cm
+       de las paredes (antes salía fuera junto a la pared).
+     · En la ventana: otro golpe en la puerta + gruñido + empieza la música de jefe: stream 5 del archivo
+       global (bio4bgm, bloque 0; el de r119, la pelea con El Gigante) con SndStrReq(0, 5, 0x80000003,
+       100, 0, 0.0) (PAL 0x80057080); la de la granja baja a 1; al morir el Herrero la de jefe se apaga en
+       4 s y la de la granja vuelve.
+     · Fin de la escena: cámara de juego tras León (copia de su matriz en m_pl_mat, ángulos a 0, init flag).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

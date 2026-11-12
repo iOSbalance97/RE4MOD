@@ -382,7 +382,9 @@ def blendpose(a, b, w):
         r = Rr.from_matrix(np.stack([a.W[k], b.W[k]])); p.W[k] = Slerp([0, 1], r)([w]).as_matrix()[0]
     p.root = lerp(a.root, b.root, w); p.travel = lerp(a.travel, b.travel, w)
     return p
-COMBO_BL = 8                                         # frames the blow from below blends into the smash
+COMBO_BL = 6                                         # frames the blow from below blends into the smash
+COMBO_SKIP = 26                                      # B107: the smash joined at its frame 26 (anvil already up over the
+                                                     # right shoulder): its own wind-up turned his back to Leon (weird)
 def steps(poses):
     """B87: footsteps (Se 1/2, as the Ganado's walks) where each foot comes down"""
     ev = {}
@@ -401,8 +403,10 @@ if __name__ == '__main__':
     # attack routine ended with the first. The smash part shifted by CO; the last COMBO_BL frames of the
     # first blow blend into the smash's first ones.
     CO = UP_N + 1 - COMBO_BL
-    CP = UP[:CO] + [blendpose(UP[CO + k], SP[k], sm((k + 1) / (COMBO_BL + 1))) for k in range(COMBO_BL)] + SP[COMBO_BL:]
+    SK = COMBO_SKIP
+    CP = UP[:CO] + [blendpose(UP[CO + k], SP[SK + k], sm((k + 1) / (COMBO_BL + 1))) for k in range(COMBO_BL)] + SP[SK + COMBO_BL:]
     SP = CP
+    CO -= SK                                             # smash frame f is now at CO + f
     wm = build(WP); sm_ = build(SP); im = build(IP); fm = build(FP); rm = build(RP); um = build(UP)
     print('walk', check(wm, WP), len(wm), '| smash', check(sm_, SP), len(sm_), '| idle', len(im), '| flex', len(fm))
     print('walk travel per frame', WP[-1].travel[2] * S / WN2)
