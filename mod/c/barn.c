@@ -28,7 +28,8 @@ void CrouchStand(void);
 #define EMMGR ((void*)0x80283160)
 #define STA1 (*(u32*)(pG + 0x501C))      /* Status_flg[1]: 0x10000000 = STA_SUSPEND: only works with be_flag 0x800 move */
 #define STA_SUSPEND 0x10000000u
-#define SND_STR_START ((void (*)(int, int, int))0x800586F8)   /* SndRoomStrStart(flag, fade s, play_ck): r103 starts it 30 s in */
+#define SND_STR_START ((void (*)(int, int, int))0x800586F8)
+#define SND_STR_CK ((int (*)(int, int, int))0x8005748C)    /* SndStrStatusCk(blk, no, mask) */   /* SndRoomStrStart(flag, fade s, play_ck): r103 starts it 30 s in */
 typedef f32 (*Atan2F)(f32, f32);
 #define atan2f_ ((Atan2F)0x8005FFE8)
 
@@ -127,7 +128,7 @@ static u8* HerreroSpawn(f32 x, f32 y, f32 z, f32 ang)
     *(u8**)(e + 0x378) = *(u8**)(e + 0x37C) = real + *(u32*)(real + 4 * HR_ARC_W);
     e[0x101] = 0;                         /* type 0: male villager (Em10Set) */
     e[0x38D] = 0;                         /* set */
-    *(u32*)(e + 0x3C8) = 0x20000001u;     /* weapon: the axe class (routine 0x26 = our smash); B91: bit 1 =
+    *(u32*)(e + 0x3C8) = 0x20000000u;     /* weapon: the axe class (routine 0x26 = our smash); B91: bit 1 =
                                              Wait calls setFindPL(): it knows where Leon is and comes for him */
     e[0x3D0] = 0;
     *(f32*)(e + 0x3CC) = 20000.0f;        /* Guard_r */
@@ -157,6 +158,11 @@ int BarnCoords(int i)
     if (i == 0) return (int)*(f32*)(pPL + 0x94);
     if (i == 1) return (int)*(f32*)(pPL + 0x9C);
     if (i == 2) return (int)*(f32*)(pPL + 0x98);
+    if (i == 5) {                                        /* test: the room stream table word, + 1 if playing */
+        u8* snd = *(u8**)0x802B7E54;
+        if (!snd) return -1;
+        return (int)(*(u32*)(snd + 2760) & 0xFFFF) * 10 + (SND_STR_CK(0, (int)(*(u32*)(snd + 2760) & 0xFF), 0x10) != 0);
+    }
     if (i == 4) return herrero ? dbg * 1000 + herrero[0xFC] * 100 + herrero[0xFD] : dbg;
     return (int)(*(f32*)(pPL + 0xA4) * 57.29578f);
 }
@@ -199,6 +205,9 @@ void BarnFrame(void)
     case 2: {                                            /* until that Ganado is dead */
         u8* e = EmFind(list_no);
         WindowsLock(1);
+        /* B94: no action prompt at all while up in the loft (the window jumps were still offered):
+         * Stop_flg 0x100 = cActionButton::move shows and runs nothing */
+        if (*(f32*)(pl + 0x98) > 2500.0f) STOPF |= SPF_ACTBTN; else STOPF &= ~SPF_ACTBTN;
         if (e && *(s16*)(e + 0x320) > 0 && e[0xFC] < 3) { upper = e; return; }
         if (pl[0xFC] != 0 || (pl[0xFD] > 3 && pl[0xFD] != 6)) { t = 0; return; }   /* Leon still busy (the takedown) */
         if (++t < 50) return;                            /* let it fall */
@@ -227,7 +236,10 @@ void BarnFrame(void)
              * skips it (he knows where Leon is), so he stayed invisible until some later routine did */
             *(u32*)herrero |= 0x800 | 2; *(f32*)(herrero + 0x154) = 1.0f;
         }
-        if (t == 96) SND_STR_START(1, 1, 1);            /* B93: the farm's battle music, from the moment he is shown */
+        /* B94: born like B90 (where he WAS seen): his first frames in Wait make him drawn; only then the
+         * flag bit 1 (Wait -> setFindPL: he knows where Leon is and comes) */
+        if (herrero && t == 42) *(u32*)(herrero + 0x3C8) |= 1u;
+        if (t >= 96 && (t - 96) % 60 == 0) SND_STR_START(1, 1, 1);   /* the farm's battle music (retried) */
         if (t == 40) {
             Vec v; v.x = dx; v.y = 1200.0f; v.z = dz;
             SndCall(6, 0x37, (int)&v, 0, 0, 0);          /* a door smashed in */

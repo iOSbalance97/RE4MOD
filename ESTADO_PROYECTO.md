@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B93** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B94** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -424,6 +424,17 @@ Reglas de trabajo del usuario:
      mientras vive. Ventanas: tipos 2, 4, 5, 26. Música: el estado "en combate" no es la música (solo lo
      usa la cámara); la de combate de la granja es el stream de sala (r103.cpp la arranca a los 30 s con
      SndRoomStrStart(1, 0xF, 1)) → la escena la arranca al mostrar al Herrero (PAL 0x800586F8).
+   - **B94** (B93 igual: sin música, Herrero invisible, "SALTAR SOBRE"): análisis con el decomp:
+     · Invisible: con flag bit 1 desde el nacimiento, em10_R0_Init llama setFindPL y pasa directo a Walk
+       sin pasar por Wait, que es quien le quita Be_flg 0x400000 (lejos: oculto, sin colisión) y le pone
+       be_flag 2 / alfa / atari 0x300. En B90 (sin bit 1) SÍ se veía. Ahora nace sin el bit (Wait lo
+       muestra) y el bit 1 se le pone 6 frames después (t 42) → Wait llama setFindPL y echa a andar.
+     · Ventana: el bloqueo por be_flg de las áreas no alcanzó a ese aviso; ahora, del panel al final de la
+       escena y con León arriba (y > 2,5 m), Stop_flg 0x100 (cActionButton::move no muestra ni ejecuta
+       NINGÚN aviso). También bloquea bajar por la escalera hasta matar al Ganado.
+     · Música: SndRoomStrStart reintentado cada 2 s desde t 96; 6º número de prueba = palabra de la tabla
+       de stream de la sala ×10 + 1 si suena (pSnd = *(0x802B7E54), room_str_tbl +2760; SndStrStatusCk
+       0x8005748C) para saber si la granja tiene stream.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.
