@@ -89,6 +89,15 @@ static const f32 WP[][2] = { { -13256.0f, -2179.0f }, { -12837.0f, -2096.0f }, {
 #define END_Y 1750.0f
 #define END_Z (-7450.0f)
 void HerreroRoarSnd(u8* e);
+void HerreroYellAt(f32 x, f32 y, f32 z, u8* e, int se);
+/* B101: the HUD off for the scene, as the game's own events do (sce_com.cpp begin/end, PAL 0x80156E98):
+ * Cckpt.lifeMeterDisp(sw) (PAL 0x800C0518, Cckpt 0x8027E4A8) and IdSys.dispSw(IDC_LIFE_METER 33, sw)
+ * (PAL 0x8011C3CC, IdSys 0x8028481C) */
+static void Hud(int on)
+{
+    ((void (*)(void*, int))0x800C0518)((void*)0x8027E4A8, on);
+    ((void (*)(void*, int, int))0x8011C3CC)((void*)0x8028481C, 33, on);
+}
 static int hph, hph_t;                  /* B98: his scripted entrance: 0 walk in, 1 roar, 2 idle; frame it began */
 static f32 hlx, hlz;                    /* his position last frame */               /* tracking camera */                         /* test: 1 create failed, 2 bad archive, 3 created; +10*routine */
 
@@ -265,7 +274,7 @@ int BarnPanel(void) { return st == 1; }
 u8* BarnText(void) { return arc12 ? arc12 + *(u32*)(arc12 + 4 * HR_TXT_W) : 0; }
 int BarnCoords(int i)
 {
-    if (!pG || STAGE != 1 || ROOM != 3 || !pPL) return -999999;
+    if (!pG || STAGE != 1 || ROOM != 3 || !pPL || st == 3) return -999999;   /* B101: no test numbers in the scene */
     if (i == 0) return (int)*(f32*)(pPL + 0x94);
     if (i == 1) return (int)*(f32*)(pPL + 0x9C);
     if (i == 2) return (int)*(f32*)(pPL + 0x98);
@@ -331,7 +340,7 @@ void BarnFrame(void)
         if (bars) STOPF |= SPF_CINESCO; else STOPF &= ~SPF_CINESCO;
     }
     if (STAGE != 1 || ROOM != 3) {                       /* left the farm: forget everything */
-        if (st) { STOPF &= ~(SPF_KEY | SPF_CAM | SPF_EM | SPF_PL | SPF_SCEAT | SPF_ACTBTN); if (st == 3) STA1 &= ~STA_SUSPEND; }
+        if (st) { STOPF &= ~(SPF_KEY | SPF_CAM | SPF_EM | SPF_PL | SPF_SCEAT | SPF_ACTBTN); if (st == 3) { STA1 &= ~STA_SUSPEND; Hud(1); } }
         st = 0; list_no = -1; seen = 0; lock_n = 0; upper = 0; herrero = 0; hold_n = 0; hr_scene_em = 0;
         return;
     }
@@ -388,14 +397,18 @@ void BarnFrame(void)
             }
             if (best < 500.0f * 500.0f && wi < NWP - 1) wi++;
             a1 = atan2f_(WP[wi][0] - lx, WP[wi][1] - lz);   /* where he will face after the turn */
-            a0 = *(f32*)(pl + 0xA4);                       /* B100: as he is (B99's quick turn stepped him toward the window) */
+            a0 = Wrap(a1 + 3.14159265f);                   /* B101 (user): turned to face away (a cut: the camera is on his
+                                                              face), so his quick turn ends right toward the ladder */
+            *(f32*)(pl + 0xA4) = a0;
             ex = lx; ez = lz;
         }
         STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN;
         CrouchStand();
         /* B96: Leon in the game's event routine (cPlayer::beginEvent(0): routine 5, idle, no pad) */
         PlVirt(pl, 16, 0);
+        SetMat(pl, ex, ez, a0);
         STA1 |= STA_SUSPEND; *(u32*)pl |= 0x800;          /* B92: the game's own event pause: only Leon and El Herrero move */
+        Hud(0);
         turn_t = 0;
         return;
     }
@@ -428,12 +441,20 @@ void BarnFrame(void)
             hlx = hx; hlz = hz;
         }
         if (music && (t % 45) == 0) MusicOn();            /* the farm's battle music, from his entrance on */
+        if (t == 56) HerreroYellAt(DOOR_X, 1900.0f, DOOR_Z, 0, 0x1A);   /* B101: his yell outside, after the bang */
         /* ---- Leon */
         if (ph == 0) {                                    /* hears the door, turns where he is */
             if (t == 40) SndCall(1, 0x1E, 0, 0, 0, 0);   /* a door kicked in (Leon's bank, always loaded) */
-            if (t == 46) {                                /* B100: the game's event walk turns him round on the spot (its
-                                                             own turn motion, quick) and walks him off toward the ladder */
-                WalkTo(pl, wi); *(f32*)(pl + 0x400) = 0.2f; best_d = 1e30f; ph = 1; ph_t = t;
+            if (t == 48) {                                /* B101: his quick 180 turn (m_MotTbl 0xB/0xC, hurt 0x6B/0x6C), played
+                                                             through the game's own event routine 5/2 (pl_R1_Event_Smooth: the motion
+                                                             to its end, then feet re-planted): B99 cut it at frame 21 and his
+                                                             rotation was still in the pose, so he faced the window for a moment */
+                void** tb = *(void***)(pl + 0x424);
+                if (tb && tb[0xB] && tb[0x6B]) {
+                    PL_MOTSET(pl, tb[0xB], tb[0xC], tb[0x6B], tb[0x6C], 5, 0);
+                    pl[0xFC] = 5; pl[0xFD] = 2; pl[0xFE] = 0; pl[0xFF] = 0;
+                }
+                ph = 1; ph_t = t; turn_t = 1;
             }
             {   /* on his face, from the front; a shake with the bang */
                 f32 sh = (t >= 40 && t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
@@ -445,22 +466,28 @@ void BarnFrame(void)
                                                              the loft to almost the ladder; the camera low at his feet */
             f32 qx = WP[wi][0] - lx, qz = WP[wi][1] - lz, d = qx * qx + qz * qz;
             f32 fa = Sin(*(f32*)(pl + 0xA4)), fb = Cos(*(f32*)(pl + 0xA4));
+            if (turn_t) {                                 /* the turn: until Smooth is back to idle (step 3) */
+                if ((pl[0xFC] == 5 && pl[0xFD] == 2 && pl[0xFE] == 3) || t > ph_t + 50) {
+                    turn_t = 0; WalkTo(pl, wi); best_d = 1e30f; stuck = 0;
+                }
+                d = 1e30f; best_d = 1e30f;
+            }
             if (d < best_d - 2500.0f) { best_d = d; stuck = 0; } else if (t > ph_t + 30) stuck++;
-            if (wi < NWP - 1 && (d < 600.0f * 600.0f || stuck > 45)) {      /* next point, without stopping */
+            if (!turn_t && wi < NWP - 1 && (d < 600.0f * 600.0f || stuck > 45)) {      /* next point, without stopping */
                 wi++; best_d = 1e30f; stuck = 0;
                 *(f32*)(pl + 0x404) = WP[wi][0]; *(f32*)(pl + 0x408) = ly; *(f32*)(pl + 0x40C) = WP[wi][1];
             }
-            if ((wi == NWP - 1 && (*(u32*)(pl + 0x3E0) == 1 || d < 150.0f * 150.0f || stuck > 45)) || t > ph_t + 300) {
+            if ((!turn_t && wi == NWP - 1 && (*(u32*)(pl + 0x3E0) == 1 || d < 150.0f * 150.0f || stuck > 45)) || t > ph_t + 300) {
                 PlVirt(pl, 16, 0);                        /* there: stands */
                 ph = 2; ph_t = t; c0x = cex; c0y = cey; c0z = cez; t0x = ctx; t0y = cty; t0z = ctz;
             }
-            if (t < ph_t + 26) {                          /* the turn, still on his face */
+            if (t < ph_t + 30) {                          /* the turn, still on his face */
                 f32 sh = (t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
                 f32 ga = Sin(a0), gb = Cos(a0);
                 Cam(lx + ga * 1350.0f + gb * 420.0f + sh, ly + 1700.0f + sh, lz + gb * 1350.0f - ga * 420.0f,
                     lx + ga * 60.0f, ly + 1560.0f, lz + gb * 60.0f, 38.0f);
             } else {                                      /* then low, at his feet */
-                if (t == ph_t + 26) { cex = lx - fa * 1700.0f + fb * 500.0f; cey = ly + 650.0f; cez = lz - fb * 1700.0f - fa * 500.0f;
+                if (t == ph_t + 30) { cex = lx - fa * 1700.0f + fb * 500.0f; cey = ly + 650.0f; cez = lz - fb * 1700.0f - fa * 500.0f;
                                       ctx = lx + fa * 400.0f; cty = ly + 250.0f; ctz = lz + fb * 400.0f; }
                 CamTo(lx - fa * 1700.0f + fb * 500.0f, ly + 650.0f, lz - fb * 1700.0f - fa * 500.0f,
                       lx + fa * 400.0f, ly + 250.0f, lz + fb * 400.0f, 0.10f, 0.15f);
@@ -500,6 +527,7 @@ void BarnFrame(void)
         }
         if (t >= 2000 || (t > 120 && (press & PAD_A))) {
             PlVirt(pl, 24, 2);                            /* cPlayer::endEvent(2): routine 0, pad back */
+            Hud(1);
             STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN); STA1 &= ~STA_SUSPEND; *(u32*)pl &= ~0x800u;
             if (!herrero) {                               /* skipped before he came: he is there anyway */
                 herrero = HerreroSpawn(MARK_X, 163.0f, MARK_Z, atan2f_(lx - MARK_X, lz - MARK_Z));

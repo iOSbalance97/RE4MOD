@@ -308,29 +308,29 @@ def turn(p, k, R):
     for c in sub(k): p.W[c] = R @ p.W[c]
 ROAR_N = 96
 def roar(f):
-    """gathers itself, rears back with the claw up and the head thrown back, shakes, slumps: procedural on
-    the breathing idle; the beam keeps dragging"""
+    """B101: gathers itself, then rears up and roars at Leon: chest out, head up and forward, the claw arm
+    flung down and back with the elbow out and the claw open (B87's arm went up and out: it looked like
+    a wave); shakes, slumps. Procedural on the breathing idle; the beam keeps dragging"""
     p, Wm = mixpose('mutant breathing idle', (f % 120) / 30.0)
     t = f / 30.0
     crouch = sm(t / 0.35) * (1 - sm((t - 0.35) / 0.3))                      # gathers (0-0.5 s)
     e = sm((t - 0.3) / 0.35) * (1 - sm((t - 2.35) / 0.6))                    # the roar (0.5-2.4 s)
     shake = math.sin(t * 2 * math.pi * 7.0) * e
-    turn(p, 1, rx(0.25 * crouch - 0.32 * e + 0.015 * shake))                # chest down, then back
-    turn(p, 3, rx(-0.15 * crouch - 0.45 * e) @ rz(0.04 * shake))           # head thrown back, trembling
-    turn(p, 11, rz(0.25 * e) @ ry(-0.25 * e))                                # left shoulder up and back
-    # B87: the claw arm by IK (turning the bones flipped the elbow): wrist up and out, elbow out and down
+    turn(p, 1, rx(0.25 * crouch - 0.34 * e + 0.015 * shake))                # chest down, then out and up
+    turn(p, 3, rx(-0.10 * crouch - 0.50 * e) @ rz(0.05 * shake))           # head up, trembling
+    turn(p, 11, rz(-0.10 * e) @ ry(0.30 * e))                                # left shoulder pulled back
     P = fk(p)
-    if e > 0.01:
-        sh = P[13]; reach = (L_UA + L_FA) * 0.72
-        up = sh + nrm([0.8, 0.62, 0.3 + 0.03 * shake]) * reach
-        wr = lerp(P[16], up, e)
+    if e > 0.01:                                                             # the claw arm by IK
+        sh = P[13]; reach = (L_UA + L_FA) * 0.84
+        dn = sh + nrm([0.80, -0.42, -0.32 + 0.03 * shake]) * reach           # out, down and back
+        wr = lerp(P[16], dn, e)
         pole0 = nrm(P[14] - (P[13] + P[16]) / 2 + np.array([0, 0, -1e-3]))
-        pole = nrm(lerp(pole0, nrm([0.55, -0.75, -0.35]), e))
-        d0 = p.W[16] @ np.array([1.0, 0, 0]); d = nrm(lerp(d0, nrm([0.35, 1.0, 0.1]), e))
-        hand = aim([1.0, 0, 0], [0, 0, 1.0], d, [0, 0, 1.0])
+        pole = nrm(lerp(pole0, nrm([0.85, 0.20, -0.50]), e))                 # elbow out and back
+        d0 = p.W[16] @ np.array([1.0, 0, 0]); d = nrm(lerp(d0, nrm([0.45, -0.55, 0.70]), e))   # claw open, forward
+        hand = aim([1.0, 0, 0], [0, 0, 1.0], d, [0, 1.0, 0])
         arm(p, P, 1, wr, pole, hand)
     turn(p, 5, rz(-0.2 * e))                                                 # right shoulder braces
-    p.root[1] -= 70 * crouch + 25 * e
+    p.root[1] -= 70 * crouch + 10 * e
     P = fk(p)
     low = min(P[20][1] - BP[20][1], P[24][1] - BP[24][1], P[21][1] - BP[21][1], P[25][1] - BP[25][1])
     p.root[1] -= low

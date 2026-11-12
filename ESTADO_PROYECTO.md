@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B100** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B101** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -506,6 +506,20 @@ Reglas de trabajo del usuario:
        le lleva; la cámara sigue en su cara 26 frames y luego baja a sus pies; al llegar se queda quieto.
      · Cámara final: del pie de la escalera se aleja y se centra en (−13300, 1750, −7450) en 70 frames,
        a 4,5 m de la marca del Herrero, siguiéndole.
+   - **B101** (vídeo B100: ya no desaparece nadie. Pide: sin HUD en la escena; giro rápido que acabe hacia la
+     escalera; gritos del Herrero; el brazo del rugido raro):
+     · HUD: Hud(0/1) = lo que hace sce_com al empezar/acabar un evento: Cckpt.lifeMeterDisp (PAL 0x800C0518,
+       Cckpt 0x8027E4A8) + IdSys.dispSw(33) (PAL 0x8011C3CC, IdSys 0x8028481C); números de prueba ocultos.
+     · León: al empezar se le pone de espaldas al camino (corte, cámara en su cara) y en t 48 giro rápido
+       (m_MotTbl 0xB/0xC) por la rutina de evento 5/2 (pl_R1_Event_Smooth: el movimiento hasta su final y
+       pies recolocados): B99 lo cortaba en el frame 21 con el giro aún en la pose → miraba a la ventana un
+       momento. Cuando Smooth llega al paso 3 (o 50 frames), andar de evento a la escalera.
+     · Gritos: B99/B100 no sonaban porque las voces del banco 8 son 3D y se llamaban sin posición; ahora
+       SndCall(8, no, &pos, 0, 0, em) como em10 (Ctrl11SetSe2). t 56: grito 0x1A (tipo 0, "te encontré")
+       en la puerta, −700 cents; y al rugir, en él (Se_tbl[4]).
+     · Rugido nuevo (mkanim.py roar): pecho fuera y arriba, cabeza levantada, brazo de la garra abajo y
+       atrás, codo fuera, garra abierta (B87 subía el brazo: parecía saludar). herrero.bin regenerado
+       (game.py; malla y texturas idénticas, solo el paquete de movimientos).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.
