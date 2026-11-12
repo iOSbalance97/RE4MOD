@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B107** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B108** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -588,6 +588,15 @@ Reglas de trabajo del usuario:
        100, 0, 0.0) (PAL 0x80057080); la de la granja baja a 1; al morir el Herrero la de jefe se apaga en
        4 s y la de la granja vuelve.
      · Fin de la escena: cámara de juego tras León (copia de su matriz en m_pl_mat, ángulos a 0, init flag).
+   - **B108** (vídeo B107: escena y cámara descolocadas → vuelta atrás, solo límites de paredes):
+     · Primer plano: el de B106 otra vez; si su sitio queda tras una pared (límites de B107), la cámara gira
+       alrededor de León a la misma distancia (pasos de 15°, a ambos lados) hasta el primer sitio dentro.
+       Cam() sigue limitando todas las cámaras a las paredes.
+     · Cámara tras el cartel: al salir el cartel León da además un paso de 0,8 m hacia el Ganado (bajo el
+       cartel): en el primer frame arriba sigue mandando el corte de cámara de la escalera (su área), y se
+       quedaba mientras León siguiera ahí.
+     · Combo con pausa (usuario): golpe de abajo (hasta su frame 24), vuelta a la postura de arrastre (14),
+       parado (12) y el mazazo entero desde su inicio (6 de mezcla). HR_SMASH 131 frames, golpes 15-21 / 82-91.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

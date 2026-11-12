@@ -416,26 +416,34 @@ static void Shot0(u8* pl, int tt)
     f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C);
     f32 sh = (tt >= 40 && tt < 52) ? 18.0f * Sin((f32)tt * 2.1f) : 0.0f;
     f32 px, py, pz, qx, qy, qz;
-    /* B107: four places for the first shot (offsets along his facing f and his side r); the first one far
-     * enough inside the barn is kept for the whole shot (chosen on the scene's first frame): shot by the
-     * wall, B106's camera ended up outside the house */
-    static const f32 CV[4][2] = { { -1500.0f, 520.0f }, { -1500.0f, -520.0f }, { 250.0f, 1400.0f }, { 250.0f, -1400.0f } };
-    static const f32 CT[4][2] = { { 1350.0f, 420.0f }, { 1350.0f, -420.0f }, { 350.0f, 1350.0f }, { 350.0f, -1350.0f } };
-    static int pick;
-    f32 aa = vs ? a1 : a0, fa = Sin(aa), fb = Cos(aa);
-    const f32 (*C)[2] = vs ? CV : CT;
-    if (tt == 0) {
-        int i; f32 best = -1e30f;
-        pick = 0;
-        for (i = 0; i < 4; i++) {
-            f32 x = lx + fa * C[i][0] + fb * C[i][1], z = lz + fb * C[i][0] - fa * C[i][1], m = InMargin(x, z);
-            if (m > 300.0f) { pick = i; break; }
-            if (m > best) { best = m; pick = i; }
+    if (vs) {
+        f32 fa = Sin(a1), fb = Cos(a1);
+        px = lx - fa * 1500.0f - fb * 520.0f; py = ly + 1650.0f; pz = lz - fb * 1500.0f + fa * 520.0f;
+        qx = lx + fa * 2500.0f; qy = ly + 1300.0f; qz = lz + fb * 2500.0f;
+    } else {
+        f32 ga = Sin(a0), gb = Cos(a0);
+        px = lx + ga * 1350.0f + gb * 420.0f; py = ly + 1700.0f; pz = lz + gb * 1350.0f - ga * 420.0f;
+        qx = lx + ga * 60.0f; qy = ly + 1560.0f; qz = lz + gb * 60.0f;
+    }
+    {   /* B108 (user: only keep it inside the walls): if that place is behind a wall, the camera goes
+         * round Leon at the same distance (steps of 15 degrees, either way, chosen on the first frame and
+         * kept) to the first place inside the barn */
+        static f32 rot;
+        f32 ox = px - lx, oz = pz - lz;
+        if (tt == 0) {
+            int k;
+            rot = 0.0f;
+            if (InMargin(px, pz) < 150.0f)
+                for (k = 1; k <= 12; k++) {
+                    f32 r = 0.2618f * (f32)((k + 1) / 2) * ((k & 1) ? 1.0f : -1.0f), c = Cos(r), n = Sin(r);
+                    if (InMargin(lx + ox * c + oz * n, lz - ox * n + oz * c) >= 150.0f) { rot = r; break; }
+                }
+        }
+        if (rot != 0.0f) {
+            f32 c = Cos(rot), n = Sin(rot);
+            px = lx + ox * c + oz * n; pz = lz - ox * n + oz * c;
         }
     }
-    px = lx + fa * C[pick][0] + fb * C[pick][1]; pz = lz + fb * C[pick][0] - fa * C[pick][1];
-    if (vs) { py = ly + 1650.0f; qx = lx + fa * 2500.0f; qy = ly + 1300.0f; qz = lz + fb * 2500.0f; }
-    else    { py = ly + 1700.0f; qx = lx + fa * 60.0f; qy = ly + 1560.0f; qz = lz + fb * 60.0f; }
     Cam(px + sh, py + sh, pz, qx, qy, qz, vs ? 44.0f : 38.0f);
     cang = atan2f_(px - lx, pz - lz); crad = Sq((px - lx) * (px - lx) + (pz - lz) * (pz - lz));
     cex = px; cey = py; cez = pz; ctx = qx; cty = qy; ctz = qz;
@@ -487,7 +495,13 @@ void BarnFrame(void)
             st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_EM | SPF_PL; MusicQuiet(); barn_padlock = 1;
             QFPS_DIR = 0.0f; QFPS_DEP = 0.0f;
             {
+                /* B108: also a step (0.8 m) toward the Ganado, under the panel: on the very first frame up the
+                 * ladder's own camera cut (its area at the ladder top) is still the camera, and it stayed so
+                 * while Leon stood there -- after the panel the camera looked at him from the side. Out of
+                 * that area the shoulder camera takes over behind him */
                 f32 a = atan2f_(ux - lx, uz - lz);
+                lx += Sin(a) * 800.0f; lz += Cos(a) * 800.0f;
+                *(f32*)(pl + 0x94) = lx; *(f32*)(pl + 0x9C) = lz;
                 *(f32*)(pl + 0xA4) = a; SetMat(pl, lx, lz, a);
                 QfpsPlMat(pl);
             }

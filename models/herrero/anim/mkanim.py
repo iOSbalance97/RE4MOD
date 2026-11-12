@@ -402,11 +402,14 @@ if __name__ == '__main__':
     # B105: the combo is ONE motion (the blow from below, then the smash): B104 chained two and the game's
     # attack routine ended with the first. The smash part shifted by CO; the last COMBO_BL frames of the
     # first blow blend into the smash's first ones.
-    CO = UP_N + 1 - COMBO_BL
-    SK = COMBO_SKIP
-    CP = UP[:CO] + [blendpose(UP[CO + k], SP[SK + k], sm((k + 1) / (COMBO_BL + 1))) for k in range(COMBO_BL)] + SP[SK + COMBO_BL:]
+    # B108 (user): a pause between the blows: the blow from below (to frame 26, the anvil up in front), back
+    # down to his dragging stance (14 frames), a stop (12), and the whole two-handed smash from its start
+    UPC = 24; DN = 14; HOLD = 12; BL2 = 6
+    I0 = IP[0]
+    CP = UP[:UPC + 1] + [blendpose(UP[UPC], I0, sm((k + 1) / (DN + 1))) for k in range(DN)] + [I0] * HOLD
+    CP += [blendpose(I0, SP[k], sm((k + 1) / (BL2 + 1))) for k in range(BL2)] + SP[BL2:]
+    CO = UPC + 1 + DN + HOLD                             # smash frame f is now at CO + f
     SP = CP
-    CO -= SK                                             # smash frame f is now at CO + f
     wm = build(WP); sm_ = build(SP); im = build(IP); fm = build(FP); rm = build(RP); um = build(UP)
     print('walk', check(wm, WP), len(wm), '| smash', check(sm_, SP), len(sm_), '| idle', len(im), '| flex', len(fm))
     print('walk travel per frame', WP[-1].travel[2] * S / WN2)
