@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B82** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B83** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -320,6 +320,18 @@ Reglas de trabajo del usuario:
      +0x15C, matriz a 0). Texturas: medido en el disco que las del juego tienen ~1,6× más contraste
      (desviación de luminancia 30–37 frente a 20, misma media ~50): game.py estira el contraste ×1,6 y
      enfoca un poco antes de codificar CMPR.
+   - **B82 probado: "muchísimo mejor el aspecto"**. Pide animaciones que peguen con él y quitar el
+     rastro del ganado (sigue golpeando como el ganado del hacha).
+   - **B83: animaciones propias** (models/herrero/anim/mkanim.py → mod/c/herrero_mot.h; animprev.py
+     las dibuja con la malla). Formato de movimiento: canal kind 1 de la parte 0 = avance de raíz (lo
+     que MotionMove usa para mover al enemigo), kind 4 parte 0 = cadera, kind 2 = rotaciones locales
+     (euler zyx). Todo FK (como el HUNK del disco), posiciones ×0,95. Andar pesado (64 frames, 17 mm/
+     frame, encorvado, balanceo, arrastra el yunque detrás) y golpe por encima de la cabeza (84 frames:
+     carga 0–24, golpe 24–33, impacto quieto, vuelta; secuencia: Free 8 en 0–19 sigue girando hacia
+     León, 0x20 en 24 sonido, Free 1 en 28–34 comprobación de golpe). HerreroFrame los pone en lugar
+     de los del ganado: rutina 1 0x10 Walk / 0x11 Dash → andar; 0x26 AxeAtk → golpe; 0x24 ThrowAxe →
+     AxeAtk. El daño sigue siendo el del juego (AxeAtk barre desde la matriz del hacha oculta, ~1 m
+     a lo largo del mango): POR COMPROBAR si coincide con el yunque.
    - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
      em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
      material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.

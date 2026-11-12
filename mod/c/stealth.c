@@ -41,6 +41,7 @@ static f32* FindPool(u8* m)
 
 void StealthKillFrame(void);
 static void HerreroFrame(void);
+#include "herrero_mot.h"
 void StealthFrame(void)
 {
     StealthKillFrame();
@@ -441,6 +442,20 @@ static void HerreroFrame(void)
                     f32* m = (f32*)(wi + 0x5C);
                     m[0] = m[1] = m[2] = m[4] = m[5] = m[6] = m[8] = m[9] = m[10] = 0.0f;
                 }
+            }
+        }
+        /* B83: its own motions (models/herrero/anim/mkanim.py), put in place of the Ganado's the frame
+         * the game sets them (em10 routine 1: 0x10 Walk / 0x11 Dash -> the heavy walk, 0x26 AxeAtk ->
+         * the overhead smash; 0x24 ThrowAxe is turned into AxeAtk). The game's own routine still runs
+         * them: it moves the body by their root track and reads their sequence (Free 8: keep turning
+         * to Leon, 0x20: swing sound, 1: the attack check) */
+        if (e[0xFC] == 1) {
+            void* cur = *(void**)(e + 0x1D8);
+            if (e[0xFD] == 0x24) { e[0xFD] = 0x26; e[0xFE] = 0; e[0xFF] = 0; }
+            else if (e[0xFD] == 0x26) {
+                if (cur != (void*)hr_smash_mot) MotionSetCore(e, e + 0x1D8, (void*)hr_smash_mot, (void*)hr_smash_seq, 8, 1, 0);
+            } else if (e[0xFD] == 0x10 || e[0xFD] == 0x11) {
+                if (cur != (void*)hr_walk_mot) MotionSetCore(e, e + 0x1D8, (void*)hr_walk_mot, (void*)hr_walk_seq, 10, 5, 0);
             }
         }
         for (k = 0; k < 3; k++) {
