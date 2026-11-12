@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B94** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B95** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -435,6 +435,15 @@ Reglas de trabajo del usuario:
      · Música: SndRoomStrStart reintentado cada 2 s desde t 96; 6º número de prueba = palabra de la tabla
        de stream de la sala ×10 + 1 si suena (pSnd = *(0x802B7E54), room_str_tbl +2760; SndStrStatusCk
        0x8005748C) para saber si la granja tiene stream.
+   - **B95** (vídeo B94: ventana bloqueada OK; el Herrero SE VE pero desaparece al llegar a la cámara fija
+     —se la come—; 6º número 327760→327761: la granja SÍ tiene stream 8 y suena desde ~30 s): cámara del
+     2º plano delante de él, retrocediendo (2,7 m por delante hacia León, 0,9 m de lado, suavizada 8 %
+     por frame). Música: se para al salir el panel (y cada segundo si el temporizador de la sala la
+     arranca), suena al aparecer el Herrero, se apaga en 4 s cuando muere (SndRoomStrStop PAL
+     0x800587D8). BANDAS (idea del usuario): con la ✕ de sigilo o durante la ejecución, Stop_flg 0x4000
+     (SPF_CINESCO, el juego no lo usa) → barras; 8 frames de margen. cine_polling: el bit 0x100
+     (ACTBTN, nuestro bloqueo de la ventana) ya no pone barras: rlwimi r0,r12,25,23,23 mete ahí el bit
+     del título (antes rlwinm+or).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

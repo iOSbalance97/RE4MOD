@@ -112,7 +112,8 @@ W04={0x80146D60:0x7009FFFF,0x80146E50:0x880A0003,0x80146EEC:0x880A0003,0x8014700
      0x801F0184:0x00000000,
      # 4) cine_polling (0x8017579C), preset "gameplay" (B74 back from B73's "everywhere": the menus /
      # inventory have things to fix under their bars): bars only with Stop_flg or the title
-     0x801757A0:0x80090170,0x801757A4:0x81895020,0x801757A8:0x558C8FFE,0x801757AC:0x7C006378,
+     0x801757A0:0x80090170,0x801757A4:0x81895020,0x801757A8:0x5180CDEE,0x801757AC:0x60000000,   # B95: rlwimi r0,r12,25,23,23: the title bit takes the place of Stop_flg 0x100 (SPF_ACTBTN: no bars just for that)
+     
      0x801757B0:0x3180FFFF,0x801757B4:0x7D6C0110,0x801757B8:0x88030002}
 # __ArenaLo: lis r3,hi / addi r3,r3,lo at both sites
 ha=(END+0x8000)>>16; lo=END-(ha<<16)
