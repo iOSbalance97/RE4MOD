@@ -18,6 +18,6 @@ def posed(pz):
 which = sys.argv[1]; frames = [int(x) for x in sys.argv[2].split(',')]; eye = tuple(float(x) for x in sys.argv[3].split(','))
 W = Image.new('RGB', (450 * len(frames), 600))
 for i, f in enumerate(frames):
-    pz = mkanim.walk(f) if which == 'walk' else (mkanim.swing(f) if which == 'swing' else mkanim.smash(f))
+    pz = {'walk': lambda f: mkanim.walk(f), 'walk2': lambda f: mkanim.walk2(f, 78), 'idle': lambda f: mkanim.idle(f, 120), 'flex': lambda f: mkanim.flex(f), 'swing': lambda f: mkanim.swing(f)}.get(which, mkanim.smash)(f)
     im = render.render(posed(pz), eye, (-200, 1050, 500), W=450, H=600, ss=1, texs=texs); W.paste(im, (450 * i, 0))
 W.save(sys.argv[4])

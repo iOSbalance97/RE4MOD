@@ -78,3 +78,5 @@ DVDReadAsyncPrio   = 0x80075AF8;
 DvdFileExistCheck  = 0x800C66EC;
 mem_alloc          = 0x80125BC4;
 EstSet             = 0x80105A90;
+LifeDownSet2       = 0x800CFE2C;
+PlSetDamage        = 0x800D02B4;

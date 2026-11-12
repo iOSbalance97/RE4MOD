@@ -415,6 +415,33 @@ void StealthCam(f32* q, const f32* m)
     cam_w = w;
 }
 
+/* B85: the smash's damage, at the anvil (the game's AxeAtk check sweeps the hidden axe from the hand,
+ * so the smash's sequence no longer carries Free 1). Once per swing, motion frames HR_HIT0..HR_HIT1:
+ * Leon within 0.85 m of the anvil (horizontally, and not above it by more than 1.2 m) is knocked down
+ * (PlSetDamage type 4/5 = DOWN front/back, as EmAtkSetDamagePL picks for a low hit) and loses
+ * HR_POWER life through LifeDownSet2 with flag 1: it never leaves him dead */
+#define HR_POWER 760
+static u8* hr_hit_em;
+static void HerreroHit(u8* e)
+{
+    u8* pl = pPL;
+    f32 fr = *(f32*)(e + 0x1D8 + 0xB8), ax, ay, az, dx, dz, dy, fx, fz;
+    f32* w;
+    int type;
+    if (fr < (f32)HR_HIT0 - 1.0f) { if (hr_hit_em == e) hr_hit_em = 0; return; }
+    if (fr > (f32)HR_HIT1 || hr_hit_em == e || !pl) return;
+    w = (f32*)((u8*)getPartsPtr(e, 10) + 0x0C);
+    ax = w[0] * HR_ANVIL_X + w[1] * HR_ANVIL_Y + w[2] * HR_ANVIL_Z + w[3];
+    ay = w[4] * HR_ANVIL_X + w[5] * HR_ANVIL_Y + w[6] * HR_ANVIL_Z + w[7];
+    az = w[8] * HR_ANVIL_X + w[9] * HR_ANVIL_Y + w[10] * HR_ANVIL_Z + w[11];
+    dx = *(f32*)(pl + 0x94) - ax; dy = *(f32*)(pl + 0x98) - ay; dz = *(f32*)(pl + 0x9C) - az;
+    if (dx * dx + dz * dz > 850.0f * 850.0f || dy > 1200.0f || dy < -600.0f) return;
+    hr_hit_em = e;
+    fx = *(f32*)(pl + 0x0C + 0x08); fz = *(f32*)(pl + 0x0C + 0x28);           /* Leon's facing */
+    type = (fx * dx + fz * dz >= 0.0f) ? 5 : 4;                                 /* anvil behind him: DOWN_BACK */
+    LifeDownSet2(pl, HR_POWER, 0, 1);
+    PlSetDamage(type, 0, 0);
+}
 /* B81: El Herrero (test: on a Ganado body, mod/mkfiles.py). Its BIN carries 'HERR' at +0x58. The Ganado's
  * own head and hands are separate models (em10 work: pRHand +0x564, pLHand +0x568, pHead +0x56C,
  * cModelInfo*); the Herrero has its own in the body mesh, so theirs are collapsed every frame the way
@@ -449,14 +476,25 @@ static void HerreroFrame(void)
          * the overhead smash; 0x24 ThrowAxe is turned into AxeAtk). The game's own routine still runs
          * them: it moves the body by their root track and reads their sequence (Free 8: keep turning
          * to Leon, 0x20: swing sound, 1: the attack check) */
-        if (e[0xFC] == 1) {
+        if (e[0xFC] == 1 && *(u32*)(bin + 0x5C) != 0) {
+            /* B85: the motions travel inside the Herrero's own BIN (u32 at +0x5C -> pack of 8 offsets:
+             * mot/seq of walk, smash, idle, flex): the mod's code space is too small for them */
+            u8* pk = bin + *(u32*)(bin + 0x5C);
+#define HRM(i) ((void*)(pk + *(u32*)(pk + 4 * (i))))
             void* cur = *(void**)(e + 0x1D8);
-            if (e[0xFD] == 0x24) { e[0xFD] = 0x26; e[0xFE] = 0; e[0xFF] = 0; }
-            else if (e[0xFD] == 0x26) {
-                if (cur != (void*)hr_smash_mot) MotionSetCore(e, e + 0x1D8, (void*)hr_smash_mot, (void*)hr_smash_seq, 8, 1, 0);
-            } else if (e[0xFD] == 0x10 || e[0xFD] == 0x11) {
-                if (cur != (void*)hr_walk_mot) MotionSetCore(e, e + 0x1D8, (void*)hr_walk_mot, (void*)hr_walk_seq, 10, 5, 0);
+            u8 r = e[0xFD];
+            if (r == 0x24) { e[0xFD] = 0x26; e[0xFE] = 0; e[0xFF] = 0; r = 0x26; }
+            if (r == 0x26) {
+                if (cur != HRM(HR_SMASH)) MotionSetCore(e, e + 0x1D8, HRM(HR_SMASH), HRM(HR_SMASH + 1), 8, 1, 0);
+                else HerreroHit(e);
+            } else if (r == 0x10 || r == 0x11) {
+                if (cur != HRM(HR_WALK)) MotionSetCore(e, e + 0x1D8, HRM(HR_WALK), HRM(HR_WALK + 1), 10, 5, 0);
+            } else if (r == 0x00 || r == 0x1B || r == 0x4F) {          /* B85: Wait / Stay / AttackWait */
+                if (cur != HRM(HR_IDLE)) MotionSetCore(e, e + 0x1D8, HRM(HR_IDLE), HRM(HR_IDLE + 1), 10, 5, 0);
+            } else if (r == 0x0D || r == 0x16) {                       /* B85: Find / Threat: the flex */
+                if (cur != HRM(HR_FLEX) && e[0xFE] <= 1) MotionSetCore(e, e + 0x1D8, HRM(HR_FLEX), HRM(HR_FLEX + 1), 10, 1, 0);
             }
+#undef HRM
         }
         for (k = 0; k < 3; k++) {
             u8* p = *(u8**)(e + 0x564 + 4 * k);

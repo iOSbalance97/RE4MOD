@@ -118,3 +118,5 @@ void* getPartsPtr(void* model, int no);
 f32  SQRTF(f32 x);
 void* examInfo(int id, int ext);
 void ModelTrans(void* model);
+int LifeDownSet2(void* em, int dm_val, int rnd, int flag);
+void PlSetDamage(int type, int val, int flag);

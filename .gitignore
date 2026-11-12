@@ -1,1 +1,3 @@
 mod/files/
+mod/out/*.iso
+__pycache__/

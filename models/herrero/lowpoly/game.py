@@ -112,6 +112,8 @@ def build(parts):
     o_t40 = len(blob); blob += dm[H[16]:H[17]]; o_t44 = len(blob); blob += dm[H[17]:DONOR[2]].rstrip(b'\0'); pad()
     H[3], H[4], H[5], H[7], H[12], H[13], H[16], H[17] = o_col, o_uv, o_wt, o_mat, o_pos, o_nrm, o_t40, o_t44
     H[22] = 0x48455252                               # 'HERR' at +0x58: stealth.c HerreroFrame finds it
+    pad(); H[23] = len(blob)                         # B85: its motions (models/herrero/anim/mkanim.py) at +0x5C
+    blob += open('/home/claude/re4mod/mod/data/herrero_anim.bin', 'rb').read(); pad()
     blob[:0x60] = struct.pack('>24I', *H)
     blob[0x18] = len(wt); blob[0x19] = nb; blob[0x1a:0x1c] = struct.pack('>H', nmat); blob[0x38:0x3c] = struct.pack('>HH', len(POS), len(NRM))
     print('BIN', len(blob), 'of', DONOR[2], '| pos', len(POS), 'nrm', len(NRM), 'uv', len(UV), 'weights', len(wt), 'tris', ntot)

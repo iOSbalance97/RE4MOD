@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B84** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B85** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -340,6 +340,16 @@ Reglas de trabajo del usuario:
      garra va por IK al mango 270 mm detrás de la empuñadura, la cadera se ajusta para que los pies
      toquen el suelo. Modelo: mango alargado (empuñadura hasta −330 mm, pomo −365) para las dos manos
      (model.py y model_hi.py). Sustituye al golpe procedural de B83 (smash() se queda en el archivo).
+   - **B85**: golpe dañino propio (stealth.c HerreroHit): una vez por golpe, entre los frames HR_HIT0–1,
+     posición del yunque = matriz de la parte 10 × HR_ANVIL_*; si León está a <850 mm en horizontal
+     y −600<dy<1200 → LifeDownSet2(pl, 760, 0, flag 1 = nunca mata) + PlSetDamage(4 frente / 5
+     espalda = derribo). La seq ya no lleva Free 1 (el chequeo del hacha del Ganado se queda fuera).
+     Pack Creature_NPC_Pack (anim/mixamo/herrero/pack): walk2 = 'mutant walking' al 0,55 (78 fr) con
+     el arma arrastrando, idle = 'mutant breathing idle' (Wait/Stay/AttackWait), flex = 'mutant flexing
+     muscles' (Find/Threat). Las animaciones ya NO van en el código (no cabían en el hueco del dol,
+     assert de bake.py): mkanim.py escribe mod/data/herrero_anim.bin (8 offsets: mot/seq de walk,
+     smash, idle, flex) y game.py lo añade al final del BIN con su offset en BIN+0x5C; HerreroFrame
+     las coge de ahí. BIN 160 KB. Sin usar aún del pack: swiping (2º ataque), dying, run, turns.
    - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
      em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
      material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.
