@@ -28,9 +28,10 @@ typedef f32 (*Atan2F)(f32, f32);
 
 /* where El Herrero comes in: the barn's big door (set from the user's coordinates; until then a guess
  * from the ladder) */
-#define DOOR_KNOWN 0
-#define DOOR_X 0.0f
-#define DOOR_Z 0.0f
+#define DOOR_KNOWN 1                     /* B89: guess from the user's screenshot (Leon at the side door -13562,-12198 looking +z
+                                            at the opening in the far wall, under the Ganado at z -1770) */
+#define DOOR_X (-13650.0f)
+#define DOOR_Z 2300.0f
 
 static int st, t, list_no = -1, seen, lock_n;
 static u8* upper;                       /* the Ganado upstairs (live work) */
@@ -177,7 +178,7 @@ void BarnFrame(void)
         if (!upper || seen) return;
         lx = *(f32*)(pl + 0x94); lz = *(f32*)(pl + 0x9C); ux = *(f32*)(upper + 0x94); uz = *(f32*)(upper + 0x9C);
         if (*(f32*)(pl + 0x98) > 2500.0f && (lx - ux) * (lx - ux) + (lz - uz) * (lz - uz) < 12000.0f * 12000.0f
-            && pl[0xFC] == 1 && pl[0xFD] <= 3) {
+            && pl[0xFC] == 0 && (pl[0xFD] <= 3 || pl[0xFD] == 6)) {
             if (++t >= 20) { st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_KEY | SPF_EM | SPF_PL; }
         } else t = 0;
         return;
@@ -189,7 +190,7 @@ void BarnFrame(void)
         u8* e = EmFind(list_no);
         WindowsLock(1);
         if (e && *(s16*)(e + 0x320) > 0 && e[0xFC] < 3) { upper = e; return; }
-        if (pl[0xFC] != 1 || pl[0xFD] > 3) { t = 0; return; }   /* Leon still busy (the takedown) */
+        if (pl[0xFC] != 0 || (pl[0xFD] > 3 && pl[0xFD] != 6)) { t = 0; return; }   /* Leon still busy (the takedown) */
         if (++t < 50) return;                            /* let it fall */
         st = 3; t = 0;
         {   /* the door, Leon's turn */

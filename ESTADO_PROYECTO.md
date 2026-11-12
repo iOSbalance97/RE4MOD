@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B88** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B89** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -389,6 +389,11 @@ Reglas de trabajo del usuario:
      (puerta rota, emdoor) + temblor, f52–86 León se gira, f96+ cámara por encima del hombro siguiendo al
      Herrero; A salta tras 120 fr; luego se reactivan las ventanas. PUERTA: aún estimada desde la escalera
      (DOOR_KNOWN 0) → la prueba muestra x z y ángulo de León arriba a la izquierda en r103 para fijarla.
+   - **B89**: B88 no hacía nada: barn.c pedía pl r_no_0 == 1, pero la rutina normal de León es 0
+     (weapon.c CanSwap: r_no_0 0, r_no_1 ≤ 3 o 6). Puerta: captura del usuario con León en la puerta
+     lateral (x −13562, z −12198, ángulo 0 = mirando a +z) viendo al fondo la abertura grande bajo el
+     Ganado (z −1770) → puerta estimada (−13650, +2300) (el Ganado de abajo de la lista, entrada 96, está
+     en (−13700, 2590)). Números de posición más separados.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.
