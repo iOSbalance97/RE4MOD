@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B101** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B102** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -520,6 +520,19 @@ Reglas de trabajo del usuario:
      · Rugido nuevo (mkanim.py roar): pecho fuera y arriba, cabeza levantada, brazo de la garra abajo y
        atrás, codo fuera, garra abierta (B87 subía el brazo: parecía saludar). herrero.bin regenerado
        (game.py; malla y texturas idénticas, solo el paquete de movimientos).
+   - **B102** (vídeo B101):
+     · Gritos sin sonido: el 4º argumento de SndCall en el banco 8 es el id del enemigo (em +0x100, 0x10
+       Ganado): emSeCheck elige el banco 8+i cuyo snd_em_id coincide; con 0 no hay banco → nada.
+     · Armas invisibles en la escena: el arma es un modelo aparte (cPlWep +0x788 → m_pWep +0x34,
+       m_pWepHand +0x38) congelado por STA_SUSPEND: be_flag 0x800 durante la escena.
+     · Cartel: al salir, León mira al Ganado (la cámara de hombro va tras él) y se ponen a 0 los ángulos
+       de la cámara con el C-stick (CamCtrl.m_QuasiFPS PAL 0x80217104 +0x200/+0x204): seguían girando.
+     · León (propuesta del usuario): giro rápido hacia la ventana (WIN −13500, −2330), unos pasos hacia
+       ella, grito, se para, ~1,3 s después el andar de evento le gira en el sitio y va a la escalera por
+       el camino que hizo él en el vídeo (WP nuevos, 5 puntos).
+     · Cámara de los pies: gira ALREDEDOR de León (ángulo y distancia ≥ 1,4 m) en vez de atravesarle; el
+       paso a lo alto de la escalera hace un arco por encima de él.
+     · Rugido: cabeza menos levantada (−0,22 en vez de −0,50).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

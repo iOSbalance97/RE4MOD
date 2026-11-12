@@ -317,7 +317,7 @@ def roar(f):
     e = sm((t - 0.3) / 0.35) * (1 - sm((t - 2.35) / 0.6))                    # the roar (0.5-2.4 s)
     shake = math.sin(t * 2 * math.pi * 7.0) * e
     turn(p, 1, rx(0.25 * crouch - 0.34 * e + 0.015 * shake))                # chest down, then out and up
-    turn(p, 3, rx(-0.10 * crouch - 0.50 * e) @ rz(0.05 * shake))           # head up, trembling
+    turn(p, 3, rx(-0.10 * crouch - 0.22 * e) @ rz(0.05 * shake))           # head up, trembling
     turn(p, 11, rz(-0.10 * e) @ ry(0.30 * e))                                # left shoulder pulled back
     P = fk(p)
     if e > 0.01:                                                             # the claw arm by IK

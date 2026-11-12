@@ -492,7 +492,9 @@ static f32 hr_yell_pos[3];
 void HerreroYellAt(f32 x, f32 y, f32 z, u8* e, int se)
 {
     hr_yell_pos[0] = x; hr_yell_pos[1] = y; hr_yell_pos[2] = z;
-    hr_roar_id = (u32)SndCall(8, se, (int)hr_yell_pos, 0, 0, (int)e);
+    /* B102: the 4th argument is the enemy's id (em->id, +0x100: 0x10 for the Ganado): SndCall's emSeCheck
+     * picks the enemy bank (8 + i) whose snd_em_id matches it; B101 passed 0 -> no bank -> silence */
+    hr_roar_id = (u32)SndCall(8, se, (int)hr_yell_pos, e ? e[0x100] : 0x10, 0, (int)e);
     hr_roar_n = 100;
     if (hr_roar_id) SND_DOP_PITCH(hr_roar_id, -700);
 }
