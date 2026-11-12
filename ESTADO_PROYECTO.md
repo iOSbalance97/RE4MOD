@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B98** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B99** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -478,6 +478,22 @@ Reglas de trabajo del usuario:
      stealth.c HerreroSceneMot pone nuestros movimientos (andar; si la raíz no le mueve, 30,8 mm/frame);
      al llegar: rugido (HR_ROAR) y quieto; la escena acaba ~1 s después. Al terminar: Guard_r 20000,
      flag bit 1 y rutina Wait → su IA normal desde dentro del granero. HerreroFrame ignora al de la escena.
+   - **B99** (usuario: con León quieto junto al cuerpo el Herrero sigue sin verse; si se aleja hacia la
+     escalera, sí, y ruge sin sonido. Propuesta suya, hecha así):
+     · La escena empieza en cuanto León sale del derribo (sin los 50 frames libres), donde mató.
+     · Fases: 0 golpe (t 40) y giro rápido de 180° (pre-orientado de espaldas al primer punto del
+       camino); 1 León anda solo con el andar de evento del juego (rutina 5/1 pl_R1_Event_ToWalk:
+       m_VecWork0 +0x404, m_Fwork0 +0x400 giro/frame, m_Work0 +0x3E0 = llegó) por los puntos de sus propios
+       pasos en los vídeos (WP[], altillo y 3334) hasta casi la escalera (−12630, −5650); cámara baja a sus
+       pies, suavizada; 2 cámara a lo alto de la escalera a la altura de la cabeza; 3 baja por el hueco
+       siguiendo la subida de León en el vídeo (+1,3 m: por donde pasó su cabeza) girando hacia la puerta;
+       a los 30 frames de bajar nace el Herrero (patada a la puerta + música); 4 cámara al pie de la
+       escalera mirándole: entra recto hasta la marca, ruge, y ~1 s después acaba (máx. 11 s).
+     · Rugido con sonido: grito de "te encontré" del Ganado (Se_tbl[4] +0xAA6, banco 8) 7 semitonos más
+       grave (SndSetDopPitch PAL 0x80056E5C, −700 cents, mantenido 24 frames); también en el rugido de juego.
+     · Ganados de fuera: desde que León entra al granero hasta el fin de la escena, cada Ganado fuera del
+       granero queda en Keeper (Guard_r 0, Be_flg 0x100): quieto mirando. Al acabar: su Guard_r, flag
+       bit 1 y Wait → saben dónde está León y vienen.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

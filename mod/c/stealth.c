@@ -479,6 +479,20 @@ static HrSlot* HrSlotOf(u8* e)
  * the wall, or round the barn, depending on where Leon stands). Its motion is chosen here, not by
  * the routine mapping below. Returns the motion frame. */
 u8* hr_scene_em;
+/* B99: his roar had no sound: the Ganado's own "found you" yell (em10 Se_tbl[4], +0xAA6, enemy bank 8,
+ * what em10_R1_Find plays) pitched down 7 semitones (SndSetDopPitch PAL 0x80056E5C, cents; held a few
+ * frames: the SE system may set it again) */
+#define SND_DOP_PITCH ((int (*)(u32, int))0x80056E5C)
+static u32 hr_roar_id; static int hr_roar_n;
+void HerreroRoarSnd(u8* e)
+{
+    int se = e[0xAA6 + 4];
+    if (!se) se = e[0xAA6 + 12];
+    if (!se) return;
+    hr_roar_id = (u32)SndCall(8, se, 0, 0, 0, 0);
+    hr_roar_n = 24;
+    if (hr_roar_id) SND_DOP_PITCH(hr_roar_id, -700);
+}
 f32 HerreroSceneMot(u8* e, int m)
 {
     u8* mi = *(u8**)(e + 0x15C); u8* bin; u8* pk; void* cur;
@@ -495,6 +509,7 @@ f32 HerreroSceneMot(u8* e, int m)
 }
 static void HerreroFrame(void)
 {
+    if (hr_roar_n > 0) { hr_roar_n--; if (hr_roar_id) SND_DOP_PITCH(hr_roar_id, -700); }
     if (hr_pin > 0) {
         u8* pl = pPL;
         hr_pin--;
@@ -551,6 +566,7 @@ static void HerreroFrame(void)
                     if (cur != HRM(HR_ROAR) || *(f32*)(e + 0x1D8 + 0xB8) >= (f32)HR_ROAR_N - 1.0f) { hs->roar = 0; hs->chase = 0; }
                 } else if (++hs->chase > HR_CHASE_MAX) {
                     hs->roar = 1; MotionSetCore(e, e + 0x1D8, HRM(HR_ROAR), HRM(HR_ROAR + 1), 10, 1, 0);
+                    HerreroRoarSnd(e);
                 }
                 if (!hs->roar && cur != HRM(HR_WALK)) MotionSetCore(e, e + 0x1D8, HRM(HR_WALK), HRM(HR_WALK + 1), 10, 5, 0);
             } else if (r == 0x00 || r == 0x1B || r == 0x4F) {          /* B85: Wait / Stay / AttackWait */
