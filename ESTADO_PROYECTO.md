@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B85** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B86** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -350,6 +350,22 @@ Reglas de trabajo del usuario:
      assert de bake.py): mkanim.py escribe mod/data/herrero_anim.bin (8 offsets: mot/seq de walk,
      smash, idle, flex) y game.py lo añade al final del BIN con su offset en BIN+0x5C; HerreroFrame
      las coge de ahí. BIN 160 KB. Sin usar aún del pack: swiping (2º ataque), dying, run, turns.
+   - **B86** (el usuario: daño perfecto, pero que tire al suelo; hueco por el que se ve el interior; andar
+     y golpe algo más rápidos; grito si tarda en alcanzarte): derribo = PlSetDamage(8) (el del
+     barril/dinamita 0x800CF6B8 y el empujón 0x800D744C; 4/5 solo eran tambaleo de golpe bajo; 6/7/9
+     son otros) + vibración 0x80138624(pG+72…, 7, 1); antes se gira a León hacia el Herrero. Tipos de
+     PlSetDamage: 0–5 alto/medio/bajo × frente/espalda, 7/8 → rutina (1,1), 9 → (1,2); f1=123.0 = sin
+     dirección. Hueco: el delantal (LEATHER de 'legs') y las piezas de 'acc' son láminas abiertas; el
+     juego no pinta caras traseras → game.py les añade la cara de atrás (3206 tris). Diagnóstico:
+     /tmp/holes (raster con caras traseras visibles en rojo, posado con las animaciones).
+     Andar al 70 % (61 fr, ~31 mm/fr), golpe ×1,3 (80 fr, impacto 31–40). Grito procedural roar()
+     (96 fr: se encoge, echa la cabeza atrás, garra arriba, tiembla) sobre el breathing idle; HrSlot por
+     Herrero: 240 frames andando (Walk/Dash) sin golpear → grito, luego sigue. Pack con 10 offsets.
+   - PLAN enemigo NUEVO (no sustituir): ESL (emleon00–09.esl, 255 entradas × 32 B) → entrada Ganado
+     (id 0x10) con una marca en un campo libre; hook en la creación/carga de modelo de em10: si lleva
+     la marca, usar el BIN/TPL del Herrero añadidos como entradas NUEVAS de em10.drs (restaurar las
+     originales de em10/12/13/15/17), vida propia, reacciones/muerte propias. Falta: formato de la
+     entrada ESL, cómo elige em10 cuerpo/cabeza, dónde engancharse.
    - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
      em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
      material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.

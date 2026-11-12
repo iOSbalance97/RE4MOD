@@ -88,6 +88,16 @@ def build(parts):
                 u = np.clip(np.round(p['uv'][t, k] / 2), 0, 255).astype(int); ui = UV.setdefault((int(u[0]), int(u[1])), len(UV))
                 cor.append((base + vi, ni, 0, ui))
             mats[p['atlas']].append(cor)
+            # B86: open sheets (the apron flaps: LEATHER of 'legs'; the iron straps/pauldron 'acc') get a back side:
+            # the game culls back faces and the body showed through them from behind
+            if p['name'] == 'acc' or (p['name'] == 'legs' and p['mat'][f[t, 0]] == 3):
+                back = []
+                for k in (0, 2, 1):
+                    vi = int(f[t, k]); n = -np.clip(np.round(p['cn'][t, k] * 127), -127, 127).astype(int)
+                    ni = NRM.setdefault((int(n[0]), int(n[1]), int(n[2]), int(wi[vi])), len(NRM))
+                    u = np.clip(np.round(p['uv'][t, k] / 2), 0, 255).astype(int); ui = UV.setdefault((int(u[0]), int(u[1])), len(UV))
+                    back.append((base + vi, ni, 0, ui))
+                mats[p['atlas']].append(back)
         base += len(p['v'])
     POS = np.concatenate(POS); assert np.abs(POS[:, :3]).max() < 32767
     blob = bytearray(0x60) + bones

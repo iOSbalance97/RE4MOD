@@ -201,6 +201,7 @@ from mix import Fbx
 SW_PATH = '/home/claude/re4mod/anim/mixamo/herrero/Heavy_Weapon_Swing.fbx'
 SW0, SW1 = 36, 140                                  # the swing inside the clip (30 fps frames)
 SW_HIT = (76, 86)                                   # the anvil comes down (clip frames)
+SW_SPEED = 1.3                                      # B86: the swing played 30 % faster
 SW_FLOOR = 170.0                                    # lowest anvil centre (its half height)
 MAPX = {1: 'Spine', 2: 'Spine2', 3: 'Neck', 4: 'Head', 5: 'RightShoulder', 7: 'RightArm', 8: 'RightForeArm',
         9: 'RightForeArm', 10: 'RightHand', 11: 'LeftShoulder', 13: 'LeftArm', 14: 'LeftForeArm', 15: 'LeftForeArm',
@@ -210,7 +211,7 @@ _fb = None; _bind = None
 def swing(f):
     global _fb, _bind
     if _fb is None: _fb = Fbx(SW_PATH); _bind = Fbx('/home/claude/re4mod/anim/mixamo/X Bot.fbx').world()
-    t = (SW0 + f) / 30.0; Wm = _fb.world(t); W0 = _fb.world(SW0 / 30.0)
+    t = (SW0 + f * SW_SPEED) / 30.0; Wm = _fb.world(t); W0 = _fb.world(SW0 / 30.0)
     p = Pose()
     for k, n in MAPX.items(): p.W[k] = Wm[n][0] @ _bind[n][0].T
     p.W[6] = p.W[7]; p.W[12] = p.W[13]
@@ -279,7 +280,7 @@ def drag_right(p, swing=0.0):
     fore = nrm(np.array([-0.15, -1.0, 0.25])); grip = wr + fore * GRIP_OFF
     dy = grip[1] - 150; dz = math.sqrt(max(BEAM * BEAM - dy * dy, 1.0)); bdir = nrm([-0.04 * BEAM, -dy, -dz])
     arm(p, P, -1, wr, nrm([0.3, 0, -1.0]), beam_hand(bdir, fore))
-WALK_SLOW = 0.55                                     # the clip played at 55 %: heavy (~26 mm per frame)
+WALK_SLOW = 0.70                                     # B86: the clip at 70 % (was 55 %: the user wants it a bit faster)
 def walk2(f, n):
     fb_dur = 1.4333
     t = (f / n) * fb_dur
@@ -296,32 +297,63 @@ def flex(f):
     p, Wm = mixpose('mutant flexing muscles', (FLEX0 + f) / 30.0)
     drag_right(p)                                    # the beam stays in the right hand, the claw flexes
     return p
+
+# ---------------------------------------------------------------- B86: the roar (frustration while chasing)
+KIDS = {k: [c for c in B if B[c][0] == k] for k in B}
+def sub(k):
+    out = [k]
+    for c in KIDS[k]: out += sub(c)
+    return out
+def turn(p, k, R):
+    for c in sub(k): p.W[c] = R @ p.W[c]
+ROAR_N = 96
+def roar(f):
+    """gathers itself, rears back with the claw up and the head thrown back, shakes, slumps: procedural on
+    the breathing idle; the beam keeps dragging"""
+    p, Wm = mixpose('mutant breathing idle', (f % 120) / 30.0)
+    t = f / 30.0
+    crouch = sm(t / 0.35) * (1 - sm((t - 0.35) / 0.3))                      # gathers (0-0.5 s)
+    e = sm((t - 0.3) / 0.35) * (1 - sm((t - 2.35) / 0.6))                    # the roar (0.5-2.4 s)
+    shake = math.sin(t * 2 * math.pi * 7.0) * e
+    turn(p, 1, rx(0.25 * crouch - 0.32 * e + 0.015 * shake))                # chest down, then back
+    turn(p, 3, rx(-0.15 * crouch - 0.45 * e) @ rz(0.04 * shake))           # head thrown back, trembling
+    turn(p, 11, rz(0.25 * e) @ ry(-0.25 * e))                                # left shoulder up and back
+    turn(p, 13, rz(1.4 * e + 0.03 * shake) @ rx(-0.2 * e))                  # claw arm up and out
+    turn(p, 14, rz(0.6 * e) @ ry(-0.3 * e))                                  # forearm up, claw open to the sky
+    turn(p, 5, rz(-0.2 * e))                                                 # right shoulder braces
+    p.root[1] -= 70 * crouch + 25 * e
+    P = fk(p)
+    low = min(P[20][1] - BP[20][1], P[24][1] - BP[24][1], P[21][1] - BP[21][1], P[25][1] - BP[25][1])
+    p.root[1] -= low
+    drag_right(p, 20 * shake)
+    return p
 if __name__ == '__main__':
     WN2 = int(round(43 / WALK_SLOW)); IN = 120
-    WP = [walk2(f, WN2) for f in range(WN2 + 1)]; SP = [swing(f) for f in range(SW1 - SW0 + 1)]
+    WP = [walk2(f, WN2) for f in range(WN2 + 1)]; SP = [swing(f) for f in range(int((SW1 - SW0) / SW_SPEED) + 1)]
     IP = [idle(f, IN) for f in range(IN + 1)]; FP = [flex(f) for f in range(FLEX1 - FLEX0 + 1)]
-    wm = build(WP); sm_ = build(SP); im = build(IP); fm = build(FP)
+    RP = [roar(f) for f in range(ROAR_N + 1)]
+    wm = build(WP); sm_ = build(SP); im = build(IP); fm = build(FP); rm = build(RP)
     print('walk', check(wm, WP), len(wm), '| smash', check(sm_, SP), len(sm_), '| idle', len(im), '| flex', len(fm))
     print('walk travel per frame', WP[-1].travel[2] * S / WN2)
-    NS = len(SP); h0, h1 = SW_HIT[0] - SW0, SW_HIT[1] - SW0
-    ev = {f: (0, 8) for f in range(0, h0 - 8)}              # 8: keep turning to Leon (wind-up)
+    NS = len(SP); h0, h1 = int(round((SW_HIT[0] - SW0) / SW_SPEED)), int(round((SW_HIT[1] - SW0) / SW_SPEED))
+    ev = {f: (0, 8) for f in range(0, h0 - 6)}              # 8: keep turning to Leon (wind-up)
     ev.update({h0 - 4: (0, 0x20)})                           # 0x20: the swing sound
     # B85: no Free 1 (the game's check sweeps the hidden axe): stealth.c HerreroHit checks the anvil itself
-    ss = seq(NS, ev); ws = seq(WN2 + 1, {}); is_ = seq(IN + 1, {}); fs = seq(len(FP), {})
+    ss = seq(NS, ev); ws = seq(WN2 + 1, {}); is_ = seq(IN + 1, {}); fs = seq(len(FP), {}); rs = seq(len(RP), {})
     # the anvil centre in the fist's (part 10) frame, game units (the weapon is rigid on part 10)
     av = (np.array([-GRIP_OFF, 0.0, -BEAM]) + np.array([0, 120.0, 0])) * S
     out = '/* generated by models/herrero/anim/mkanim.py */\n#define HR_WALK_N %d\n#define HR_SMASH_N %d\n' % (WN2, NS - 1)
     out += '#define HR_HIT0 %d\n#define HR_HIT1 %d\n#define HR_ANVIL_X %.1ff\n#define HR_ANVIL_Y %.1ff\n#define HR_ANVIL_Z %.1ff\n' % (h0, h1 + 2, av[0], av[1], av[2])
     # B85: the motions travel inside the Herrero's BIN (game.py appends this pack and puts its offset at
     # BIN+0x5C): the mod's code space in the dol is too small for them
-    blobs = [wm, ws, sm_, ss, im, is_, fm, fs]
-    pack = bytearray(struct.pack('>8I', *([0] * 8))); pack += b'\0' * ((-len(pack)) % 32); offs = []
+    blobs = [wm, ws, sm_, ss, im, is_, fm, fs, rm, rs]
+    pack = bytearray(64); offs = []
     for b_ in blobs:
         offs.append(len(pack)); pack += b_ + b'\0' * ((-len(b_)) % 32)
-    pack[:32] = struct.pack('>8I', *offs)
+    pack[:4 * len(offs)] = struct.pack('>%dI' % len(offs), *offs)
     open('/home/claude/re4mod/mod/data/herrero_anim.bin', 'wb').write(bytes(pack))
     out += '/* motion pack inside the BIN: u32 at BIN+0x5C = pack offset; pack[i] = offset (from the pack) */\n'
-    out += '#define HR_WALK 0\n#define HR_SMASH 2\n#define HR_IDLE 4\n#define HR_FLEX 6\n'
+    out += '#define HR_WALK 0\n#define HR_SMASH 2\n#define HR_IDLE 4\n#define HR_FLEX 6\n#define HR_ROAR 8\n#define HR_ROAR_N %d\n' % ROAR_N
     print('pack', len(pack))
     open('/home/claude/re4mod/mod/c/herrero_mot.h', 'w').write(out)
     import pickle; pickle.dump((WP, SP), open('/tmp/hr_poses.pkl', 'wb'))

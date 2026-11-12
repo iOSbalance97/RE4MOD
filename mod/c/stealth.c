@@ -418,7 +418,7 @@ void StealthCam(f32* q, const f32* m)
 /* B85: the smash's damage, at the anvil (the game's AxeAtk check sweeps the hidden axe from the hand,
  * so the smash's sequence no longer carries Free 1). Once per swing, motion frames HR_HIT0..HR_HIT1:
  * Leon within 0.85 m of the anvil (horizontally, and not above it by more than 1.2 m) is knocked down
- * (PlSetDamage type 4/5 = DOWN front/back, as EmAtkSetDamagePL picks for a low hit) and loses
+ * (B86: PlSetDamage type 8, the knockdown) and loses
  * HR_POWER life through LifeDownSet2 with flag 1: it never leaves him dead */
 #define HR_POWER 760
 static u8* hr_hit_em;
@@ -437,10 +437,34 @@ static void HerreroHit(u8* e)
     dx = *(f32*)(pl + 0x94) - ax; dy = *(f32*)(pl + 0x98) - ay; dz = *(f32*)(pl + 0x9C) - az;
     if (dx * dx + dz * dz > 850.0f * 850.0f || dy > 1200.0f || dy < -600.0f) return;
     hr_hit_em = e;
-    fx = *(f32*)(pl + 0x0C + 0x08); fz = *(f32*)(pl + 0x0C + 0x28);           /* Leon's facing */
-    type = (fx * dx + fz * dz >= 0.0f) ? 5 : 4;                                 /* anvil behind him: DOWN_BACK */
-    LifeDownSet2(pl, HR_POWER, 0, 1);
-    PlSetDamage(type, 0, 0);
+    /* B86: type 4/5 only staggers (a low hit). Type 8 is the game's knockdown (dynamite's blast,
+     * 0x800CF6B8; the push-down at 0x800D744C: LifeDownSet2 then PlSetDamage(8) then the pad rumble
+     * 0x80138624(.., 7, 1)). Leon is turned to face the Herrero first, so he falls away from it */
+    {
+        f32 a = atan2f_(*(f32*)(e + 0x94) - *(f32*)(pl + 0x94), *(f32*)(e + 0x9C) - *(f32*)(pl + 0x9C));
+        u8* q = *(u8**)(pG + 72);
+        *(f32*)(pl + 0xA4) = a;
+        SetMat(pl, *(f32*)(pl + 0x94), *(f32*)(pl + 0x9C), a);
+        (void)fx; (void)fz; (void)type;
+        LifeDownSet2(pl, HR_POWER, 0, 1);
+        PlSetDamage(8, 0, 0);
+        if ((u32)q >= 0x80000000u && (u32)q < 0x81800000u) ((void (*)(u8*, int, int))0x80138624)(q + *(u32*)(q + 28), 7, 1);
+    }
+}
+/* B86: per-Herrero chase timer (frames walking since its last smash) and roar state */
+#define HR_CHASE_MAX 240                    /* ~8 s at 30 fps */
+typedef struct { u8* e; u16 chase; u8 roar; } HrSlot;
+static HrSlot hr_slot[8];
+static HrSlot* HrSlotOf(u8* e)
+{
+    int k, fr = -1;
+    for (k = 0; k < 8; k++) {
+        if (hr_slot[k].e == e) return &hr_slot[k];
+        if (fr < 0 && (!hr_slot[k].e || (*(u32*)hr_slot[k].e & 1) == 0)) fr = k;
+    }
+    if (fr < 0) fr = 0;
+    hr_slot[fr].e = e; hr_slot[fr].chase = 0; hr_slot[fr].roar = 0;
+    return &hr_slot[fr];
 }
 /* B81: El Herrero (test: on a Ganado body, mod/mkfiles.py). Its BIN carries 'HERR' at +0x58. The Ganado's
  * own head and hands are separate models (em10 work: pRHand +0x564, pLHand +0x568, pHead +0x56C,
@@ -483,15 +507,26 @@ static void HerreroFrame(void)
 #define HRM(i) ((void*)(pk + *(u32*)(pk + 4 * (i))))
             void* cur = *(void**)(e + 0x1D8);
             u8 r = e[0xFD];
+            HrSlot* hs = HrSlotOf(e);
             if (r == 0x24) { e[0xFD] = 0x26; e[0xFE] = 0; e[0xFF] = 0; r = 0x26; }
             if (r == 0x26) {
+                hs->chase = 0; hs->roar = 0;
                 if (cur != HRM(HR_SMASH)) MotionSetCore(e, e + 0x1D8, HRM(HR_SMASH), HRM(HR_SMASH + 1), 8, 1, 0);
                 else HerreroHit(e);
             } else if (r == 0x10 || r == 0x11) {
-                if (cur != HRM(HR_WALK)) MotionSetCore(e, e + 0x1D8, HRM(HR_WALK), HRM(HR_WALK + 1), 10, 5, 0);
+                /* B86: chasing too long without reaching Leon: it stops and roars (motion with no travel, so
+                 * the Walk routine's root move keeps it in place), then walks on */
+                if (hs->roar) {
+                    if (cur != HRM(HR_ROAR) || *(f32*)(e + 0x1D8 + 0xB8) >= (f32)HR_ROAR_N - 1.0f) { hs->roar = 0; hs->chase = 0; }
+                } else if (++hs->chase > HR_CHASE_MAX) {
+                    hs->roar = 1; MotionSetCore(e, e + 0x1D8, HRM(HR_ROAR), HRM(HR_ROAR + 1), 10, 1, 0);
+                }
+                if (!hs->roar && cur != HRM(HR_WALK)) MotionSetCore(e, e + 0x1D8, HRM(HR_WALK), HRM(HR_WALK + 1), 10, 5, 0);
             } else if (r == 0x00 || r == 0x1B || r == 0x4F) {          /* B85: Wait / Stay / AttackWait */
+                hs->roar = 0;
                 if (cur != HRM(HR_IDLE)) MotionSetCore(e, e + 0x1D8, HRM(HR_IDLE), HRM(HR_IDLE + 1), 10, 5, 0);
             } else if (r == 0x0D || r == 0x16) {                       /* B85: Find / Threat: the flex */
+                hs->roar = 0;
                 if (cur != HRM(HR_FLEX) && e[0xFE] <= 1) MotionSetCore(e, e + 0x1D8, HRM(HR_FLEX), HRM(HR_FLEX + 1), 10, 1, 0);
             }
 #undef HRM
