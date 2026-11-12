@@ -40,9 +40,11 @@ static f32* FindPool(u8* m)
 }
 
 void StealthKillFrame(void);
+static void HerreroFrame(void);
 void StealthFrame(void)
 {
     StealthKillFrame();
+    HerreroFrame();
     u8* pl = pPL;
     u8* m;
     int i, n = 0;
@@ -410,4 +412,32 @@ void StealthCam(f32* q, const f32* m)
     }
     q[10] *= 1.0f - 0.05f * w;
     cam_w = w;
+}
+
+/* B81: El Herrero (test: on a Ganado body, mod/mkfiles.py). Its BIN carries 'HERR' at +0x58. The Ganado's
+ * own head and hands are separate models (em10 work: pRHand +0x564, pLHand +0x568, pHead +0x56C,
+ * cModelInfo*); the Herrero has its own in the body mesh, so theirs are collapsed every frame the way
+ * cPlBody::setKnife hides the knife: the cModelInfo matrix (+0x5C) diagonal to 0 */
+static void HerreroFrame(void)
+{
+    u8* arr = *(u8**)(EM_MGR + 0x00);
+    u32 cnt = *(u32*)(EM_MGR + 0x04), sz = *(u32*)(EM_MGR + 0x08), i;
+    int k;
+    if ((u32)arr < 0x80000000u || (u32)arr >= 0x81800000u || cnt > 1024 || sz < 0xC00 || sz > 0x40000) return;
+    for (i = 0; i < cnt; i++) {
+        u8* e = arr + i * sz; u8* mi; u8* bin;
+        if ((*(u32*)e & 1) == 0) continue;
+        if (e[0x100] < 0x10 || e[0x100] > 0x20 || e[0x100] == 0x18) continue;
+        mi = *(u8**)(e + 0x15C);
+        if ((u32)mi < 0x80000000u || (u32)mi >= 0x81800000u) continue;
+        bin = *(u8**)(mi + 0x0C);
+        if ((u32)bin < 0x80000000u || (u32)bin >= 0x81800000u || *(u32*)(bin + 0x58) != 0x48455252u) continue;
+        for (k = 0; k < 3; k++) {
+            u8* p = *(u8**)(e + 0x564 + 4 * k);
+            if ((u32)p >= 0x80000000u && (u32)p < 0x81800000u) {
+                f32* m = (f32*)(p + 0x5C);
+                m[0] = m[1] = m[2] = m[4] = m[5] = m[6] = m[8] = m[9] = m[10] = 0.0f;
+            }
+        }
+    }
 }

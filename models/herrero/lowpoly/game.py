@@ -82,7 +82,7 @@ def build(parts):
         f = p['f']
         for t in range(len(f)):
             cor = []
-            for k in (2, 1, 0):                              # the game's winding is the other way round
+            for k in (0, 1, 2):                              # B81: same winding as ours (B80 inverted it: insides showed)
                 vi = int(f[t, k]); n = np.clip(np.round(p['cn'][t, k] * 127), -127, 127).astype(int)
                 ni = NRM.setdefault((int(n[0]), int(n[1]), int(n[2]), int(wi[vi])), len(NRM))
                 u = np.clip(np.round(p['uv'][t, k] / 2), 0, 255).astype(int); ui = UV.setdefault((int(u[0]), int(u[1])), len(UV))
@@ -111,6 +111,7 @@ def build(parts):
         h = bytearray(mh); h[0x0C] = at + 1; h[0x18:0x20] = struct.pack('>II', len(dl), len(tr)); blob += h + dl; ntot += len(tr); nmat += 1
     o_t40 = len(blob); blob += dm[H[16]:H[17]]; o_t44 = len(blob); blob += dm[H[17]:DONOR[2]].rstrip(b'\0'); pad()
     H[3], H[4], H[5], H[7], H[12], H[13], H[16], H[17] = o_col, o_uv, o_wt, o_mat, o_pos, o_nrm, o_t40, o_t44
+    H[22] = 0x48455252                               # 'HERR' at +0x58: stealth.c HerreroFrame finds it
     blob[:0x60] = struct.pack('>24I', *H)
     blob[0x18] = len(wt); blob[0x19] = nb; blob[0x1a:0x1c] = struct.pack('>H', nmat); blob[0x38:0x3c] = struct.pack('>HH', len(POS), len(NRM))
     print('BIN', len(blob), 'of', DONOR[2], '| pos', len(POS), 'nrm', len(NRM), 'uv', len(UV), 'weights', len(wt), 'tris', ntot)

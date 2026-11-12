@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B80** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B81** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -304,6 +304,16 @@ Reglas de trabajo del usuario:
      el índice de peso de las normales es s8).
      Qué aldeano es: las 5 copias (em10/12/13/15/17) llevan la MISMA ropa: camisa/jersey claro
      grisáceo y pantalón marrón oscuro.
+   - **B80 probado: CARGA Y FUNCIONA** (vídeo: casa del principio, el ganado del hacha sale con el cuerpo
+     del Herrero, se mueve con sus animaciones). El usuario: la idea final es AÑADIR un enemigo, no
+     sustituir; esto es solo prueba. Fallos vistos: (1) se veía el interior → la orientación de los
+     triángulos estaba invertida (volumen firmado del juego > 0 en orden de lectura; el nuestro < 0);
+     (2) asomaban la cabeza y las manos del ganado original: son modelos aparte (em10: pRHand +0x564,
+     pLHand +0x568, pHead +0x56C, cModelInfo*; pHood +0x580); (3) lleva el hacha del ganado (pWeapon
+     +0x54C, se deja por ahora).
+   - **B81**: game.py escribe la orientación correcta y 'HERR' en +0x58 del BIN; stealth.c
+     HerreroFrame busca cada ganado cuyo cuerpo (em+0x15C cModelInfo → +0x0C datos BIN) lleve 'HERR' y
+     aplasta la matriz (+0x5C, diagonal a 0, como cPlBody::setKnife) de su cabeza y manos.
    - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
      em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
      material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.
