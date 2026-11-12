@@ -86,7 +86,17 @@ def load():
         vn /= (np.linalg.norm(vn, axis=1)[:, None] + 1e-9)
         _, mat = mesh.ev(fn, v - vn * 0.5, True)
         col, ao = colour(name, v, mat, vn)
-        cn = corner_normals(v, f)
+        cn = corner_normals(v, f, 50.0)
+        # like the game's models: soft shading everywhere on flesh / cloth / leather (normals of the true
+        # surface, from the distance field's gradient), creases only on iron and wood
+        g = np.zeros_like(v); e = 2.0
+        for k in range(3):
+            dv = np.zeros(3, np.float32); dv[k] = e
+            g[:, k] = mesh.ev(fn, v + dv) - mesh.ev(fn, v - dv)
+        g /= np.linalg.norm(g, axis=1)[:, None] + 1e-9
+        soft = ~np.isin(mat, (IRON, CHAIN, WOOD, SOLE))
+        sm = soft[f]                                           # (nf, 3)
+        cn = np.where(sm[:, :, None] & ((cn * g[f]).sum(2) > 0.2)[:, :, None], g[f], cn)
         P_ = dict(name=name, v=v, f=f, mat=mat, col=col, cn=cn, fn=name)
         if name == 'body':                                   # legs / skirt / boots get their own texture
             low = v[f].mean(1)[:, 1] < 1100

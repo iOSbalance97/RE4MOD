@@ -250,10 +250,29 @@ Reglas de trabajo del usuario:
      tex.py: paleta gris-parda desaturada, arrugas finas oscuras con borde claro siguiendo el miembro,
      pliegues largos pintados en la tela, parches cosidos y pespuntes, cuero cuarteado, óxido en
      regueros y arañazos en el hierro.
-   - PENDIENTE (paso 4): formato del juego. em10.drs entrada 0 NO es el modelo (es un sub-archivo de 11
-     entradas); hay que localizar y descifrar el modelo/texturas de un ganado (BIN/TPL), ver si admite
-     pesos o es rígido por parte, su límite de polígonos (20.550 vértices tras partir por costuras UV:
-     probablemente haya que bajar) y cómo registrar un enemigo nuevo o sustituir uno.
+   - v6: sombreado suave como en el juego (normales del gradiente del campo de distancia en carne/tela/
+     cuero; aristas solo en hierro y madera).
+   - **FORMATO DEL MODELO DESCIFRADO** (models/tools/re4bin.py lee, view.py dibuja, tpl.py texturas;
+     comprobado: los triángulos leídos coinciden con el contador de cada material). Modelo .BIN (GC,
+     big-endian), cabecera 0x60:
+       0x00 → huesos (16 B: nº parte u8, padre u8, 2 pad, xyz float mm); 0x0C → colores (RGBA8);
+       0x10 → UV (s16,s16); 0x14 → tabla de pesos (8 B: 3 huesos u8, nº influencias u8, 3 pesos en %,
+       pad); 0x18 u8 nº pesos; 0x19 u8 nº huesos; 0x1A u16 nº materiales; 0x1C → materiales;
+       0x30 → posiciones (4×s16: x,y,z, índice de peso; ~15 unidades/mm, escala por confirmar);
+       0x34 → normales (4×s8); 0x38 u16 nº posiciones, u16 nº normales; 0x3C fecha; 0x40/0x44 → tablas.
+     Material: cabecera 0x20 (0x0C u8 índice de textura, 0x18 u32 tamaño de la lista redondeado a 32,
+     0x1C u32 nº triángulos) + lista GX: opcode 0x98 (tira)/0x90/0xA0/0x80, u16 nº vértices, por vértice
+     4×u16 = [posición, normal, color, UV]. Los modelos están sueltos dentro de los .drs (buscar
+     0x00000060 con fecha 0x2003/0x2004 en +0x3C).
+     **Presupuesto real del juego**: Leon 1.484 vértices / ~2.500 triángulos; cuerpo de ganado 770
+     vértices / 1.460 triángulos (34 huesos, 5 materiales) + cabeza aparte (114 vért./217 tri) + manos
+     aparte; el soldado de la ametralladora (em1d) 2.534 vért./4.520 tri. Hasta 3 huesos por vértice.
+     Normales suaves con índice propio (por eso no se ven aristas); el detalle va pintado en texturas
+     de 256² (512² como mucho). El Herrero (14.981 tri, 3×1024²) hay que rehacerlo a ~3.000–4.500
+     triángulos y 1×512² + 3×256² para que entre.
+   - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
+     em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
+     material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.
 6. Más adelante: gesto de cambio de arma corriendo, interruptor Moderno/Clásico, tabla de controles
    para Dolphin, revisar puertas, suavizar la entrada del stick.
 
