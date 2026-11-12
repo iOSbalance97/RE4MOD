@@ -94,7 +94,7 @@ def load():
             dv = np.zeros(3, np.float32); dv[k] = e
             g[:, k] = mesh.ev(fn, v + dv) - mesh.ev(fn, v - dv)
         g /= np.linalg.norm(g, axis=1)[:, None] + 1e-9
-        soft = ~np.isin(mat, (IRON, CHAIN, WOOD))
+        soft = ~np.isin(mat, (IRON, WOOD))
         sm = soft[f]                                           # (nf, 3)
         cn = np.where(sm[:, :, None] & ((cn * g[f]).sum(2) > 0.2)[:, :, None], g[f], cn)
         P_ = dict(name=name, v=v, f=f, mat=mat, col=col, cn=cn, fn=name)

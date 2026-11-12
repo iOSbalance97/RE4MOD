@@ -44,7 +44,7 @@ def render(parts, eye, tgt, fov=32, W=900, H=1200, ss=2, bg=(0.012, 0.012, 0.014
             n /= np.linalg.norm(n, axis=1)[:, None] + 1e-9
             if texs is not None:
                 uv = b0[:, None] * p['uv'][i, 0] + b1[:, None] * p['uv'][i, 1] + b2[:, None] * p['uv'][i, 2]
-                T = texs[p['atlas']]; uv = uv * 4.0; ux = np.clip(uv[:, 0] - 0.5, 0, T.shape[1] - 1.001); uy = np.clip(uv[:, 1] - 0.5, 0, T.shape[0] - 1.001)
+                T = texs[p['atlas']]; uv = uv * 2.0; ux = np.clip(uv[:, 0] - 0.5, 0, T.shape[1] - 1.001); uy = np.clip(uv[:, 1] - 0.5, 0, T.shape[0] - 1.001)
                 xi = ux.astype(int); yi = uy.astype(int); fx = (ux - xi)[:, None]; fy = (uy - yi)[:, None]
                 c = (T[yi, xi] * (1 - fx) + T[yi, xi + 1] * fx) * (1 - fy) + (T[yi + 1, xi] * (1 - fx) + T[yi + 1, xi + 1] * fx) * fy
             else:

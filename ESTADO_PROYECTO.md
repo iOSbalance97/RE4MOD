@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B79** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B80** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -286,6 +286,24 @@ Reglas de trabajo del usuario:
      ~0x68b20 B sin descifrar (¿tabla de reubicación?) → por eso aún no se mueven entradas ni se
      agrandan. POR VER en la prueba: si carga, qué aldeanos usan ese cuerpo, si el esqueleto toma
      nuestras proporciones, si cabeza y manos del ganado asoman.
+   - **B80** (el usuario: B79 "fatal que se vea así" y no sabe qué ganado es). Resuelto el tamaño:
+     el archivo de la parte 0 del .drs es [nº][offset del REL dentro de la última entrada][0][0],
+     offsets[nº], etiquetas de 4 letras[nº] (BIN, TPL, FCV, SEQ, EFF...), datos; lo de detrás de "fin
+     de datos" era el REL (código), no una tabla. mod/mkfiles.py RECONSTRUYE el archivo: entradas BIN+TPL
+     nuevas, offsets posteriores +delta, offset del REL +delta, tamaño parte 0 (0x24) y offset parte 1
+     (0x4C) +delta (+245.376 B por archivo; comprobado: las otras 696 entradas, el REL y la parte 1
+     idénticos). mkiso.py recoloca los archivos que crecen en el hueco de relleno entre el main.dol
+     movido y el primer archivo (0x488000…) y actualiza el FST; por eso los parches pasan a ~20 MB por
+     disco (xdelta no encuentra los datos movidos; -B grande se queda sin memoria aquí).
+     Modelo de juego nuevo (models/herrero/lowpoly, 2.930 triángulos / 1.635 vértices, con arma):
+     malla SOLO de formas grandes (model.py simplificado) y todo lo fino (tirantes, bolsillo,
+     pespuntes, remaches, vendas, bandas de la máscara, ojos) PINTADO desde el modelo detallado
+     (model_hi.py: material + AO evaluados sobre su superficie). TPL nuevo: [0] cara del ganado 256²
+     (intacta), [1][2] nuestras 512² CMPR. UV = 1/256 de la textura (comprobado con Leon: texturas
+     128×256 con UV hasta 255), así que sirve para 512². Pesos en pasos del 20 % (104 filas ≤ 127,
+     el índice de peso de las normales es s8).
+     Qué aldeano es: las 5 copias (em10/12/13/15/17) llevan la MISMA ropa: camisa/jersey claro
+     grisáceo y pantalón marrón oscuro.
    - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
      em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
      material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.

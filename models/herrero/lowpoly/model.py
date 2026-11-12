@@ -15,16 +15,16 @@ GROWTH = [((165, 1835, 30), 66), ((235, 1800, -55), 54), ((115, 1880, -45), 46),
 # the Plaga breaking out of the neck: tendrils (bind pose)
 TENDRILS = [[(170, 1850, 20), (225, 1965, -10), (325, 2040, 10), (425, 2020, 60)],
             [(220, 1820, -60), (300, 1890, -160), (365, 1840, -255), (355, 1735, -295), (300, 1690, -300)],
-            ]
+            [(120, 1850, 110), (160, 1955, 190), (245, 1995, 262)]]
 def plaga(p):
     d = None
     for path in TENDRILS:
         n = len(path) - 1
         for i in range(n):
-            r0 = 40 - 22 * i / n; r1 = 40 - 22 * (i + 1) / n
+            r0 = 40 - 20 * i / n; r1 = 40 - 20 * (i + 1) / n
             seg = rcone(p, V(*path[i]), V(*path[i + 1]), r0, r1)
             d = seg if d is None else smin(d, seg, 9)
-    return d + 2.5 * np.sin(p[:, 0] * 0.21 + p[:, 1] * 0.17 + p[:, 2] * 0.19)                # ringed, like a worm
+    return d
 JR, JL = J(-1), J(1)
 HEAD = V(0, 1872, 352)
 def fore_r(j, s): return (132 if s < 0 else 128), (80 if s < 0 else 78)
@@ -41,7 +41,7 @@ def torso(p):
         d = smin(d, ell(p, V(s*190, 1700, -235), V(125, 115, 75)), 35)     # shoulder blades
         d = smin(d, ell(p, V(s*75, 1420, -300), V(60, 250, 55)), 30)       # erectors
         d = smin(d, ell(p, V(s*290, 1250, -40), V(150, 130, 220)), 50)     # love handles
-    for i in range(9):                                                     # vertebrae showing through
+    for i in range(0):
         d = smin(d, sph(p, V(0, 1240 + i * 62, -322 - 22 * math.sin(i * 0.42) + (i > 6) * 14 * (i - 6)), 21), 10)
     return d
 def pelvis(p): return ell(p, V(0, 1085, 5), V(335, 205, 250))
@@ -106,13 +106,13 @@ def boots(p):
         b = np.maximum(b, 20 - p[:, 1])
         cuff = rcone(p, j['ank'] + V(0, 240, 5), j['ank'] + V(0, 200, 5), 128, 128) - 15
         b = np.minimum(b, np.maximum(cuff, np.abs(p[:, 1] - (j['ank'][1] + 222)) - 26))
-        for yk in (115, 215):                                                             # straps + buckles
+        for yk in ():
             s_ = np.maximum(sh - 9, np.abs(p[:, 1] - yk - 0.15 * (p[:, 0] - c[0]) * s) - 15)
             st = s_ if st is None else np.minimum(st, s_)
             k_ = rbox(p, V(c[0] + s * 118, yk + 18, 20), V(12, 22, 24), 4)
             bk = k_ if bk is None else np.minimum(bk, k_)
         d = b if d is None else np.minimum(d, b); sole = so if sole is None else np.minimum(sole, so)
-    return d, sole, st, bk
+    return d, sole, np.full(len(p), 1e3, np.float32), np.full(len(p), 1e3, np.float32)
 def waist(p): return np.minimum(pelvis(p), ell(p, V(0, 1285, 105), V(395, 305, 335)))
 def apron(p, dt=None):
     x, y, z = p[:, 0], p[:, 1], p[:, 2]
@@ -131,14 +131,14 @@ def apron(p, dt=None):
     d = smin(up, sk, 12)
     # straps over the shoulders, down the back
     ds = np.minimum(dt, neck_head(p)) - 22
-    for s in (-1, 1):
+    for s in ():
         xs = s * (165 + np.clip((y - 1650) / 150, 0, 1) * 40)
         reg = np.abs(x - xs) - 30
         reg = np.maximum(reg, np.where(z > 60, 1625 - y, 1130 - y))
         d = np.minimum(d, np.maximum(ds, reg))
     # big pocket
     pk = np.maximum(rr - (372 + 21), np.maximum(np.abs(x) - 150, np.maximum(np.abs(y - 880) - 95, 100 - z)))
-    return np.minimum(d, pk)
+    return d
 def belt(p):
     y = p[:, 1]; x = p[:, 0]; z = p[:, 2]
     rr = np.sqrt((x * 0.86) ** 2 + (z - 60) ** 2)
@@ -161,7 +161,7 @@ def body(p):
     rag = np.maximum(sk - 8, np.abs(x + 1085 + 14 * np.sin(ang * 2 + 0.5)) - 26)
     rag = np.minimum(rag, rcone(p, V(-1085, 1665 + 98, 60 + 30), V(-1040, 1665 + 150, 60 + 75), 15, 7))      # knot ends
     rag = np.minimum(rag, rcone(p, V(-1085, 1665 + 98, 60 + 30), V(-1130, 1665 + 135, 60 - 10), 15, 7))
-    return {SKIN: sk, PANTS: lg, BOOT: bt, SOLE: so, LEATHER: mn(ap, bl, bst, kp, rope), IRON: np.minimum(bk, bbk), PLAGA: plaga(p), CLOTH: np.minimum(bnd, rag)}
+    return {SKIN: sk, PANTS: lg, BOOT: np.minimum(bt, so), LEATHER: mn(ap, bl), PLAGA: plaga(p)}
 BODY_BOX = (V(-1420, -5, -480), V(1420, 2110, 560))
 
 # ---- mask ----------------------------------------------------------------------------------------
@@ -177,37 +177,7 @@ def mask(p):
     rnd = ell(p, MC, V(176, 222, 214))
     def plate(off): return mn(np.maximum(np.maximum(np.maximum(wedge, top), np.maximum(bot, ax - 136)) - off, np.maximum(-28 - z, rnd - off)))
     pl = plate(0.0)
-    slit = np.maximum(np.abs(y - 26 - 0.10 * ax) - 8, ax - 104)
-    slots = None
-    for xi in (36, 60, 84):
-        sl = np.maximum(np.abs(ax - xi) - 5.5, np.abs(y + 78 + 0.25 * xi) - 34)
-        slots = sl if slots is None else np.minimum(slots, sl)
-    pl = np.maximum(pl, -np.maximum(np.minimum(slit, slots), -(wedge + 26)))
-    # bands riveted over it
-    brow = np.maximum(plate(9.0), np.abs(y - 82) - 20)
-    jaw = np.maximum(plate(9.0), np.abs(y + 150 + 0.15 * z) - 18)
-    ridge = np.maximum(plate(11.0), np.maximum(ax - 15, np.minimum(np.abs(y - 26) - 22, 1e3) * -1))
-    side = None
-    for s_ in (-1, 1):
-        c = MC + V(s_ * 136, 26, 28)
-        dsk = ccyl(p, c - V(s_ * 10, 0, 0), c + V(s_ * 14, 0, 0), 40, 5)
-        side = dsk if side is None else np.minimum(side, dsk)
-    pl = mn(pl, brow, jaw, ridge, side)
-    rv = None
-    def onplate(xx, yy, off): return MC + V(xx, yy, (152 + off - abs(xx) * math.sin(MA)) / math.cos(MA))
-    pts = [(sx * a_, 82) for sx in (-1, 1) for a_ in (32, 78, 120)] + [(sx * a_, -128) for sx in (-1, 1) for a_ in (30, 80)] + [(0, 150), (0, 118), (0, -30), (0, -100)]
-    for a_, b_ in pts:
-        r = sph(p, onplate(a_, b_, 13 if a_ == 0 else 10), 10.5)
-        rv = r if rv is None else np.minimum(rv, r)
-    for s_ in (-1, 1): rv = np.minimum(rv, sph(p, MC + V(s_ * 152, 26, 28), 13))
-    hd = neck_head(p); st = hd - 15
-    X, Y, Z = p[:, 0], p[:, 1], p[:, 2]
-    s1 = np.maximum(st, np.maximum(np.abs(Y - (HEAD[1] + 30) + 0.12 * (Z - HEAD[2])) - 22, Z - (HEAD[2] + 30)))
-    s2 = np.maximum(st, np.maximum(np.abs(X) - 20, np.maximum(Z - (HEAD[2] + 40), (HEAD[1] + 20) - Y)))
-    s3 = np.maximum(st, np.maximum(np.abs(Y - (HEAD[1] - 95) - 0.35 * (Z - HEAD[2])) - 17, Z - (HEAD[2] + 30)))
-    s3 = np.maximum(s3, (HEAD[2] - 150) - Z)
-    eye = np.minimum(sph(p, onplate(-46, 27, -15), 11.5), sph(p, onplate(46, 27, -15), 11.5))
-    return {IRON: pl, CHAIN: rv, LEATHER: mn(s1, s2, s3), EYE: eye}
+    return {IRON: pl}
 MASK_BOX = (HEAD - V(190, 235, 185), HEAD + V(190, 190, 215))
 
 # ---- hands ---------------------------------------------------------------------------------------
@@ -258,55 +228,14 @@ FIST_BOX = box_of([GRIP], 150); CLAW_BOX = box_of([JL['wr'], JL['wr'] + FD_L * 3
 
 # ---- accessories ---------------------------------------------------------------------------------
 def acc(p):
-    x, y, z = p[:, 0], p[:, 1], p[:, 2]
-    iron = None; chain = None; lea = None
-    def U(a, b): return b if a is None else np.minimum(a, b)
-    # wrist shackles
+    iron = None
     for s, j, fd in ((-1, JR, FD_R), (1, JL, FD_L)):
         ra, rb = fore_r(j, s)
         c = ccyl(p, j['wr'] - fd * 95, j['wr'] - fd * 25, rb + 26, 5)
-        c = np.maximum(c, -ccyl(p, j['wr'] - fd * 140, j['wr'] + fd * 40, rb + 6))
-        side = nrm(np.cross(fd, V(0, 0, 1)))
-        c = np.minimum(c, rbox(p, j['wr'] - fd * 60 + side * (rb + 30) * s, V(26, 34, 22), 6, frame(side, fd)))   # lock block
-        iron = U(iron, c)
-    LOW = True
-    # broken chain hanging from the left shackle
-    a = JL['wr'] - FD_L * 60 + V(0, 0, -(fore_r(JL, 1)[1] + 34))             # lies along the arm (bind)
-    for i in range(0):
-        c = a + FD_L * (26 + i * 62) + V(0, 6 * math.sin(i * 1.3), 5 * math.cos(i * 0.9))
-        nrm_ = V(0, 1, 0) if i % 2 == 0 else V(0, 0, 1)
-        lk = torus(p * V(0.68, 1, 1), c * V(0.68, 1, 1), nrm_, 27, 10.5)
-        chain = U(chain, lk)
-    # right pauldron: three layered plates
-    c = JR['sh'] + V(-5, 15, 0)
-    for k, (R_, lo, hi) in enumerate(((212, 100, 400), (222, 30, 122), (232, -50, 52))):
-        ax = nrm(V(-0.55, 0.8, 0.05))
-        h = (p - c) @ ax
-        pl = np.maximum(sph(p, c, R_) - 6, np.maximum(lo - h, h - hi))
-        pl = np.maximum(pl, (x - c[0]) - 70)
-        lip = np.maximum(sph(p, c, R_) - 11, np.maximum(lo - h, h - lo - 15)); lip = np.maximum(lip, (x - c[0]) - 70)
-        iron = U(iron, np.minimum(pl, lip))
-        t1 = V(-1, -0.6, 0); t1 = nrm(t1 - ax * (t1 @ ax)); t2 = np.cross(ax, t1)
-        for ph in ((0.0,) if k == 0 else (-0.85, 0.0, 0.85)):
-            hh = lo + 24; rr = math.sqrt(max(1.0, R_ * R_ - hh * hh))
-            chain = U(chain, sph(p, c + ax * hh + (t1 * math.cos(ph) + t2 * math.sin(ph)) * rr, 11))
-    # strap of the pauldron, round the chest
-    dt = torso(p)
-    st = np.maximum(dt - 19, np.abs((y - 1640) + 0.75 * (x + 250)) - 30)
-    st = np.maximum(st, np.maximum(x - 150, -(x + 430)))
-    lea = U(lea, np.maximum(st, z + 20))                                  # across the back
-    # horseshoes hanging on the left hip
-    for c, ax, rot in () if LOW else ((V(372, 960, 110), nrm(V(1, 0.1, 0.25)), 0.0), (V(385, 935, 20), nrm(V(1, 0.05, -0.2)), 0.3), (V(350, 985, 200), nrm(V(0.8, 0.1, 0.6)), -0.2)):
-        up = nrm(V(math.sin(rot) * 0.3, 1, math.sin(rot)))
-        q = p - c; hh = q @ ax; rad = np.sqrt(np.maximum(((q - hh[:, None] * ax) ** 2).sum(-1), 1e-6))
-        hs = np.maximum(np.abs(rad - 56) - 15, np.abs(hh) - 7)             # flat bar section
-        hs = np.maximum(hs, -26 - (q @ up)) - 2                            # open end down
-        iron = U(iron, hs)
-        lea = U(lea, ccyl(p, c + up * 48, V(c[0] - 28, 1112, c[2]), 8))    # its thong up to the belt
-    hot = None
-    # pouch at the back right
-    lea = U(lea, rbox(p, V(-250, 1030, -235), V(85, 75, 45), 22, frame(nrm(V(0.75, 0, -0.66)), V(0, 1, 0))))
-    return {IRON: iron, CHAIN: chain, LEATHER: lea}
+        iron = c if iron is None else np.minimum(iron, c)
+    c = JR['sh'] + V(-5, 15, 0); ax = nrm(V(-0.55, 0.8, 0.05)); h = (p - c) @ ax
+    pl = np.maximum(np.maximum(sph(p, c, 226) - 6, -45 - h), (p[:, 0] - c[0]) - 70)
+    return {IRON: np.minimum(iron, pl)}
 ACC_BOX = (V(-1400, 640, -330), V(1760, 1990, 620))
 
 # ---- weapon: an anvil chained to a beam -----------------------------------------------------------
@@ -319,18 +248,8 @@ def weapon(p):
     hd = ccyl(q, V(-150, 0, 0), V(170, 0, 0), 31, 6)                                     # grip
     hd = np.minimum(hd, ccyl(q, V(-185, 0, 0), V(-150, 0, 0), 44, 10))                   # pommel
     bm = rbox(q, V(170 + (BEAM_L - 170) / 2, 0, 0), V((BEAM_L - 170) / 2, 58, 58), 10)
-    bm = bm + 2.5 * np.sin(y * 0.11 + 0.004 * x) * np.sin(z * 0.13)                      # hewn faces
     bm = np.maximum(bm, -(sph(q, V(520, 70, 20), 38)))                                   # chips
     bm = np.maximum(bm, -(sph(q, V(820, -30, -78), 42)))
-    wrap = ccyl(q, V(-140, 0, 0), V(160, 0, 0), 37, 4) + 3.0 * np.sin(x * 0.16 + np.arctan2(z, y) * 1.0)
-    bands = None
-    for bx in (215, 610, 905):
-        b = np.maximum(rbox(q, V(bx, 0, 0), V(26, 68, 68), 6), -rbox(q, V(bx, 0, 0), V(40, 56, 56), 6))
-        bands = b if bands is None else np.minimum(bands, b)
-    nails = None
-    for bx in (215, 610, 905):
-        for a in ((0, 70, 0), (0, -70, 0), (0, 0, 70), (0, 0, -70)):
-            s_ = sph(q, V(bx, *a[1:]), 12); nails = s_ if nails is None else np.minimum(nails, s_)
     # the anvil sits on the beam's end, face up
     A = V(BEAM_L - 190, 0, 0); AS = 1.28
     a = (q - A) / AS; a[:, 1] += 58 - 58 / AS
@@ -346,26 +265,13 @@ def weapon(p):
     an = smin(an, np.minimum(np.minimum(top, horn), heel), 14)
     an = np.maximum(an, -hole) * AS
     a = q - A
-    # chain: two loops round the anvil's waist and the beam
-    ch = None
-    for li, (lx, tilt) in enumerate(((-58, 0.10), (62, -0.12))):
-        n_l = 10
-        for i in range(n_l):
-            t = 2 * math.pi * (i + 0.5 * li) / n_l
-            cy = 112 + 196 * math.cos(t); cz = 108 * math.sin(t)
-            c = V(lx + tilt * (cy - 100), cy, cz)
-            tang = nrm(V(tilt * -196 * math.sin(t), -196 * math.sin(t), 108 * math.cos(t)))
-            fr = frame(tang, V(1, 0, 0))
-            qq = ((a - c) @ fr.T) * V(0.62, 1, 1)
-            lk = torus(qq, O, V(0, 0, 1) if i % 2 == 0 else V(0, 1, 0), 30, 11.5)
-            ch = lk if ch is None else np.minimum(ch, lk)
-    return {WOOD: bm, LEATHER: wrap, IRON: mn(an, bands, hd), CHAIN: mn(ch, nails)}
+    return {WOOD: bm, IRON: np.minimum(an, hd)}
 def wbox():
     c = [GRIP + WB.T @ V(x, y, z) for x in (-200, BEAM_L + 330) for y in (-110, 400) for z in (-170, 170)]
     return box_of(c, 12)
 WEAPON_BOX = wbox()
-PARTS = [('body', body, BODY_BOX, 6.0, 580), ('mask', mask, MASK_BOX, 2.5, 130), ('fist', fist, FIST_BOX, 3.0, 44),
-         ('claw', claw, CLAW_BOX, 2.5, 72), ('acc', acc, ACC_BOX, 3.0, 70)]
+PARTS = [('body', body, BODY_BOX, 6.0, 1900), ('mask', mask, MASK_BOX, 2.5, 150), ('fist', fist, FIST_BOX, 3.0, 110),
+         ('claw', claw, CLAW_BOX, 2.5, 250), ('acc', acc, ACC_BOX, 3.0, 150), ('weapon', weapon, WEAPON_BOX, 3.0, 380)]
 def field(fn, p):
     g = fn(p); mats = list(g.keys()); D = np.stack([g[m] for m in mats])
     return D.min(0), np.array(mats)[D.argmin(0)]

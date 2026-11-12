@@ -31,13 +31,31 @@ for n in ('disc1','disc2'):
             if typ: stack.append((b,base+nm+'/'))
             else: paths[(base+nm).lower()]=(a,b)
             i+=1
+        ents={}; i=1; stack=[(cnt,'')]
+        while i<cnt:
+            while stack and i>=stack[-1][0]: stack.pop()
+            typ=t[i*12]; no=int.from_bytes(t[i*12+1:i*12+4],'big'); a,b=struct.unpack('>II',t[i*12+4:i*12+12])
+            nm=t[st+no:t.index(b'\0',st+no)].decode('latin1'); base=stack[-1][1] if stack else ''
+            if typ: stack.append((b,base+nm+'/'))
+            else: ents[(base+nm).lower()]=i
+            i+=1
+        used=sorted((a,a+b) for a,b in paths.values()); f.seek(0,2); isosz=f.tell(); t=bytearray(t)
+        bump=[(NEW_OFF+len(dol)+0x7fff)&~0x7fff]
+        def alloc(sz):
+            # a file that grew goes into the junk-filled room between the moved main.dol and the first file
+            o=bump[0]; bump[0]=(o+sz+0x7fff)&~0x7fff
+            if bump[0]>first: raise SystemExit('no room in the ISO')
+            return o
         for root,_,fs in os.walk('files'):
-            for fn in fs:
+            for fn in sorted(fs):
                 rel=os.path.relpath(os.path.join(root,fn),'files'); new=open(os.path.join(root,fn),'rb').read()
                 off,size=paths[rel.lower()]; f.seek(off); cur=f.read(size)
                 clean=open('/home/claude/disc/ext1/files/'+rel,'rb').read()
-                if cur!=clean or len(new)!=size: print(n,rel,'SKIPPED (differs from the clean copy)'); continue
-                f.seek(off); f.write(new); print(n,rel,'replaced')
+                if cur!=clean: print(n,rel,'SKIPPED (differs from the clean copy)'); continue
+                if len(new)>size:
+                    off=alloc(len(new)); e=ents[rel.lower()]; t[e*12+4:e*12+12]=struct.pack('>II',off,len(new))
+                f.seek(off); f.write(new); print(n,rel,'replaced at',hex(off),len(new)-size)
+        f.seek(fst); f.write(t)
     pat=f'out/RE4_PAL_{n}_{TAG}.xdelta'
     if os.path.exists(pat): os.remove(pat)
     subprocess.check_call(['/home/claude/tools/xdelta3','-e','-9','-S','djw','-s',src,dst,pat])

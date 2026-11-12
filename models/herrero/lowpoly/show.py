@@ -2,7 +2,7 @@ import numpy as np, pickle, sys, cv2
 from PIL import Image
 import rig, render
 parts = pickle.load(open('parts.pkl', 'rb'))
-texs = [(cv2.resize(cv2.imread('herrero_tex%d.png' % i), (1024, 1024), interpolation=cv2.INTER_LINEAR)[:, :, ::-1].astype(np.float32) / 255) ** 2.2 for i in (0, 1)]
+texs = [(cv2.resize(cv2.imread('herrero_tex%d.png' % i), (1024, 1024), interpolation=cv2.INTER_NEAREST)[:, :, ::-1].astype(np.float32) / 255) ** 2.2 for i in (0, 1)]
 for p in parts: p['J'], p['W'] = rig.weights(p)
 pickle.dump(parts, open('parts.pkl', 'wb'))
 def posed(rot):

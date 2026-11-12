@@ -83,9 +83,9 @@ def build(parts):
         for t in range(len(f)):
             cor = []
             for k in (2, 1, 0):                              # the game's winding is the other way round
-                vi = int(f[t, k]); n = np.clip(np.round(p['cn'][t, k] * 21) * 6, -127, 127).astype(int)
+                vi = int(f[t, k]); n = np.clip(np.round(p['cn'][t, k] * 127), -127, 127).astype(int)
                 ni = NRM.setdefault((int(n[0]), int(n[1]), int(n[2]), int(wi[vi])), len(NRM))
-                u = np.clip(np.round(p['uv'][t, k] / 2) * 2, 0, 255).astype(int); ui = UV.setdefault((int(u[0]), int(u[1])), len(UV))
+                u = np.clip(np.round(p['uv'][t, k] / 2), 0, 255).astype(int); ui = UV.setdefault((int(u[0]), int(u[1])), len(UV))
                 cor.append((base + vi, ni, 0, ui))
             mats[p['atlas']].append(cor)
         base += len(p['v'])
@@ -109,7 +109,7 @@ def build(parts):
             for c in s: dl += struct.pack('>4H', *inv[c])
         while len(dl) % 32: dl.append(0)
         h = bytearray(mh); h[0x0C] = at + 1; h[0x18:0x20] = struct.pack('>II', len(dl), len(tr)); blob += h + dl; ntot += len(tr); nmat += 1
-    o_t40 = len(blob); blob += dm[H[16]:H[17]]; o_t44 = len(blob); blob += dm[H[17]:H[17] + 4 + 2 * nb + 64][: (DONOR[2] - H[17])]
+    o_t40 = len(blob); blob += dm[H[16]:H[17]]; o_t44 = len(blob); blob += dm[H[17]:DONOR[2]].rstrip(b'\0'); pad()
     H[3], H[4], H[5], H[7], H[12], H[13], H[16], H[17] = o_col, o_uv, o_wt, o_mat, o_pos, o_nrm, o_t40, o_t44
     blob[:0x60] = struct.pack('>24I', *H)
     blob[0x18] = len(wt); blob[0x19] = nb; blob[0x1a:0x1c] = struct.pack('>H', nmat); blob[0x38:0x3c] = struct.pack('>HH', len(POS), len(NRM))
@@ -120,7 +120,6 @@ if __name__ == '__main__':
     blob, dm = build(parts)
     # read it back with the same reader used on the game's own models
     r = re4bin.parse(blob); print('read back: tris', sum(len(t['tris']) for t in r['mats']), 'hdr', sum(t['ntri'] for t in r['mats']), 'tex', [t['tex'] for t in r['mats']])
-    assert len(blob) <= DONOR[2], 'too big for the donor slot'
     open('herrero.bin', 'wb').write(blob)
     texs = [cmpr(cv2.imread('herrero_tex%d.png' % i)[:, :, ::-1]) for i in (0, 1)]
     for i, t in enumerate(texs): open('herrero_tex%d.cmpr' % i, 'wb').write(t)

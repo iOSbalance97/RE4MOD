@@ -3,11 +3,20 @@ import numpy as np, pickle, sys, math, cv2
 import model, mesh, finish
 from model import SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, HOT, PLAGA, EYE, CLOTH
 FN = {n: fn for n, fn, *_ in model.PARTS}
+import model_hi
+finish.model = model_hi
+def hi_field(P):
+    d = np.full(len(P), 1e3, np.float32); m = np.zeros(len(P), np.int32)
+    for n2, fn, box, vox, bud in model_hi.PARTS:
+        lo, hi = box; ins = np.all((P > lo - 60) & (P < hi + 60), 1)
+        if ins.any():
+            dd, mm = mesh.ev(fn, P[ins], True); idx = np.nonzero(ins)[0]; b = dd < d[idx]; d[idx[b]] = dd[b]; m[idx[b]] = mm[b]
+    return d, m
 from finish import vnoise, fbm, allsdf
-SZ = 256; PAD = 1
-ATLAS = {'body': 0, 'fist': 1, 'claw': 1, 'mask': 1, 'acc': 1, 'legs': 1}
+SZ = 512; PAD = 2
+ATLAS = {'body': 0, 'fist': 1, 'claw': 1, 'mask': 1, 'acc': 1, 'weapon': 1, 'legs': 1}
 NAT = 2
-DENS = {'legs': 1.0, 'body': 1.0, 'fist': 1.0, 'claw': 1.0, 'mask': 1.3, 'acc': 0.8}
+DENS = {'legs': 1.0, 'body': 1.0, 'fist': 1.1, 'claw': 1.1, 'mask': 1.6, 'acc': 0.9, 'weapon': 0.8}
 def adjacency(f):
     e = np.concatenate([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]]); e.sort(1)
     fi = np.tile(np.arange(len(f)), 3); o = np.lexsort((e[:, 1], e[:, 0])); e = e[o]; fi = fi[o]
@@ -77,7 +86,8 @@ def height(P, mat):
         h[wd] = 1.6 * vnoise(q * np.array([0.05, 1, 1], np.float32), 5.0) - 2.5 * np.clip(1 - np.abs(vnoise(q * np.array([0.03, 1, 1], np.float32) + 9, 22.0) - 0.5) * 30, 0, 1)
     return h
 def texcolour(name, fn, P, N):
-    _, mat = mesh.ev(fn, P - N * 0.8, True)
+    dh, _ = hi_field(P); P = P + N * np.clip(1.0 - dh, 0, 45)[:, None]     # out to the detailed surface
+    _, mat = hi_field(P - N * 0.8)
     c, ao = finish.colour(name, P, mat, N)                   # base palette + large-scale variation + AO
     c = c / np.maximum(ao[:, None], 1e-3)
     y = P[:, 1]
@@ -270,7 +280,7 @@ def bake(parts, uvs):
     out = []
     for im, m in zip(imgs, msk):
         im8 = (im * 255).astype(np.uint8); mm = m.astype(np.uint8)
-        for _ in range(3):                                   # bleed over the chart borders
+        for _ in range(6):                                   # bleed over the chart borders
             d = cv2.dilate(im8, np.ones((3, 3), np.uint8)); dm = cv2.dilate(mm, np.ones((3, 3), np.uint8))
             im8 = np.where(mm[..., None] > 0, im8, d); mm = dm
         im8[mm == 0] = (40, 30, 24); out.append(im8)
