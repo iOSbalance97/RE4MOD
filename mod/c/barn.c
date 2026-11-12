@@ -76,8 +76,9 @@ static f32 best_d, c0x, c0y, c0z, t0x, t0y, t0z;
 static const f32 WP[][2] = { { -13164.0f, -3146.0f }, { -13032.0f, -3755.0f }, { -12846.0f, -4300.0f },
                              { -12811.0f, -4929.0f }, { -12639.0f, -5493.0f } };
 #define NWP 5
-#define WIN_X (-13500.0f)                /* B102 (user): first a few steps toward the window, where the noise is */
-#define WIN_Z (-2330.0f)
+#define WIN_X (-13550.0f)                /* B102 (user): first a few steps toward the window, where the noise is; */
+#define WIN_Z (-2080.0f)                 /* B104: up to it, as if to look out */
+static int skill, vs;                    /* B104: the Ganado died by a takedown; the scene's stealth variant */
 #define QFPS_DIR (*(f32*)(0x80217104 + 0x204))   /* CamCtrl.m_QuasiFPS (PAL 0x80217104, from resetCameraAngle */
 #define QFPS_DEP (*(f32*)(0x80217104 + 0x200))   /* 0x800078DC): the C-stick look angles */
 static int ls, lt;                       /* B102: Leon's steps in phase 1 */
@@ -336,6 +337,28 @@ static void GanadoHold(int on)
     }
 }
 
+/* B104: the first shot, from the scene's first frame (B103 set the camera only on the next frame: one
+ * frame of the game camera with Leon already turned). Turn variant: on his face; stealth variant (he
+ * already faces the window after the takedown): over his shoulder toward the window. A shake with the bang. */
+static void Shot0(u8* pl, int tt)
+{
+    f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C);
+    f32 sh = (tt >= 40 && tt < 52) ? 18.0f * Sin((f32)tt * 2.1f) : 0.0f;
+    f32 px, py, pz, qx, qy, qz;
+    if (vs) {
+        f32 fa = Sin(a1), fb = Cos(a1);
+        px = lx - fa * 1500.0f - fb * 520.0f; py = ly + 1650.0f; pz = lz - fb * 1500.0f + fa * 520.0f;
+        qx = lx + fa * 2500.0f; qy = ly + 1300.0f; qz = lz + fb * 2500.0f;
+    } else {
+        f32 ga = Sin(a0), gb = Cos(a0);
+        px = lx + ga * 1350.0f + gb * 420.0f; py = ly + 1700.0f; pz = lz + gb * 1350.0f - ga * 420.0f;
+        qx = lx + ga * 60.0f; qy = ly + 1560.0f; qz = lz + gb * 60.0f;
+    }
+    Cam(px + sh, py + sh, pz, qx, qy, qz, vs ? 44.0f : 38.0f);
+    cang = atan2f_(px - lx, pz - lz); crad = Sq((px - lx) * (px - lx) + (pz - lz) * (pz - lz));
+    cex = px; cey = py; cez = pz; ctx = qx; cty = qy; ctz = qz;
+}
+
 void BarnFrame(void)
 {
     u8* pl = pPL; u16 b, press;
@@ -390,7 +413,10 @@ void BarnFrame(void)
                 *(f32*)(pl + 0xA4) = a; SetMat(pl, lx, lz, a);
             }
             QFPS_DIR = 0.0f; QFPS_DEP = 0.0f;
-            STOPF &= ~(SPF_KEY | SPF_EM | SPF_PL | SPF_CAM); st = 2; t = 0;
+            *(u8*)(0x80217104 + 0x1B2) = 1;            /* B104: m_init_flag: the shoulder camera snaps behind him on its
+                                                          next frame (CamSmth.setFlag) instead of easing round from where
+                                                          it was (B102/B103: it was still looking elsewhere) */
+            STOPF &= ~(SPF_KEY | SPF_EM | SPF_PL | SPF_CAM); st = 2; t = 0; skill = 0;
         }
         return;
     case 2: {                                            /* until that Ganado is dead */
@@ -400,6 +426,7 @@ void BarnFrame(void)
          * Stop_flg 0x100 = cActionButton::move shows and runs nothing */
         if (*(f32*)(pl + 0x98) > 2500.0f) STOPF |= SPF_ACTBTN; else STOPF &= ~SPF_ACTBTN;
         if ((mod_t++ % 30) == 0) MusicQuiet();  /* the farm starts its music 30 s in: kept down until El Herrero */
+        if (StealthKilling()) skill = 1;
         if (e && *(s16*)(e + 0x320) > 0 && e[0xFC] < 3) { upper = e; return; }
         if (pl[0xFC] != 0 || (pl[0xFD] > 3 && pl[0xFD] != 6)) { t = 0; return; }   /* Leon still busy (the takedown) */
         /* B99 (user): no free moment after the kill: the scene starts the frame Leon is back from the
@@ -409,7 +436,10 @@ void BarnFrame(void)
             f32 lx = *(f32*)(pl + 0x94), lz = *(f32*)(pl + 0x9C);
             dx = DOOR_X; dz = DOOR_Z; wi = 0;
             a1 = atan2f_(WIN_X - lx, WIN_Z - lz);          /* B102: after the turn he faces the window */
-            a0 = Wrap(a1 + 3.14159265f);                   /* B101 (user): turned to face away (a cut: the camera is on his
+            /* B104 (user): after a takedown he already faces it: he gets up and walks there, no turn */
+            vs = skill && Wrap(*(f32*)(pl + 0xA4) - a1) < 1.3f && Wrap(*(f32*)(pl + 0xA4) - a1) > -1.3f;
+            if (vs) a0 = *(f32*)(pl + 0xA4);
+            else a0 = Wrap(a1 + 3.14159265f);              /* B101 (user): turned to face away (a cut: the camera is on his
                                                               face), so his quick turn ends right toward the ladder */
             *(f32*)(pl + 0xA4) = a0;
             ex = lx; ez = lz;
@@ -422,6 +452,7 @@ void BarnFrame(void)
         STA1 |= STA_SUSPEND; *(u32*)pl |= 0x800;          /* B92: the game's own event pause: only Leon and El Herrero move */
         Hud(0);
         turn_t = 0;
+        Shot0(pl, 0);
         return;
     }
     case 3: {                                            /* the scene */
@@ -465,7 +496,11 @@ void BarnFrame(void)
         /* ---- Leon */
         if (ph == 0) {                                    /* hears the door, turns where he is */
             if (t == 40) SndCall(1, 0x1E, 0, 0, 0, 0);   /* a door kicked in (Leon's bank, always loaded) */
-            if (t == 48) {                                /* B101: his quick 180 turn (m_MotTbl 0xB/0xC, hurt 0x6B/0x6C), played
+            if (t == 48 && vs) {                          /* B104: stealth variant: up (CrouchStand above) and to the window */
+                WalkTo(pl, 0); *(f32*)(pl + 0x404) = WIN_X; *(f32*)(pl + 0x40C) = WIN_Z;
+                ph = 1; ph_t = t; ls = 1; lt = t; best_d = 1e30f; stuck = 0;
+            }
+            if (t == 48 && !vs) {                         /* B101: his quick 180 turn (m_MotTbl 0xB/0xC, hurt 0x6B/0x6C), played
                                                              through the game's own event routine 5/2 (pl_R1_Event_Smooth: the motion
                                                              to its end, then feet re-planted): B99 cut it at frame 21 and his
                                                              rotation was still in the pose, so he faced the window for a moment */
@@ -476,12 +511,7 @@ void BarnFrame(void)
                 }
                 ph = 1; ph_t = t; turn_t = 1;
             }
-            {   /* on his face, from the front; a shake with the bang */
-                f32 sh = (t >= 40 && t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
-                f32 fa = Sin(a0), fb = Cos(a0);
-                Cam(lx + fa * 1350.0f + fb * 420.0f + sh, ly + 1700.0f + sh, lz + fb * 1350.0f - fa * 420.0f,
-                    lx + fa * 60.0f, ly + 1560.0f, lz + fb * 60.0f, 38.0f);
-            }
+            Shot0(pl, t);
         } else if (ph == 1) {                             /* B102 (user): turns to the window, a few steps to it, his
                                                              yell, stops, turns where he stands to the ladder, walks there */
             f32 tx = ls < 3 ? WIN_X : WP[wi][0], tz = ls < 3 ? WIN_Z : WP[wi][1];
@@ -514,15 +544,8 @@ void BarnFrame(void)
                     ph = 2; ph_t = t; c0x = cex; c0y = cey; c0z = cez; t0x = ctx; t0y = cty; t0z = ctz;
                 }
             }
-            if (ls < 4) {                                 /* B103: one still shot from the bang to his yell at the window
-                                                             (he turns his back to it and walks off) */
-                f32 sh = (t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
-                f32 ga = Sin(a0), gb = Cos(a0);
-                Cam(lx + ga * 1350.0f + gb * 420.0f + sh, ly + 1700.0f + sh, lz + gb * 1350.0f - ga * 420.0f,
-                    lx + ga * 60.0f, ly + 1560.0f, lz + gb * 60.0f, 38.0f);
-                cang = atan2f_(ga * 1350.0f + gb * 420.0f, gb * 1350.0f - ga * 420.0f);
-                crad = 1414.0f; cey = ly + 1700.0f;
-                ctx = lx + ga * 60.0f; cty = ly + 1560.0f; ctz = lz + gb * 60.0f;
+            if (ls < 4) {                                 /* B103: one shot from the bang to his growl at the window */
+                Shot0(pl, t);
             } else {                                      /* B103: as he turns and walks to the ladder the camera goes
                                                              round him, slowly, down to his feet (B102's swung round while he
                                                              stood): angle and distance about Leon, never through him */

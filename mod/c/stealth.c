@@ -423,14 +423,14 @@ void StealthCam(f32* q, const f32* m)
  * HR_POWER life through LifeDownSet2 with flag 1: it never leaves him dead */
 #define HR_POWER 760
 static u8* hr_hit_em;
-static void HerreroHit(u8* e)
+static void HerreroHit(u8* e, int h0, int h1, int heavy)
 {
     u8* pl = pPL;
     f32 fr = *(f32*)(e + 0x1D8 + 0xB8), ax, ay, az, dx, dz, dy, fx, fz;
     f32* w;
     int type;
-    if (fr < (f32)HR_HIT0 - 1.0f) { if (hr_hit_em == e) hr_hit_em = 0; return; }
-    if (fr > (f32)HR_HIT1 || hr_hit_em == e || !pl) return;
+    if (fr < (f32)h0 - 1.0f) { if (hr_hit_em == e) hr_hit_em = 0; return; }
+    if (fr > (f32)h1 || hr_hit_em == e || !pl) return;
     w = (f32*)((u8*)getPartsPtr(e, 10) + 0x0C);
     ax = w[0] * HR_ANVIL_X + w[1] * HR_ANVIL_Y + w[2] * HR_ANVIL_Z + w[3];
     ay = w[4] * HR_ANVIL_X + w[5] * HR_ANVIL_Y + w[6] * HR_ANVIL_Z + w[7];
@@ -447,6 +447,12 @@ static void HerreroHit(u8* e)
         *(f32*)(pl + 0xA4) = a;
         SetMat(pl, *(f32*)(pl + 0x94), *(f32*)(pl + 0x9C), a);
         (void)fx; (void)fz; (void)type;
+        if (!heavy) {                               /* B104: the one-armed blow from below: a third of it, a stagger
+                                                       (type 4: front, low), and the smash follows */
+            LifeDownSet2(pl, HR_POWER / 3, 0, 1);
+            PlSetDamage(4, 0, 0);
+            return;
+        }
         LifeDownSet2(pl, HR_POWER, 0, 1);
         PlSetDamage(8, 0, 0);
         if (*(f32*)(pl + 0x98) > 1000.0f) {        /* B92: up high (the barn's loft) he would be thrown off the edge
@@ -575,9 +581,16 @@ static void HerreroFrame(void)
             HrSlot* hs = HrSlotOf(e);
             if (r == 0x24) { e[0xFD] = 0x26; e[0xFE] = 0; e[0xFF] = 0; r = 0x26; }
             if (r == 0x26) {
+                /* B104 (user): a combo: first the one-armed blow from below (HR_UP), then -- chained before it
+                 * ends, so the game's attack routine does not see a motion end -- the two-handed smash */
+                f32 fr = *(f32*)(e + 0x1D8 + 0xB8);
                 hs->chase = 0; hs->roar = 0;
-                if (cur != HRM(HR_SMASH)) MotionSetCore(e, e + 0x1D8, HRM(HR_SMASH), HRM(HR_SMASH + 1), 8, 1, 0);
-                else HerreroHit(e);
+                if (cur != HRM(HR_SMASH) && cur != HRM(HR_UP)) MotionSetCore(e, e + 0x1D8, HRM(HR_UP), HRM(HR_UP + 1), 8, 1, 0);
+                else if (cur == HRM(HR_UP)) {
+                    HerreroHit(e, HR_UP_HIT0, HR_UP_HIT1, 0);
+                    if (fr >= (f32)HR_UP_N - 2.0f) { hr_hit_em = 0; MotionSetCore(e, e + 0x1D8, HRM(HR_SMASH), HRM(HR_SMASH + 1), 8, 3, 0); }
+                }
+                else HerreroHit(e, HR_HIT0, HR_HIT1, 1);
             } else if (r == 0x10 || r == 0x11) {
                 /* B86: chasing too long without reaching Leon: it stops and roars (motion with no travel, so
                  * the Walk routine's root move keeps it in place), then walks on */

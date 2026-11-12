@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B103** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B104** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -540,6 +540,19 @@ Reglas de trabajo del usuario:
        (a 1,1 m del final, sin parar) y dura 50 frames con arco de 0,7 m. Pausa en la ventana 0,8 s.
      · Gruñido: el quejido de levantarse del Ganado (Se_tbl[11] = 0x4A) en dos capas: −800 cents y, 3
        frames después (emSeCheck descarta el mismo SE del mismo enemigo en el mismo frame), −1500 cents.
+   - **B104** (vídeo B103):
+     · Cartel: al cerrarlo, además de girar a León y poner a 0 los ángulos del C-stick, m_init_flag de la
+       cámara de hombro (CamCtrl.m_QuasiFPS +0x1B2 = 1) → se coloca tras él al instante (antes giraba
+       despacio desde donde estaba).
+     · Corte de un frame al empezar: la cámara de la escena se pone ya en el frame en que empieza (Shot0).
+     · Variante sigilo (usuario): si murió por derribo (StealthKilling visto en st 2) y León ya mira a la
+       ventana (±75°), sin giro: se levanta y anda hasta la ventana (WIN −13550, −2080, para asomarse),
+       plano por encima del hombro hacia ella; luego igual. Muerte a tiros: el giro rápido de antes.
+     · Combo del Herrero (usuario): golpe de abajo a una mano (mkanim.py upswing, HR_UP, 40 frames,
+       golpe 15-21: la viga se arrastra desde atrás por el suelo y sube por delante hasta encima de la
+       cabeza y vuelve sobre el hombro derecho, donde empieza el mazazo); daño 1/3 y tambaleo (PlSetDamage
+       4); enlazado al mazazo a dos manos antes de acabar (la rutina AxeAtk no ve fin de movimiento).
+       Agarre de la mano igual que antes. models/herrero/anim/upswing_preview.png.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

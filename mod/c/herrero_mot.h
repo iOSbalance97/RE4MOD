@@ -13,3 +13,7 @@
 #define HR_FLEX 6
 #define HR_ROAR 8
 #define HR_ROAR_N 96
+#define HR_UP 10
+#define HR_UP_N 40
+#define HR_UP_HIT0 15
+#define HR_UP_HIT1 21
