@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B81** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B82** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -314,6 +314,12 @@ Reglas de trabajo del usuario:
    - **B81**: game.py escribe la orientación correcta y 'HERR' en +0x58 del BIN; stealth.c
      HerreroFrame busca cada ganado cuyo cuerpo (em+0x15C cModelInfo → +0x0C datos BIN) lleve 'HERR' y
      aplasta la matriz (+0x5C, diagonal a 0, como cPlBody::setKnife) de su cabeza y manos.
+   - **B81 probado: "ahora sí, la implementación es bastante buena"**. Modelo sólido, sin cabeza/manos
+     del ganado. Vídeo: aún lleva el hacha del ganado además de la viga; texturas lavadas y blandas.
+   - **B82**: HerreroFrame oculta también el arma del ganado (cEmWep +0x54C, es un cEm: su cModelInfo
+     +0x15C, matriz a 0). Texturas: medido en el disco que las del juego tienen ~1,6× más contraste
+     (desviación de luminancia 30–37 frente a 20, misma media ~50): game.py estira el contraste ×1,6 y
+     enfoca un poco antes de codificar CMPR.
    - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
      em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
      material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.

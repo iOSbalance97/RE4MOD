@@ -432,6 +432,17 @@ static void HerreroFrame(void)
         if ((u32)mi < 0x80000000u || (u32)mi >= 0x81800000u) continue;
         bin = *(u8**)(mi + 0x0C);
         if ((u32)bin < 0x80000000u || (u32)bin >= 0x81800000u || *(u32*)(bin + 0x58) != 0x48455252u) continue;
+        {   /* B82: and the Ganado's own weapon (cEmWep, a cEm: its cModelInfo +0x15C); the Herrero's beam and
+             * anvil are part of its body mesh */
+            u8* w = *(u8**)(e + 0x54C);
+            if ((u32)w >= 0x80000000u && (u32)w < 0x81800000u) {
+                u8* wi = *(u8**)(w + 0x15C);
+                if ((u32)wi >= 0x80000000u && (u32)wi < 0x81800000u) {
+                    f32* m = (f32*)(wi + 0x5C);
+                    m[0] = m[1] = m[2] = m[4] = m[5] = m[6] = m[8] = m[9] = m[10] = 0.0f;
+                }
+            }
+        }
         for (k = 0; k < 3; k++) {
             u8* p = *(u8**)(e + 0x564 + 4 * k);
             if ((u32)p >= 0x80000000u && (u32)p < 0x81800000u) {

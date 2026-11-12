@@ -122,6 +122,16 @@ if __name__ == '__main__':
     # read it back with the same reader used on the game's own models
     r = re4bin.parse(blob); print('read back: tris', sum(len(t['tris']) for t in r['mats']), 'hdr', sum(t['ntri'] for t in r['mats']), 'tex', [t['tex'] for t in r['mats']])
     open('herrero.bin', 'wb').write(blob)
-    texs = [cmpr(cv2.imread('herrero_tex%d.png' % i)[:, :, ::-1]) for i in (0, 1)]
+    def grade(img):
+        """B82: the game's own textures have about 1.6x the contrast of ours (luminance std ~30-37 vs 20
+        at the same mean ~50, measured on the Ganado's and El Gigante's): stretch round the mean and
+        sharpen a little (the in-game look was washed out and soft)"""
+        x = img.astype(np.float32); m = x.reshape(-1, 3).mean(0)
+        x = m + (x - m) * 1.6
+        bl = cv2.GaussianBlur(x, (0, 0), 1.2); x = x + 0.6 * (x - bl)
+        return np.clip(x, 0, 255).astype(np.uint8)
+    imgs = [grade(cv2.imread('herrero_tex%d.png' % i)[:, :, ::-1]) for i in (0, 1)]
+    for i, im in enumerate(imgs): cv2.imwrite('herrero_tex%d_game.png' % i, im[:, :, ::-1])
+    texs = [cmpr(im) for im in imgs]
     for i, t in enumerate(texs): open('herrero_tex%d.cmpr' % i, 'wb').write(t)
     print('textures', [len(t) for t in texs])
