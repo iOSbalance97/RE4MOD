@@ -586,7 +586,7 @@ static void HerreroFrame(void)
                  * first. Light hit in the first window, the knockdown in the second */
                 f32 fr = *(f32*)(e + 0x1D8 + 0xB8);
                 hs->chase = 0; hs->roar = 0;
-                if (cur != HRM(HR_SMASH)) MotionSetCore(e, e + 0x1D8, HRM(HR_SMASH), HRM(HR_SMASH + 1), 8, 3, 0);
+                if (cur != HRM(HR_SMASH)) MotionSetCore(e, e + 0x1D8, HRM(HR_SMASH), HRM(HR_SMASH + 1), 8, 1, 0);   /* B106: flags 1 = play once (B105 passed 3: the pose never moved) */
                 else if (fr < (f32)HR_UP_HIT1 + 2.0f) HerreroHit(e, HR_UP_HIT0, HR_UP_HIT1, 0);
                 else HerreroHit(e, HR_HIT0, HR_HIT1, 1);
             } else if (r == 0x10 || r == 0x11) {

@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B105** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B106** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -567,6 +567,16 @@ Reglas de trabajo del usuario:
      · Combo del Herrero en UN solo movimiento (HR_SMASH = golpe de abajo + mazazo, 113 frames, 8 de mezcla
        con slerp): B104 encadenaba dos y la rutina AxeAtk terminaba con el primero. Golpe flojo 15-21,
        mazazo 64-73.
+   - **B106** (usuario, sin vídeo):
+     · Herrero sin animación de golpe (solo el sonido): MotionSetCore del combo con flags 3 (B105); el 6º
+       argumento es el modo: 1 = una vez (5 = bucle). Vuelto a 1.
+     · Cámara tras el cartel "mira a León desde la derecha": la cámara de hombro se coloca con SU copia de
+       la matriz de León (CameraQuasiFPS::m_pl_mat +0x174, calcBaseMatrix), que solo refresca la rutina de
+       León (setPlayerLocation), parada bajo el cartel (SPF_PL): al girarle se quedaba con la orientación
+       vieja. Se copia la matriz (+0x0C) ahí al salir el cartel, cada frame del cartel y al cerrarlo.
+     · La ventana es la del fondo (este) del altillo: "SALTAR SOBRE" con León en (−10406, −1558) en el vídeo
+       de las 15:46 (act 5, no 2: B105 no la encontraba y usaba el punto de 0,7 m). Ida por la pared del
+       frente (WW, 4 puntos de sus pasos) y vuelta a la escalera en diagonal (WP nuevos, 5 puntos).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.
