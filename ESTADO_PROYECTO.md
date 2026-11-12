@@ -404,6 +404,16 @@ Reglas de trabajo del usuario:
      vueltas del pantalón, remiendo; capucha con parche cosido, hilos y boca hundida; sangre de carnicero
      (peto/delantal, antebrazo der., salpicaduras en pantalón/botas, hoz). Siguiente: opinión del usuario → pose a
      4 patas con IK, low-poly/formato del juego.
+   - **Carnicero → formato del juego (B88, sin insertar aún)**: /home/claude/carnicero_lp (copia en
+     models/carnicero/lowpoly): model.py = las formas de model_hi.py (el detallado) malladas gruesas
+     (body 2000, mask 420, fist 120, claw 330, acc 260, weapon 300 → 3604 tris con dobles caras),
+     tex.py pinta 2×512² leyendo materiales del detallado (hi_field), game.py = escritor del Herrero
+     con firma 'CARN' en BIN+0x58 y pack de movimientos en +0x5C (mod/data/carnicero.bin + 2 cmpr).
+     models/carnicero/anim/mkcarn.py (reutiliza mkanim.py del Herrero con el rig del Carnicero):
+     run4 = galope a 4 patas (20 fr por zancada, 150 mm/fr ≈ 4,5 m/s, espalda casi horizontal, la
+     garra y el puño de la hoz apoyados; pisadas Se 3/4) y swipe = salto con zarpazo (40 fr, golpe
+     17–24). Falta: insertarlo (como el Herrero: entradas extra en el em*.drs de su sala + subArc
+     falso), conectar rutinas (andar → erguido corto; lejos de León → run4; cerca → swipe; poca vida).
    - PLAN enemigo NUEVO (no sustituir): ESL (emleon00–09.esl, 255 entradas × 32 B) → entrada Ganado
      (id 0x10) con una marca en un campo libre; hook en la creación/carga de modelo de em10: si lleva
      la marca, usar el BIN/TPL del Herrero añadidos como entradas NUEVAS de em10.drs (restaurar las
