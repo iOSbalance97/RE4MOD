@@ -212,6 +212,35 @@ def texcolour(name, fn, P, N):
         scr = np.clip(1 - np.abs(aniso(Q, 45.0, 2.2, 0, 31.0) - 0.5) / 0.012, 0, 1) * (vnoise(Q + 8, 60.0) > 0.55) + np.clip(1 - np.abs(aniso(Q + 9, 50.0, 2.0, 1, 37.0) - 0.5) / 0.010, 0, 1) * (vnoise(Q + 80, 60.0) > 0.6)
         c[ir] += 0.10 * np.clip(scr, 0, 1)[:, None]
         ham = vnoise(Q, 16.0); c[ir] *= (0.72 + 0.5 * ham)[:, None]                                            # hammered, uneven plate
+    # ---- the butcher: blood everywhere he works
+    x_, y_, z_ = P[:, 0], P[:, 1], P[:, 2]
+    BLD = np.array([0.15, 0.018, 0.014], np.float32); DRY = np.array([0.075, 0.03, 0.022], np.float32)
+    b = np.zeros(len(P), np.float32)
+    apr = (mat == LEATHER) & (z_ > 25) & (y_ < 1400) & (np.abs(x_) < 270)
+    if apr.any():
+        Q = P[apr]
+        big = np.clip((fbm(Q + 31, 110.0) - 0.36) * 3.0, 0, 1) * (0.55 + 0.45 * np.clip((1250 - Q[:, 1]) / 400, 0, 1))
+        drip = np.clip((vnoise(Q * np.array([1, 0.05, 1], np.float32), 14.0) - 0.62) * 4, 0, 1) * np.clip((fbm(Q + 3, 160.0) - 0.3) * 3, 0, 1)
+        wipe = np.clip((vnoise(Q * np.array([0.06, 1, 1], np.float32), 10.0) - 0.55) * 3, 0, 1) * np.clip((np.abs(Q[:, 0]) - 80) / 60, 0, 1) * (np.abs(Q[:, 1] - 930) < 90)
+        b[apr] = np.maximum(np.maximum(big, drip), wipe)
+    skn = ((mat == SKIN) | (mat == CLOTH)) & (np.abs(x_) > model.ARM_X + 150) & (x_ < 0)       # the working arm, to the elbow
+    if skn.any():
+        Q = P[skn]; t_ = np.clip((np.abs(Q[:, 0]) - (model.ARM_X + 150)) / 280, 0, 1)
+        b[skn] = np.clip(t_ * 1.1 - 0.35 + 0.9 * (fbm(Q + 9, 30.0) - 0.5), 0, 1) * 0.75
+    hnd = (mat == SKIN) & (np.linalg.norm(P - model.GRIP, axis=1) < 140)
+    b[hnd] = np.maximum(b[hnd], 0.6 * np.clip((fbm(P[hnd] + 2, 20.0) - 0.45) * 3, 0, 1))
+    spl = np.isin(mat, (PANTS, BOOT, CLOTH)) & ~skn
+    if spl.any():
+        Q = P[spl]
+        spots = np.clip((vnoise(Q + 77, 9.0) - 0.78) * 6, 0, 1) * np.clip((fbm(Q + 11, 90.0) - 0.35) * 3, 0, 1)
+        runs = np.clip((vnoise(Q * np.array([1, 0.07, 1], np.float32) + 5, 12.0) - 0.75) * 5, 0, 1) * (Q[:, 1] < 700)
+        b[spl] = np.maximum(spots, runs * 0.7) * (0.6 + 0.4 * np.clip((900 - Q[:, 1]) / 600, 0, 1))
+    ir = (mat == IRON) & (np.linalg.norm(P - model.GRIP, axis=1) < 520) & (np.linalg.norm(P - model.GRIP, axis=1) > 160)
+    if ir.any():
+        b[ir] = np.clip((fbm(P[ir] + 41, 40.0) - 0.4) * 2.5, 0, 1) * 0.8
+    dry = np.clip(fbm(P + 123, 35.0) * 1.4 - 0.3, 0, 1)[:, None]
+    bc = BLD * (1 - dry) + DRY * dry
+    c = c * (1 - 0.9 * b[:, None]) + bc * 0.9 * b[:, None]
     sa = mat == SACK
     if sa.any():
         Q = P[sa]

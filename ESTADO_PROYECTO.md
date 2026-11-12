@@ -374,7 +374,12 @@ Reglas de trabajo del usuario:
      Capucha de saco (ojos rotos, boca cosida, sangre), camisa rota en el hombro izq. y en la columna,
      tirantes, delantal hecho jirones, pantalón roto, botas; hoz oxidada en la mano der.; brazo izq. de la
      Plaga (fibras rojas, púas de hueso, garras de hueso); púas en la columna. Materiales nuevos SACK, BONE.
-     Hoja 1 de diseño: rastrero_sheet.png (13.623 tris de detalle). Siguiente: opinión del usuario → pose a
+     Hoja 1 de diseño: rastrero_sheet.png (13.623 tris de detalle). Usuario: le falta detalle, será el
+     CARNICERO del pueblo → hoja 2 carnicero_sheet.png (20.443 tris): delantal de carnicero con peto, tira
+     al cuello, lazo atrás, bolsillo, remaches y cortes; brazal de cuero en el antebrazo der.; cinturón con
+     cuchilla en anilla, cuchillo en funda, chaira y dos ganchos de carne con cadena; costuras, cuello,
+     vueltas del pantalón, remiendo; capucha con parche cosido, hilos y boca hundida; sangre de carnicero
+     (peto/delantal, antebrazo der., salpicaduras en pantalón/botas, hoz). Siguiente: opinión del usuario → pose a
      4 patas con IK, low-poly/formato del juego.
    - PLAN enemigo NUEVO (no sustituir): ESL (emleon00–09.esl, 255 entradas × 32 B) → entrada Ganado
      (id 0x10) con una marca en un campo libre; hook en la creación/carga de modelo de em10: si lleva

@@ -131,6 +131,16 @@ def legs(p):
     for c, r in ((JR['knee'] + V(0, -10, 70), V(55, 60, 60)), (JL['knee'] + V(10, -170, 55), V(48, 70, 60))):
         d = np.maximum(d, -(ell(p, c, r) + 6 * np.sin(p[:, 0] * 0.3 + p[:, 1] * 0.25)))
     return d
+def seams(p, lg):
+    """raised outer seams, a stitched patch on the left thigh, rolled cuffs"""
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    d = None
+    for s, j in ((-1, JR), (1, JL)):
+        ln_ = np.maximum(np.maximum(lg - 2.5, -lg - 2), np.maximum(np.abs(z - 10) - 3.0, np.maximum(s * (j['hip'][0] - x), y - 930)))
+        cf = np.maximum(np.abs(rcone(p, j['ank'] + V(0, 185, 0), j['ank'] + V(0, 235, 0), 86, 84)) - 7, np.abs(y - j['ank'][1] - 210) - 26)
+        d = mn(*(e for e in (d, ln_, cf) if e is not None))
+    pt = np.maximum(np.maximum(lg - 3.5, -lg - 3), rbox(p, JL['hip'] + V(25, -230, 90), V(55, 65, 80), 10))
+    return np.minimum(d, pt)
 def knees(p):                                                     # skin showing through the tears
     d = None
     for s, j in ((-1, JR), (1, JL)):
@@ -172,6 +182,12 @@ def shirt(p, tor):
     d = np.maximum(d, -np.maximum(vn, 1300 - y))
     for i in range(4):                                                               # buttons
         d = np.minimum(d, sph(p, V(-26, 1300 - i * 75, 150 - 8 * i), 7))
+    col = np.maximum(np.abs(rcone(p, V(0, 1470, 5), V(0, 1545, 25), 78, 66)) - 6, np.maximum(np.abs(y - 1505) - 30, 1300 - y))   # collar
+    col = np.maximum(col, -np.maximum(np.abs(x) - 35, -z))
+    d = np.minimum(d, col)
+    for s_ in (-1, 1):                                                               # shoulder seams
+        d = np.minimum(d, np.maximum(np.maximum(tor - 12.5, -(tor - 6)), np.abs(x - s_ * 150) - 2.5 + 0 * y))
+    d = np.maximum(d, np.maximum(y - 1545, 930 - y))
     return d
 def straps(p, tor):
     """leather braces: front from the belt over the shoulders, crossed on the back"""
@@ -194,28 +210,75 @@ def belt(p):
     bk = rbox(p, V(-30, 975, 132), V(32, 28, 9), 4)
     bk = np.maximum(bk, -rbox(p, V(-30, 975, 140), V(19, 15, 9), 3))
     return b, bk
-def apron(p):
-    """a ragged leather apron hanging from the belt to below the knees, front only"""
+def apron(p, tor):
+    """the butcher's apron: heavy leather from the chest to below the knees, a strap round the neck,
+    tied at the back; a stitched pocket, rivets, cut and scored all over"""
     x, y, z = p[:, 0], p[:, 1], p[:, 2]
     rr = np.sqrt((x * 0.9) ** 2 + (z + 40) ** 2)
-    sl = 0.10 * np.clip(990 - y, 0, 600)                                      # flares out downwards
-    d = np.abs(rr - 168 - sl - 6 * np.sin(x * 0.05) * np.clip((900 - y) / 300, 0, 1)) - 5
-    hem = 470 + 45 * np.sin(x * 0.045 + 0.8) + 25 * np.sin(x * 0.13) + 18 * np.sin(x * 0.31)
-    d = np.maximum(d, np.maximum(y - 995, hem - y))
-    d = np.maximum(d, np.maximum(np.abs(x) - 185 - 0.12 * np.clip(990 - y, 0, 600), 40 - z))
-    for c in (V(70, 640, 200), V(-110, 560, 200), V(10, 760, 190)):        # holes
-        d = np.maximum(d, -(sph(p * V(1, 0.6, 1), c * V(1, 0.6, 1), 22)))
-    return d
+    sl = 0.10 * np.clip(990 - y, 0, 600)
+    lo = np.abs(rr - 170 - sl - 7 * np.sin(x * 0.05) * np.clip((900 - y) / 300, 0, 1)) - 5.5
+    hem = 455 + 40 * np.sin(x * 0.045 + 0.8) + 22 * np.sin(x * 0.13) + 14 * np.sin(x * 0.31)
+    lo = np.maximum(lo, np.maximum(y - 1000, hem - y))
+    lo = np.maximum(lo, np.maximum(np.abs(x) - 190 - 0.12 * np.clip(990 - y, 0, 600), 40 - z))
+    bib = np.abs(tor - 30) - 5.5                                                # over the shirt and braces
+    bw = 92 + np.clip(1390 - y, 0, 400) * 0.13
+    top = 1395 - 0.004 * x * x                                                  # rounded top corners
+    bib = np.maximum(bib, np.maximum(np.abs(x) - bw, np.maximum(y - top, 990 - y)))
+    bib = bib + 2.2 * np.sin(y * 0.05 + 0.6 * np.sin(x * 0.04)) * np.clip((1350 - y) / 100, 0, 1)    # heavy hide sags
+    bib = np.maximum(bib, 30 - z)
+    d = np.minimum(lo, bib)
+    d = d + 1.6 * np.sin(y * 0.07 + 1.3 * np.sin(x * 0.03)) * np.clip((1000 - y) / 80, 0, 1)      # creases where it bends
+    for c in (V(70, 640, 200), V(-110, 560, 200), V(10, 760, 190), V(150, 520, 160)):              # holes, cuts
+        d = np.maximum(d, -(sph(p * V(1, 0.6, 1), c * V(1, 0.6, 1), 18)))
+    for x0, y0, a_ in ((-40, 860, 0.5), (60, 1180, -0.3), (-80, 1250, 0.2), (95, 700, 0.9), (-20, 1080, -0.6)):  # knife scores
+        dd = np.abs((x - x0) * math.sin(a_) - (y - y0) * math.cos(a_)) - 1.6
+        along = np.abs((x - x0) * math.cos(a_) + (y - y0) * math.sin(a_)) - 45
+        d = np.maximum(d, -np.maximum(np.maximum(dd, along), z - 0))
+    # pocket on the front with a stitched rim
+    pk = np.maximum(np.abs(rr - 170 - sl) - 10.5, np.maximum(np.abs(x - 70) - 62, np.abs(y - 820) - 55))
+    pk = np.maximum(pk, 40 - z)
+    rim = np.maximum(pk + 1.5, -np.maximum(np.abs(x - 70) - 55, np.abs(y - 820) - 48))
+    d = np.minimum(d, pk)
+    # neck strap and the ties at the back
+    ns = None
+    for s_ in (-1, 1):
+        a0 = V(s_ * 88, 1365, 0); a0[2] = 140
+        r_ = rcone(p, a0, V(s_ * 70, 1520, 40), 13, 13); r_ = np.maximum(r_, np.abs((p - a0) @ V(s_, 0, 0.3)) - 3.5 - 1e3 * 0)
+        ns = r_ if ns is None else np.minimum(ns, r_)
+    ns = np.minimum(ns, np.maximum(torus(p, V(0, 1520, -10), nrm(V(0, 1, -0.25)), 80, 11), z - 40))
+    ties = np.maximum(np.abs(np.minimum(pelvis(p), ell(p, V(0, 1105, 12), V(138, 150, 100))) - 34) - 5, np.maximum(np.abs(y - 990) - 11, z + 20))
+    bow = np.minimum(ell(p, V(-38, 992, -150), V(38, 18, 9)), ell(p, V(38, 992, -150), V(38, 18, 9)))
+    bow = np.minimum(bow, sph(p, V(0, 990, -150), 14))
+    tl = np.minimum(rcone(p, V(-5, 985, -150), V(-30, 860, -148), 7, 6), rcone(p, V(5, 985, -150), V(25, 870, -150), 7, 6))
+    rv = None
+    for c in (V(-88, 1362, 0), V(88, 1362, 0), V(-125, 1000, 0), V(125, 1000, 0)):
+        c = c.copy(); c[2] = 152 if c[1] > 1200 else 150
+        r2 = sph(p, c, 7); rv = r2 if rv is None else np.minimum(rv, r2)
+    return mn(d, ns, ties, bow, tl), rv, rim
+def bracer(p):
+    """leather guard laced on the right forearm (the hand that holds the meat)"""
+    j = JR; a = j['el'] + (j['wr'] - j['el']) * 0.30; b = j['wr'] + (j['el'] - j['wr']) * 0.06
+    g = rcone(p, a, b, 50, 41)
+    g = np.maximum(np.abs(g) - 4.5, np.abs((p - (a + b) / 2) @ nrm(b - a)) - float(np.linalg.norm(b - a)) / 2)
+    st = None
+    for t in (0.2, 0.75):
+        c = a + (b - a) * t; s_ = np.maximum(np.abs(rcone(p, a, b, 55, 46)) - 3.5, np.abs((p - c) @ nrm(b - a)) - 9)
+        st = s_ if st is None else np.minimum(st, s_)
+    bk = None
+    for t in (0.2, 0.75):
+        c = a + (b - a) * t + V(0, 0, 50 - 6 * t); b_ = rbox(p, c, V(13, 11, 5), 2)
+        bk = b_ if bk is None else np.minimum(bk, b_)
+    return g, st, bk
 def body(p):
     sk = skin(p); tor = np.minimum(torso(p), pelvis(p))
     lg = legs(p); bt, so, la = boots(p); bl, bk = belt(p)
-    ap = apron(p); sh = shirt(p, tor); stp = straps(p, tor)
+    ap, rivets, rim = apron(p, tor); sh = shirt(p, tor); stp = straps(p, tor); bg, bst, bbk = bracer(p)
     pl = plaga_arm(p); sp = smin(spikes_arm(p), spine_spikes(p), 6)
     spb = None                                                         # flesh round the spine spikes' roots
     for y in (1170, 1235, 1300, 1365, 1430, 1490):
         s_ = ell(p, V(0, y, -110), V(34, 30, 26)); spb = s_ if spb is None else smin(spb, s_, 12)
-    return {SKIN: mn(sk, knees(p)), CLOTH: sh, PANTS: lg, BOOT: bt, SOLE: so, LEATHER: mn(ap, bl, stp, la),
-            IRON: bk, PLAGA: mn(pl, spb), BONE: sp}
+    return {SKIN: mn(sk, knees(p)), CLOTH: sh, PANTS: mn(lg, seams(p, lg)), BOOT: bt, SOLE: so, LEATHER: mn(ap, bl, stp, la, bg, bst, rim),
+            IRON: mn(bk, rivets, bbk), PLAGA: mn(pl, spb), BONE: sp}
 BODY_BOX = (V(-820, -5, -330), V(1010, 1600, 330))
 
 # ---- hood: a burlap sack tied at the neck, eye holes torn in it, a sewn mouth ----------------------
@@ -265,6 +328,19 @@ def hood(p):
     knot = sph(p, V(30, 1505, 82), 18)
     rope = smin(rope, np.minimum(knot, np.minimum(rcone(p, V(30, 1500, 85), V(42, 1395, 98), 7, 6), rcone(p, V(30, 1500, 85), V(12, 1410, 102), 7, 6))), 6)
     d = np.maximum(d, -np.maximum(groove - 0.0, np.abs(h) - 3.0))                     # the sewn-up mouth sinks in
+    # a sewn-on patch over the right temple, with big stitches round it
+    pc = HEAD + V(-78, 70, 55)
+    pt = np.maximum(np.maximum(h - 3.0, -h - 6), ell(p, pc, V(60, 48, 70)))
+    d = np.minimum(d, pt)
+    for i in range(10):
+        a_ = i * 2 * math.pi / 10; c_ = pc + V(52 * math.cos(a_) * 0.55, 42 * math.sin(a_), 52 * math.cos(a_) * 0.75)
+        q_ = np.maximum(sph(p, c_, 4.5), np.abs(h - 2) - 4)
+        st = np.minimum(st, q_)
+    # frayed threads hanging from the eye holes
+    for s_ in (-1, 1):
+        for k in range(3):
+            t0 = HEAD + V(s_ * (28 + 12 * k), 2 - 4 * k, 112 - 4 * k)
+            st = np.minimum(st, rcone(p, t0, t0 + V(s_ * 4, -28 - 10 * k, 4), 1.8, 1.2))
     return {SACK: d, SOLE: dark, EYE: glint, LEATHER: mn(seam, st, cs, rope)}
 HOOD_BOX = (V(-290, 1340, -280), V(290, 1920, 300))
 
@@ -331,16 +407,55 @@ CLAW_BOX = box_of([JL['wr'] - FD_L * 60, JL['wr'] + FD_L * 420 + V(0, -260, 0), 
 
 # ---- accessories ---------------------------------------------------------------------------------
 def acc(p):
+    """the butcher's belt: a cleaver on a ring at the right hip, a knife in its sheath at the left, the
+    sharpening steel behind it, two meat hooks on a chain at the back"""
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
     clips = None
     for s in (-1, 1):
-        fx = s * (78 + 15 * 0.06)
-        c = rbox(p, V(fx, 1005, 132), V(19, 15, 6), 3)
-        clips = c if clips is None else np.minimum(clips, c)
-    # a pouch and a whetstone hanging from the belt at the right hip
-    pouch = rbox(p, V(-150, 900, 70), V(42, 55, 26), 14, frame(nrm(V(0.4, 0, 0.9)), V(0, 1, 0)))
-    flap = rbox(p, V(-150, 945, 78), V(45, 16, 29), 8, frame(nrm(V(0.4, 0, 0.9)), V(0, 1, 0)))
-    return {IRON: clips, LEATHER: smin(pouch, flap, 4)}
-ACC_BOX = (V(-230, 820, -60), V(140, 1040, 180))
+        c = rbox(p, V(s * 79, 1005, 132), V(19, 15, 6), 3); clips = c if clips is None else np.minimum(clips, c)
+    # cleaver: hanging blade down, flat to the thigh
+    R1 = frame(nrm(V(0.08, -1, 0.15)), V(0, 0, 1))
+    q = (p - V(-258, 950, 40)) @ R1.T
+    cb = rbox(q, V(105, 0, 0), V(85, 55, 3.5), 2)
+    cb = np.maximum(cb, -(ln(q[:, [0, 1]] - np.array([38, -30], np.float32)) - 11))                       # the hang hole
+    cb = np.maximum(cb, -np.maximum(np.abs(q[:, 1] + 55) - 3, np.abs(q[:, 0] - 130) - 8))                 # a notch
+    ch = ccyl(q, V(40, 55, 0), V(40, 170, 0), 15, 4)
+    ring = torus(p, V(-232, 948, 40), nrm(V(0, 0, 1)), 26, 5)
+    rivc = np.minimum(sph(q, V(40, 90, 15), 4.5), sph(q, V(40, 130, 15), 4.5))
+    # sheath + knife on the left hip
+    R2 = frame(nrm(V(-0.05, -1, 0.12)), V(1, 0, 0))
+    q2 = (p - V(262, 900, 20)) @ R2.T
+    sheath = rbox(q2, V(115, 0, 0), V(120, 24, 11), 6) + 0.08 * np.clip(q2[:, 0] - 60, 0, 200)
+    sheath = np.maximum(sheath, q2[:, 0] - 240)
+    kh = ccyl(q2, V(-120, 0, 0), V(-6, 0, 0), 15, 4); bol = ccyl(q2, V(-8, 0, 0), V(6, 0, 0), 19, 2)
+    loop = np.maximum(np.abs(rbox(q2, V(0, 0, 0), V(30, 36, 18), 6)) - 3, np.abs(q2[:, 0] - 20) - 14)
+    # sharpening steel behind it
+    R3 = frame(nrm(V(0.05, -1, -0.1)), V(1, 0, 0))
+    q3 = (p - V(240, 930, -95)) @ R3.T
+    st = ccyl(q3, V(20, 0, 0), V(300, 0, 0), 7, 1)
+    st = st + 0.6 * np.sin(q3[:, 0] * 1.2)
+    sh_ = ccyl(q3, V(-95, 0, 0), V(0, 0, 0), 15, 4); gd = ccyl(q3, V(0, 0, 0), V(18, 0, 0), 22, 3)
+    eye = torus(q3, V(-110, 0, 0), V(0, 0, 1), 12, 3.5)
+    # two meat hooks on a short chain, right back
+    hk = None; chn = None
+    for i, (hx, hz) in enumerate(((-200, -150), (-140, -190))):
+        top = V(hx, 980, hz)
+        for k in range(3):
+            c = top + V(0, -22 * k - 10, 0)
+            l_ = torus(p, c, V(1, 0, 0) if k % 2 else V(0, 0, 1), 9, 3.2)
+            chn = l_ if chn is None else np.minimum(chn, l_)
+        b0 = top + V(0, -80, 0)
+        sh2 = rcone(p, b0, b0 + V(0, -110 - 20 * i, 0), 5.5, 5.5)
+        cv = top + V(0, -190 - 20 * i, 0) + V(0, 0, 32)
+        qq = p - cv; r_ = np.sqrt(qq[:, 1] ** 2 + qq[:, 2] ** 2)
+        arc = np.maximum(np.abs(r_ - 32) - 5.5 + 0 * qq[:, 0], np.abs(qq[:, 0]) - 5.5)
+        arc = np.maximum(arc, qq[:, 1] - 8 * 0 - 0)                                                     # lower half
+        arc = np.maximum(arc, -(qq[:, 2] + 30) * 0 + (qq[:, 2] > 26) * 1e3)
+        tip = rcone(p, cv + V(0, 0, 32), cv + V(0, 30, 34), 5.5, 1.2)
+        h_ = mn(sh2, arc, tip)
+        hk = h_ if hk is None else np.minimum(hk, h_)
+    return {IRON: mn(clips, cb, ring, st, bol, gd, eye, hk, chn), WOOD: mn(ch, kh, sh_), LEATHER: mn(sheath, loop), CHAIN: rivc}
+ACC_BOX = (V(-330, 480, -300), V(330, 1060, 240))
 
 # ---- weapon: a rusted sickle ---------------------------------------------------------------------
 WB = np.stack([HDIR, FD_R, np.cross(HDIR, FD_R)])                   # local x along the handle, y along the forearm: hanging, the blade curves down in front of the leg
@@ -379,8 +494,8 @@ def wbox():
     c = [GRIP + WB.T @ V(x, y, z) for x in (-190, 470) for y in (-40, 430) for z in (-30, 30)]
     return box_of(c, 12)
 WEAPON_BOX = wbox()
-PARTS = [('body', body, BODY_BOX, 4.5, 9000), ('mask', hood, HOOD_BOX, 2.5, 1600), ('fist', fist, FIST_BOX, 2.0, 500),
-         ('claw', claw, CLAW_BOX, 2.0, 1500), ('acc', acc, ACC_BOX, 2.5, 300), ('weapon', weapon, WEAPON_BOX, 2.0, 900)]
+PARTS = [('body', body, BODY_BOX, 3.5, 13000), ('mask', hood, HOOD_BOX, 2.0, 2200), ('fist', fist, FIST_BOX, 2.0, 500),
+         ('claw', claw, CLAW_BOX, 2.0, 1500), ('acc', acc, ACC_BOX, 2.0, 2200), ('weapon', weapon, WEAPON_BOX, 2.0, 1200)]
 def field(fn, p):
     g = fn(p); mats = list(g.keys()); D = np.stack([g[m] for m in mats])
     return D.min(0), np.array(mats)[D.argmin(0)]
