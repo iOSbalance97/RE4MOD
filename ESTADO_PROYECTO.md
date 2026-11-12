@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B91** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B92** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -408,6 +408,16 @@ Reglas de trabajo del usuario:
      PAL 0x800C9D5C; cámara de la planta baja más atrás (puerta + (1100, 1600, −6500), fovy 50→42).
      Diagnóstico en pantalla (5º número, verde): 1 = create falló, 2 = archivo raro, 3 = creado; con
      Herrero vivo 3000 + r_no_0·100 + r_no_1.
+   - **B92** (vídeo B91: diagnóstico 3116 = creado y en Walk 0x10, pero INVISIBLE durante la escena →
+     con SPF_EM tampoco se calcula su modelo; salía al acabar): la escena usa la pausa de eventos del
+     propio juego: Status_flg[1] pG+0x501C bit 0x10000000 (STA_SUSPEND, emMove PAL lo mira) y be_flag
+     0x800 en León y el Herrero → solo ellos se mueven (como sce_com.cpp). Ventana: también act_type 26
+     (ACT_JUMP, "SALTAR"). Música: status +0x3C4 bit 0 (en combate) del Herrero mientras vive → música de
+     combate del juego. Derribo arriba: si León está a >1 m de altura se le clava x/z durante el derribo
+     (stealth.c hr_pin, 150 frames mientras r_no_0 == 1) para que no salga volando del altillo. Huecos:
+     mesh.py ya no recorta nada (NOCULL total), puño y garra cerrados en la muñeca (plano a 41,3 mm, no
+     justo en la rejilla), CLAW_BOX ampliada (el pulgar se salía → abierto), puño 170 y garra 320 tris,
+     game.py dobla también el peto (LEATHER de 'body'). Pendiente: sonido de sorpresa (no sé el SE).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

@@ -41,6 +41,7 @@ static f32* FindPool(u8* m)
 
 void StealthKillFrame(void);
 static void HerreroFrame(void);
+static int hr_pin; static f32 hr_pin_x, hr_pin_z;
 #include "herrero_mot.h"
 void StealthFrame(void)
 {
@@ -448,6 +449,10 @@ static void HerreroHit(u8* e)
         (void)fx; (void)fz; (void)type;
         LifeDownSet2(pl, HR_POWER, 0, 1);
         PlSetDamage(8, 0, 0);
+        if (*(f32*)(pl + 0x98) > 1000.0f) {        /* B92: up high (the barn's loft) he would be thrown off the edge
+                                                    * and stay in the air: he falls where he stands */
+            hr_pin = 150; hr_pin_x = *(f32*)(pl + 0x94); hr_pin_z = *(f32*)(pl + 0x9C);
+        }
         if ((u32)q >= 0x80000000u && (u32)q < 0x81800000u) ((void (*)(u8*, int, int))0x80138624)(q + *(u32*)(q + 28), 7, 1);
     }
 }
@@ -472,6 +477,14 @@ static HrSlot* HrSlotOf(u8* e)
  * cPlBody::setKnife hides the knife: the cModelInfo matrix (+0x5C) diagonal to 0 */
 static void HerreroFrame(void)
 {
+    if (hr_pin > 0) {
+        u8* pl = pPL;
+        hr_pin--;
+        if (pl && pl[0xFC] == 1) {
+            *(f32*)(pl + 0x94) = hr_pin_x; *(f32*)(pl + 0x9C) = hr_pin_z;
+            *(f32*)(pl + 0x0C + 0x0C) = hr_pin_x; *(f32*)(pl + 0x0C + 0x2C) = hr_pin_z;
+        } else if (hr_pin < 140) hr_pin = 0;
+    }
     u8* arr = *(u8**)(EM_MGR + 0x00);
     u32 cnt = *(u32*)(EM_MGR + 0x04), sz = *(u32*)(EM_MGR + 0x08), i;
     int k;

@@ -26,7 +26,8 @@ void CrouchStand(void);
 #define EMLIST(i) (pG + 0x52F4 + (i) * 32)
 #define EM_CREATE ((u8* (*)(void*, int))0x801DE5F8)
 #define EMMGR ((void*)0x80283160)
-#define EM_MOVE ((void (*)(u8*))0x800C9D5C)
+#define STA1 (*(u32*)(pG + 0x501C))      /* Status_flg[1]: 0x10000000 = STA_SUSPEND: only works with be_flag 0x800 move */
+#define STA_SUSPEND 0x10000000u
 typedef f32 (*Atan2F)(f32, f32);
 #define atan2f_ ((Atan2F)0x8005FFE8)
 
@@ -81,7 +82,7 @@ static void WindowsLock(int on)
         if (lock_n) return;
         for (p = OtNext(pS + 140); p && lock_n < 8; p = OtNext(p)) {
             u8 at = p[0x4A];
-            if ((at == 2 || at == 4) && (p[0x34] & 1) && *(f32*)(p + 0x08) > 1500.0f) {   /* jump out / down, up high */
+            if ((at == 2 || at == 4 || at == 26) && (p[0x34] & 1) && *(f32*)(p + 0x08) > 1500.0f) {   /* jump out / down / jump (B92), up high */
                 p[0x34] &= ~1; locked[lock_n++] = p;
             }
         }
@@ -165,7 +166,7 @@ void BarnFrame(void)
     if (!pG || !pl) return;
     b = Pad_data[0].button; press = b & ~pad_old; pad_old = b;
     if (STAGE != 1 || ROOM != 3) {                       /* left the farm: forget everything */
-        if (st) { STOPF &= ~(SPF_KEY | SPF_CAM | SPF_EM | SPF_PL | SPF_SCEAT | SPF_ACTBTN); }
+        if (st) { STOPF &= ~(SPF_KEY | SPF_CAM | SPF_EM | SPF_PL | SPF_SCEAT | SPF_ACTBTN); if (st == 3) STA1 &= ~STA_SUSPEND; }
         st = 0; list_no = -1; seen = 0; lock_n = 0; upper = 0; herrero = 0;
         return;
     }
@@ -209,7 +210,8 @@ void BarnFrame(void)
             a0 = *(f32*)(pl + 0xA4); a1 = atan2f_(dx - lx, dz - lz);
             ex = lx; ez = lz;
         }
-        STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN | SPF_EM;     /* B91: the other enemies wait */
+        STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN;
+        STA1 |= STA_SUSPEND; *(u32*)pl |= 0x800;          /* B92: the game's own event pause: only Leon and El Herrero move */
         CrouchStand();
         return;
     }
@@ -219,8 +221,7 @@ void BarnFrame(void)
         if (t == 36 && !herrero) herrero = HerreroSpawn(dx, 0.0f, dz, atan2f_(lx - dx, lz - dz));
         /* B91: SPF_EM stops every character (the Ganado outside would see Leon): the game's own emMove
          * (PAL 0x800C9D5C, what cEmMgr::move runs on each work) for Leon and El Herrero only */
-        EM_MOVE(pl);
-        if (herrero && t > 36 && (*(u32*)herrero & 0x201) == 1) EM_MOVE(herrero);
+        if (herrero && (*(u32*)herrero & 0x201) == 1) { *(u32*)herrero |= 0x800; *(u32*)(herrero + 0x3C4) |= 1; }
         if (t == 40) {
             Vec v; v.x = dx; v.y = 1200.0f; v.z = dz;
             SndCall(6, 0x37, (int)&v, 0, 0, 0);          /* a door smashed in */
@@ -239,11 +240,14 @@ void BarnFrame(void)
             Cam(dx + 1100.0f, 1600.0f + 150.0f * k, dz - 6500.0f + 900.0f * k, hx, hy, hz, 50.0f - 8.0f * k);
         }
         if (t >= 300 || (t > 120 && (press & PAD_A))) {
-            STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN | SPF_EM); WindowsLock(0); st = 4; t = 0;
+            STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN); STA1 &= ~STA_SUSPEND; *(u32*)pl &= ~0x800u;
+            if (herrero && (*(u32*)herrero & 0x201) == 1) *(u32*)herrero &= ~0x800u;
+            WindowsLock(0); st = 4; t = 0;
         }
         return;
     }
-    default:
+    default:                                             /* B92: while he lives, the game's battle music */
+        if (herrero && (*(u32*)herrero & 0x201) == 1 && *(s16*)(herrero + 0x320) > 0) *(u32*)(herrero + 0x3C4) |= 1;
         return;
     }
 }

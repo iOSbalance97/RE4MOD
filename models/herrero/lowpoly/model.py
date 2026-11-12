@@ -194,7 +194,8 @@ def fist(p):
     side = nrm(np.cross(HDIR, FD_R))
     th = rcone(p, GRIP - FD_R * 50 + side * 55 - HDIR * 50, GRIP + FD_R * 5 + side * 72 - HDIR * 5, 30, 25)
     th = smin(th, rcone(p, GRIP + FD_R * 5 + side * 72 - HDIR * 5, GRIP + FD_R * 48 + side * 52 + HDIR * 30, 25, 21), 8)
-    return {SKIN: smin(d, th, 14)}
+    d = np.maximum(smin(d, th, 14), -((p - (JR['wr'] - FD_R * 41.3)) @ FD_R))      # B92: closed at the wrist (was cut open by its box)
+    return {SKIN: d}
 FD_L = nrm(JL['wr'] - JL['el'])
 def claw(p):
     n = V(0, -1, 0.12); n = nrm(n - FD_L * (n @ FD_L)); w = np.cross(FD_L, n)
@@ -221,10 +222,11 @@ def claw(p):
     b = a + nrm(FD_L * 0.55 - w * 0.75 + n * 0.35) * 70; c = b + nrm(FD_L * 0.75 - w * 0.2 + n * 0.65) * 52
     th = smin(rcone(p, a, b, 33, 25), rcone(p, b, c, 25, 19), 8)
     d = smin(d, th, 14)
+    d = np.maximum(d, -((p - (JL['wr'] - FD_L * 41.3)) @ FD_L))                   # B92: closed at the wrist
     return {SKIN: d}
 def box_of(pts, m):
     pts = np.array(pts); return (pts.min(0) - m).astype(f32), (pts.max(0) + m).astype(f32)
-FIST_BOX = box_of([GRIP], 150); CLAW_BOX = box_of([JL['wr'], JL['wr'] + FD_L * 300 + V(0, -90, 0)], 150)
+FIST_BOX = box_of([GRIP], 150); CLAW_BOX = box_of([JL['wr'], JL['wr'] + FD_L * 300 + V(0, -90, 0), JL['wr'] + V(0, 0, 230)], 150)   # B92: the thumb went past the box (open)
 
 # ---- accessories ---------------------------------------------------------------------------------
 def acc(p):
@@ -271,8 +273,8 @@ def wbox():
     c = [GRIP + WB.T @ V(x, y, z) for x in (-380, BEAM_L + 330) for y in (-110, 400) for z in (-170, 170)]
     return box_of(c, 12)
 WEAPON_BOX = wbox()
-PARTS = [('body', body, BODY_BOX, 6.0, 1900), ('mask', mask, MASK_BOX, 2.5, 150), ('fist', fist, FIST_BOX, 3.0, 110),
-         ('claw', claw, CLAW_BOX, 2.5, 250), ('acc', acc, ACC_BOX, 3.0, 230), ('weapon', weapon, WEAPON_BOX, 3.0, 380)]
+PARTS = [('body', body, BODY_BOX, 6.0, 1900), ('mask', mask, MASK_BOX, 2.5, 150), ('fist', fist, FIST_BOX, 3.0, 170),
+         ('claw', claw, CLAW_BOX, 2.5, 320), ('acc', acc, ACC_BOX, 3.0, 230), ('weapon', weapon, WEAPON_BOX, 3.0, 380)]
 def field(fn, p):
     g = fn(p); mats = list(g.keys()); D = np.stack([g[m] for m in mats])
     return D.min(0), np.array(mats)[D.argmin(0)]

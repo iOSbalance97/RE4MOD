@@ -91,7 +91,7 @@ def build(parts):
             mats[p['atlas']].append(cor)
             # B86: open sheets (the apron flaps: LEATHER of 'legs'; the iron straps/pauldron 'acc') get a back side:
             # the game culls back faces and the body showed through them from behind
-            if (p['name'] == 'acc' and op[t]) or (p['name'] == 'legs' and p['mat'][f[t, 0]] == 3):
+            if (p['name'] == 'acc' and op[t]) or (p['name'] in ('legs', 'body') and p['mat'][f[t, 0]] == 3):   # B92: the bib too
                 back = []
                 for k in (0, 2, 1):
                     vi = int(f[t, k]); n = -np.clip(np.round(p['cn'][t, k] * 127), -127, 127).astype(int)
