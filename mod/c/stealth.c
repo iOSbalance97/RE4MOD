@@ -475,6 +475,24 @@ static HrSlot* HrSlotOf(u8* e)
  * own head and hands are separate models (em10 work: pRHand +0x564, pLHand +0x568, pHead +0x56C,
  * cModelInfo*); the Herrero has its own in the body mesh, so theirs are collapsed every frame the way
  * cPlBody::setKnife hides the knife: the cModelInfo matrix (+0x5C) diagonal to 0 */
+/* B98: barn.c's scene drives one Herrero itself (the game's AI would go its own way to Leon: outside
+ * the wall, or round the barn, depending on where Leon stands). Its motion is chosen here, not by
+ * the routine mapping below. Returns the motion frame. */
+u8* hr_scene_em;
+f32 HerreroSceneMot(u8* e, int m)
+{
+    u8* mi = *(u8**)(e + 0x15C); u8* bin; u8* pk; void* cur;
+    if ((u32)mi < 0x80000000u || (u32)mi >= 0x81800000u) return 0.0f;
+    bin = *(u8**)(mi + 0x0C);
+    if ((u32)bin < 0x80000000u || (u32)bin >= 0x81800000u || *(u32*)(bin + 0x58) != 0x48455252u || !*(u32*)(bin + 0x5C)) return 0.0f;
+    pk = bin + *(u32*)(bin + 0x5C);
+    cur = *(void**)(e + 0x1D8);
+#define HRM(i) ((void*)(pk + *(u32*)(pk + 4 * (i))))
+    if (cur != HRM(m) || (m == HR_WALK && *(f32*)(e + 0x1D8 + 0xB8) >= (f32)HR_WALK_N - 1.5f))
+        MotionSetCore(e, e + 0x1D8, HRM(m), HRM(m + 1), 10, m == HR_ROAR ? 1 : 5, 0);
+#undef HRM
+    return *(f32*)(e + 0x1D8 + 0xB8);
+}
 static void HerreroFrame(void)
 {
     if (hr_pin > 0) {
@@ -513,7 +531,7 @@ static void HerreroFrame(void)
          * the overhead smash; 0x24 ThrowAxe is turned into AxeAtk). The game's own routine still runs
          * them: it moves the body by their root track and reads their sequence (Free 8: keep turning
          * to Leon, 0x20: swing sound, 1: the attack check) */
-        if (e[0xFC] == 1 && *(u32*)(bin + 0x5C) != 0) {
+        if (e[0xFC] == 1 && *(u32*)(bin + 0x5C) != 0 && e != hr_scene_em) {
             /* B85: the motions travel inside the Herrero's own BIN (u32 at +0x5C -> pack of 8 offsets:
              * mot/seq of walk, smash, idle, flex): the mod's code space is too small for them */
             u8* pk = bin + *(u32*)(bin + 0x5C);

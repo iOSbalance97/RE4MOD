@@ -12,6 +12,9 @@
 #include "game.h"
 #include "herrero_arc.h"
 void CrouchStand(void);
+#include "herrero_mot.h"
+extern u8* hr_scene_em;                 /* stealth.c: the Herrero whose motion the scene picks */
+f32 HerreroSceneMot(u8* e, int m);
 #define SPF_SCEAT  0x00400000u            /* no area checks (the item the Ganado dropped, doors) */
 #define SPF_ACTBTN 0x00000100u            /* no action prompts */
 
@@ -48,6 +51,9 @@ typedef f32 (*Atan2F)(f32, f32);
                                             4 m OUTSIDE, ~4 s of walking before the door, and the scene was over */
 #define DOOR_Z (-900.0f)                 /* spawn: ~0.9 m outside the opening, on Leon's way in */
 #define DOOR_IN (-1770.0f)               /* the opening (camera's first aim) */
+#define MARK_X (-13520.0f)               /* B98: where his walk in ends: 2 m in, 3.4 m from the camera */
+#define MARK_Z (-2900.0f)
+#define HR_STEP 30.8f                    /* his walk's travel per frame (mkanim.py) */
 
 static int st, t, list_no = -1, seen, lock_n;
 static u8* upper;                       /* the Ganado upstairs (live work) */
@@ -60,7 +66,9 @@ static int dbg;
 static u32 mod_t;
 static int music;                       /* 1 = his music is on */
 static f32 cex, cey, cez, ctx, cty, ctz; /* camera position, smoothed target */
-static int turn_t;                      /* B96: frame Leon's turn motion started */               /* tracking camera */                         /* test: 1 create failed, 2 bad archive, 3 created; +10*routine */
+static int turn_t;                      /* B96: frame Leon's turn motion started */
+static int hph, hph_t;                  /* B98: his scripted entrance: 0 walk in, 1 roar, 2 idle; frame it began */
+static f32 hlx, hlz;                    /* his position last frame */               /* tracking camera */                         /* test: 1 create failed, 2 bad archive, 3 created; +10*routine */
 
 static f32 Sin(f32 a)
 {
@@ -301,7 +309,39 @@ void BarnFrame(void)
     case 3: {                                            /* the scene */
         f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C);
         t++;
-        if (t == 36 && !herrero) herrero = HerreroSpawn(dx, 163.0f, dz, atan2f_(lx - dx, lz - dz));
+        /* B98: a scripted entrance, the same wherever Leon stands: B97's videos: Leon still after the kill
+         * -> nobody at the door; a step back -> he comes in. The game's AI walks a ROUTE to Leon (em10
+         * Pl_pos/route points, the ladder): up there it took him along the wall outside, or round. Now he
+         * is put in em10's Keeper (routine 1/1, step 1: no find, no walk, no attack while Guard_r is 0
+         * and Be_flg 0x100 says Leon is known) and the scene turns him and plays our motions: walk in
+         * straight through the door to MARK, roar, stand. His AI comes back when the scene ends. */
+        if (t == 70 && !herrero) {   /* at the cut (t 96) he is 0.8 m in: in the doorway */
+            herrero = HerreroSpawn(dx, 163.0f, dz, atan2f_(MARK_X - dx, MARK_Z - dz));
+            if (herrero) { *(f32*)(herrero + 0x3CC) = 0.0f; hr_scene_em = herrero; hph = 0; hph_t = t; hlx = dx; hlz = dz; }
+        }
+        if (herrero && hr_scene_em == herrero && (*(u32*)herrero & 0x201) == 1) {
+            f32 ux = MARK_X - dx, uz = MARK_Z - dz, L = Sq(ux * ux + uz * uz), hx, hz, sp, mv;
+            u8* e = herrero;
+            ux /= L; uz /= L;
+            e[0xFC] = 1; e[0xFD] = 1; e[0xFE] = 1; e[0xFF] = 0;          /* em10_R1_Keeper, step 1 */
+            *(u32*)(e + 0x3E0) |= 0x100;                                 /* Leon known: no em10FindCk */
+            *(u32*)(e + 0x3C8) &= ~1u; *(f32*)(e + 0x3CC) = 0.0f;
+            *(f32*)(e + 0xA4) = atan2f_(ux, uz);
+            hx = *(f32*)(e + 0x94); hz = *(f32*)(e + 0x9C);
+            sp = (hx - dx) * ux + (hz - dz) * uz;                        /* how far in */
+            if (hph == 0) {
+                HerreroSceneMot(e, HR_WALK);
+                mv = (hx - hlx) * ux + (hz - hlz) * uz;
+                if (mv < 8.0f && t > hph_t + 2) {                        /* the motion's root does not move him here: */
+                    hx += ux * HR_STEP; hz += uz * HR_STEP;              /* move him by its stride */
+                    *(f32*)(e + 0x94) = hx; *(f32*)(e + 0x9C) = hz;
+                }
+                if (sp >= L) { hph = 1; hph_t = t; }
+            } else if (hph == 1) {
+                if (HerreroSceneMot(e, HR_ROAR) >= (f32)HR_ROAR_N - 2.0f || t > hph_t + HR_ROAR_N + 6) { hph = 2; hph_t = t; }
+            } else HerreroSceneMot(e, HR_IDLE);
+            hlx = hx; hlz = hz;
+        }
         /* B91: SPF_EM stops every character (the Ganado outside would see Leon): the game's own emMove
          * (PAL 0x800C9D5C, what cEmMgr::move runs on each work) for Leon and El Herrero only */
         if (herrero && (*(u32*)herrero & 0x201) == 1) {
@@ -309,9 +349,6 @@ void BarnFrame(void)
              * skips it (he knows where Leon is), so he stayed invisible until some later routine did */
             *(u32*)herrero |= 0x800 | 2; *(f32*)(herrero + 0x154) = 1.0f;
         }
-        /* B94: born like B90 (where he WAS seen): his first frames in Wait make him drawn; only then the
-         * flag bit 1 (Wait -> setFindPL: he knows where Leon is and comes) */
-        if (herrero && t == 42) *(u32*)(herrero + 0x3C8) |= 1u;
         if (t >= 80 && (t - 80) % 45 == 0) { MusicOn(); music = 1; }   /* B96: the farm's battle music back up */
         if (t == 40) SndCall(1, 0x1E, 0, 0, 0, 0);       /* B96: a door kicked in (player bank: always loaded; room
                                                             bank 6 of r103 has no 0x37, B95 played nothing) */
@@ -337,10 +374,17 @@ void BarnFrame(void)
             ddx = hx - cex; ddz = hz - cez;
             if (t > 150 && ddx * ddx + ddz * ddz < 2600.0f * 2600.0f) t = 400;   /* close: the scene ends before he is */
         }
-        if (t >= 290 || (t > 120 && (press & PAD_A))) {
+        if (hph == 2 && t > hph_t + 25) t = 400;          /* B98: walked in, roared: back to the game */
+        if (t >= 330 || (t > 120 && (press & PAD_A))) {
             PlVirt(pl, 24, 2);                            /* B96: cPlayer::endEvent(2): routine 0, pad back */
             STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN); STA1 &= ~STA_SUSPEND; *(u32*)pl &= ~0x800u;
-            if (herrero && (*(u32*)herrero & 0x201) == 1) *(u32*)herrero &= ~0x800u;
+            if (herrero && (*(u32*)herrero & 0x201) == 1) {
+                *(u32*)herrero &= ~0x800u;
+                /* B98: his AI back: Guard_r, flag bit 1 (setFindPL), em10 Wait */
+                *(f32*)(herrero + 0x3CC) = 20000.0f; *(u32*)(herrero + 0x3C8) |= 1u;
+                herrero[0xFC] = 1; herrero[0xFD] = 0; herrero[0xFE] = 0; herrero[0xFF] = 0;
+            }
+            hr_scene_em = 0;
             WindowsLock(0); st = 4; t = 0;
         }
         return;

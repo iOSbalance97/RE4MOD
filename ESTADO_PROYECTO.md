@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B97** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B98** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -468,6 +468,16 @@ Reglas de trabajo del usuario:
      abertura (−13450, −900, y 163), en la línea por la que entra León; cámara FIJA en el camino por el que
      León entró (−13600, 2000, −6300), 4,5 m delante de la abertura, bajo el altillo, mirándole; corte
      solo si se acerca a < 2,6 m; plano hasta t 290 (A lo salta).
+   - **B98** (3 vídeos B97: si León se queda quieto tras acuchillar, el Herrero no entra; si retrocede un
+     poco, sí. Cámara fija y puerta ya bien: en el fallo la puerta sale vacía y la cámara se desliza siguiéndole
+     por FUERA de la pared). CAUSA: la IA del Ganado (em10) no va en línea recta: recorre RUTAS hacia León
+     (Pl_pos, puntos de ruta, escaleras); con León arriba la ruta depende de dónde está → a veces rodea por
+     fuera. Solución: ENTRADA GUIONIZADA. El Herrero nace en t 70 a 0,9 m fuera de la puerta y durante la
+     escena está en em10_R1_Keeper paso 1 (rutina 1/1/1 cada frame, Guard_r 0, Be_flg +0x3E0 |= 0x100 →
+     ni busca, ni anda, ni ataca); barn.c le orienta en línea recta a la marca (−13520, −2900) y
+     stealth.c HerreroSceneMot pone nuestros movimientos (andar; si la raíz no le mueve, 30,8 mm/frame);
+     al llegar: rugido (HR_ROAR) y quieto; la escena acaba ~1 s después. Al terminar: Guard_r 20000,
+     flag bit 1 y rutina Wait → su IA normal desde dentro del granero. HerreroFrame ignora al de la escena.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.
