@@ -1,11 +1,13 @@
 """UV atlas (box-projection charts, shelf packed) + baked diffuse texture (procedural detail, AO, soft top light)"""
 import numpy as np, pickle, sys, math, cv2
 import model, mesh, finish
-from model import SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, HOT, PLAGA, EYE
+from model import SKIN, PANTS, BOOT, LEATHER, IRON, WOOD, CHAIN, SOLE, HOT, PLAGA, EYE, CLOTH
+FN = {n: fn for n, fn, *_ in model.PARTS}
 from finish import vnoise, fbm, allsdf
 SZ = 1024; PAD = 3
-ATLAS = {'body': 0, 'fist': 0, 'claw': 0, 'mask': 1, 'acc': 1, 'weapon': 1}
-DENS = {'body': 1.0, 'fist': 1.25, 'claw': 1.25, 'mask': 1.5, 'acc': 1.0, 'weapon': 0.9}
+ATLAS = {'body': 0, 'fist': 0, 'claw': 0, 'mask': 1, 'acc': 1, 'weapon': 1, 'legs': 2}
+NAT = 3
+DENS = {'legs': 1.0, 'body': 1.0, 'fist': 1.25, 'claw': 1.25, 'mask': 1.5, 'acc': 1.0, 'weapon': 0.9}
 def adjacency(f):
     e = np.concatenate([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]]); e.sort(1)
     fi = np.tile(np.arange(len(f)), 3); o = np.lexsort((e[:, 1], e[:, 0])); e = e[o]; fi = fi[o]
@@ -39,7 +41,7 @@ def unwrap(parts):
             ch.append([pi, fs, uv, wh[0], wh[1]])
     out = [np.zeros((len(p['f']), 3, 2), np.float32) for p in parts]
     scales = {}
-    for at in (0, 1):
+    for at in range(NAT):
         cs = [c for c in ch if ATLAS[parts[c[0]]['name']] == at]; cs.sort(key=lambda c: -c[4])
         cs.sort(key=lambda c: -max(c[3], c[4]))
         def pack(s):
@@ -66,7 +68,7 @@ def height(P, mat):
     h = np.zeros(len(P), np.float32)
     sk = mat == SKIN; h[sk] = 0.8 * fbm(P[sk], 9.0) + 0.5 * np.abs(fbm(P[sk] + 300, 60.0) - 0.5) * -6
     le = mat == LEATHER; h[le] = -2.2 * np.clip(1 - np.abs(fbm(P[le] + 70, 26.0) - 0.5) * 14, 0, 1) + 0.6 * vnoise(P[le], 4.0)
-    cl = (mat == PANTS); h[cl] = 0.45 * np.sin(P[cl][:, 1] * 1.6) * np.sin((P[cl][:, 0] + P[cl][:, 2]) * 1.6) + 0.8 * fbm(P[cl], 14.0)
+    cl = (mat == PANTS) | (mat == CLOTH); h[cl] = 0.45 * np.sin(P[cl][:, 1] * 1.6) * np.sin((P[cl][:, 0] + P[cl][:, 2]) * 1.6) + 0.8 * fbm(P[cl], 14.0)
     ir = (mat == IRON) | (mat == CHAIN); h[ir] = 1.4 * vnoise(P[ir], 11.0) + 0.9 * vnoise(P[ir] + 50, 3.5)
     bo = (mat == BOOT) | (mat == SOLE); h[bo] = -1.8 * np.clip(1 - np.abs(fbm(P[bo] + 20, 30.0) - 0.5) * 12, 0, 1) + 0.5 * vnoise(P[bo], 5.0)
     wd = mat == WOOD
@@ -87,6 +89,40 @@ def texcolour(name, fn, P, N):
         t = (P[:, 0] * a + y + 55 * vnoise(P, 140.0)) * 0.016 + off
         ln_ = np.clip(1 - np.abs(np.mod(t, 6.283) - 3.14) * 9, 0, 1) * back * (vnoise(P + k * 31, 200.0) > 0.42)
         c = c * (1 - 0.75 * ln_[:, None]) + np.array([0.33, 0.14, 0.12], np.float32) * 0.75 * ln_[:, None]
+    # --- a real person's skin: tanned forearms, flushed joints, body hair, moles, a smith's spark burns
+    if sk.any():
+        tone = np.ones((len(P), 3), np.float32)
+        ax_ = np.abs(P[:, 0])
+        tan = np.clip((ax_ - 880) / 250, 0, 1) * 0.22                                    # sun on the forearms / hands
+        tone *= (1 - tan)[:, None]
+        jr = np.zeros(len(P), np.float32)
+        for j_ in (model.JR, model.JL):
+            for k_, rr_ in (('el', 130.0), ('wr', 120.0), ('sh', 230.0)):
+                jr = np.maximum(jr, np.clip(1 - np.linalg.norm(P - (j_[k_] + (np.array([0, 60, 0], np.float32) if k_ == 'sh' else 0)), axis=1) / rr_, 0, 1))
+        tone *= 1 - jr[:, None] * np.array([0.02, 0.20, 0.22], np.float32)                 # redder knuckles / elbows / shoulders
+        pale = np.clip((1500 - y) / 300, 0, 1) * (ax_ < 420) * 0.10
+        tone += pale[:, None] * np.array([0.9, 1.0, 1.0], np.float32)                      # belly / flanks never see the sun
+        hair_zone = np.clip((ax_ - 760) / 120, 0, 1) * np.clip((1290 - ax_) / 60, 0, 1) * (N[:, 1] > -0.2) + 0.7 * ((ax_ < 430) & (P[:, 2] < -150) & (y > 1500)) + 0.6 * ((ax_ < 300) & (P[:, 2] > 200) & (y > 1560))
+        hz = np.clip(hair_zone, 0, 1)
+        hair = np.clip((vnoise(P * np.array([0.22, 1, 1], np.float32), 2.6) - 0.45) * 3.0, 0, 1) * hz * 0.42
+        tone *= (1 - hair)[:, None]
+        mole = (vnoise(P + 55, 7.0) > 0.90) & (vnoise(P + 91, 23.0) > 0.55)
+        tone[mole] *= np.array([0.45, 0.38, 0.35], np.float32)
+        spark = (vnoise(P + 17, 5.0) > 0.86) & (np.linalg.norm(P - model.JR['wr'], axis=1) < 480) | (vnoise(P + 29, 5.0) > 0.88) & (np.linalg.norm(P - model.JL['wr'], axis=1) < 300)
+        tone[spark] *= np.array([0.95, 0.42, 0.38], np.float32)
+        blot = fbm(P + 700, 28.0)[:, None]                                                 # uneven, blotchy complexion
+        tone *= 0.86 + 0.28 * blot * np.array([1.0, 0.8, 0.75], np.float32)
+        # an old burn across the right forearm: shiny, pink-white, puckered rim
+        bz = np.linalg.norm((P - np.array([-1010, 1700, 110], np.float32)) * np.array([0.55, 1, 1], np.float32), axis=1) / 95 + 0.5 * (fbm(P + 5, 40.0) - 0.5)
+        burn2 = np.clip(1.15 - bz, 0, 1); rim2 = np.clip(1 - np.abs(bz - 1.0) * 5, 0, 1)
+        tone = tone * (1 - 0.6 * burn2[:, None]) + np.array([1.55, 1.15, 1.10], np.float32) * (0.8 + 0.4 * vnoise(P, 9.0))[:, None] * 0.6 * burn2[:, None]
+        tone *= (1 - 0.35 * rim2)[:, None]
+        c[sk] *= tone[sk]
+    cl_ = mat == CLOTH
+    if cl_.any():
+        c[cl_] *= (0.7 + 0.5 * vnoise(P[cl_] * np.array([0.3, 1, 1], np.float32), 4.0))[:, None]
+        bs = np.clip((fbm(P[cl_] + 64, 55.0) - 0.48) * 6, 0, 1)[:, None]
+        c[cl_] = c[cl_] * (1 - 0.8 * bs) + np.array([0.12, 0.02, 0.015], np.float32) * 0.8 * bs
     # --- the infection: spreads from the growths; black veins, grey necrotic skin, an inflamed rim
     G = np.array([c_ for c_, r_ in model.GROWTH], np.float32); GR = np.array([r_ for c_, r_ in model.GROWTH], np.float32)
     dg = np.full(len(P), 1e9, np.float32)
@@ -141,9 +177,9 @@ def texcolour(name, fn, P, N):
     grime[hot | ey] = 1.0
     return np.clip(c * shade[:, None] * grime * 1.2, 0, 1) ** (1 / 2.2)   # display space
 def bake(parts, uvs):
-    imgs = [np.zeros((SZ, SZ, 3), np.float32) for _ in (0, 1)]; msk = [np.zeros((SZ, SZ), bool) for _ in (0, 1)]
-    for p, uv, (name, fn, box, vox, bud) in zip(parts, uvs, model.PARTS):
-        at = ATLAS[name]; v = p['v']; f = p['f']; cn = p['cn']
+    imgs = [np.zeros((SZ, SZ, 3), np.float32) for _ in range(NAT)]; msk = [np.zeros((SZ, SZ), bool) for _ in range(NAT)]
+    for p, uv in zip(parts, uvs):
+        name = p['name']; fn = FN[p['fn']]; at = ATLAS[name]; v = p['v']; f = p['f']; cn = p['cn']
         PX = []; PP = []; NN = []
         for i in range(len(f)):
             t = uv[i].astype(np.float64); x0, y0 = t[:, 0], t[:, 1]

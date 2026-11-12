@@ -39,13 +39,13 @@ for p in parts:
     nodes.append(dict(name=p['name'], mesh=len(meshes) - 1, skin=0)); tot += nf
     p['x_pos'], p['x_nor'], p['x_uv'], p['x_idx'] = pos, nor, uv, inv.reshape(-1, 3)
 images = []; 
-for i in (0, 1):
+for i in (0, 1, 2):
     b = open('herrero_tex%d.png' % i, 'rb').read(); off = sum(len(x) for x in bufs); bufs.append(b + b'\0' * ((-len(b)) % 4))
     views.append(dict(buffer=0, byteOffset=off, byteLength=len(b))); images.append(dict(bufferView=len(views) - 1, mimeType='image/png'))
 g = dict(asset=dict(version='2.0', generator='herrero'), scene=0, scenes=[dict(nodes=[0] + list(range(len(joints), len(nodes))))], nodes=nodes, meshes=meshes,
          skins=[dict(joints=list(range(len(joints))), inverseBindMatrices=ibm_acc, skeleton=0)],
-         materials=[dict(name='herrero_%d' % i, pbrMetallicRoughness=dict(baseColorTexture=dict(index=i), metallicFactor=0.0, roughnessFactor=0.9)) for i in (0, 1)],
-         textures=[dict(source=0, sampler=0), dict(source=1, sampler=0)], samplers=[dict(magFilter=9729, minFilter=9987, wrapS=33071, wrapT=33071)], images=images,
+         materials=[dict(name='herrero_%d' % i, pbrMetallicRoughness=dict(baseColorTexture=dict(index=i), metallicFactor=0.0, roughnessFactor=0.9)) for i in (0, 1, 2)],
+         textures=[dict(source=i, sampler=0) for i in (0, 1, 2)], samplers=[dict(magFilter=9729, minFilter=9987, wrapS=33071, wrapT=33071)], images=images,
          accessors=acc, bufferViews=views, buffers=[dict(byteLength=sum(len(x) for x in bufs))])
 js = json.dumps(g, separators=(',', ':')).encode(); js += b' ' * ((-len(js)) % 4); bn = b''.join(bufs)
 with open('herrero.glb', 'wb') as fo:
@@ -59,5 +59,5 @@ with open('herrero.obj', 'w') as fo:
         for n in p['x_nor']: fo.write('vn %.4f %.4f %.4f\n' % tuple(n))
         for t in p['x_idx'] + o: fo.write('f %d/%d/%d %d/%d/%d %d/%d/%d\n' % (t[0], t[0], t[0], t[1], t[1], t[1], t[2], t[2], t[2]))
         o += len(p['x_pos'])
-open('herrero.mtl', 'w').write(''.join('newmtl herrero_%d\nKd 1 1 1\nmap_Kd herrero_tex%d.png\n' % (i, i) for i in (0, 1)))
+open('herrero.mtl', 'w').write(''.join('newmtl herrero_%d\nKd 1 1 1\nmap_Kd herrero_tex%d.png\n' % (i, i) for i in (0, 1, 2)))
 print('tris', tot, 'joints', len(joints), 'verts', sum(len(p['x_pos']) for p in parts))

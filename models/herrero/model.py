@@ -28,7 +28,7 @@ def plaga(p):
     return d + 2.5 * np.sin(p[:, 0] * 0.21 + p[:, 1] * 0.17 + p[:, 2] * 0.19)                # ringed, like a worm
 JR, JL = J(-1), J(1)
 HEAD = V(0, 1872, 352)
-def fore_r(j, s): return (150 if s < 0 else 142), (104 if s < 0 else 98)
+def fore_r(j, s): return (132 if s < 0 else 128), (80 if s < 0 else 78)
 
 # ---- body ---------------------------------------------------------------------------------------
 def torso(p):
@@ -47,23 +47,32 @@ def torso(p):
     return d
 def pelvis(p): return ell(p, V(0, 1085, 5), V(335, 205, 250))
 def arms(p):
+    """T-pose; real arm anatomy instead of tubes: deltoid cap, biceps / triceps split, brachioradialis and
+    flexor masses that taper to a narrow wrist, bony elbow and wrist"""
     d = None
     for s, j in ((-1, JR), (1, JL)):
-        ra, rb = fore_r(j, s)
-        a = rcone(p, j['sh'], j['el'], 170, 132)
-        a = smin(a, sph(p, j['sh'] + V(s*5, 15, 0), 192), 40)                            # deltoid
-        mid = (j['sh'] + j['el']) / 2
-        a = smin(a, ell(p, mid + V(0, 15, 72), V(175, 112, 100)), 30)                    # biceps
-        a = smin(a, ell(p, mid + V(-s*20, 0, -78), V(185, 108, 95)), 30)                 # triceps
-        a = smin(a, rcone(p, j['el'], j['wr'], ra, rb), 30)
-        fd = nrm(j['wr'] - j['el'])
-        a = smin(a, ell(p, j['el'] + fd*125 + V(0, 22, 10), V(155, 118, 122)), 30)       # forearm bulk
-        a = smin(a, sph(p, j['el'] + V(0, 0, -45), 100), 30)                             # elbow
+        ra, rb = fore_r(j, s); X = V(s, 0, 0)
+        a = rcone(p, j['sh'], j['el'], 128, 104)
+        a = smin(a, ell(p, j['sh'] + V(s*35, 28, -5), V(178, 150, 160)), 26)                 # deltoid
+        a = smin(a, ell(p, j['sh'] + X*235 + V(0, 8, 78), V(165, 98, 88)), 16)               # biceps
+        a = smin(a, ell(p, j['sh'] + X*215 + V(0, 22, -82), V(185, 92, 80)), 16)             # triceps (long head)
+        a = smin(a, ell(p, j['sh'] + X*300 + V(0, -55, -60), V(120, 70, 72)), 16)            # triceps (lateral)
+        f = rcone(p, j['el'], j['wr'], 100, rb)
+        f = smin(f, ell(p, j['el'] + X*95 + V(0, 48, 30), V(165, 80, 84)), 16)               # brachioradialis
+        f = smin(f, ell(p, j['el'] + X*120 + V(0, -42, 5), V(170, 84, 92)), 16)              # flexors
+        f = smin(f, ell(p, j['el'] + X*150 + V(0, 10, -62), V(150, 66, 62)), 16)             # extensors
+        a = smin(a, f, 22)
+        a = smin(a, sph(p, j['el'] + V(0, -8, -84), 58), 14)                                 # olecranon
+        a = smin(a, sph(p, j['el'] + V(0, -50, 20), 50), 14)                                 # medial epicondyle
+        a = smin(a, sph(p, j['wr'] - X*18 + V(0, 34, -52), 30), 10)                          # ulna head
         d = a if d is None else np.minimum(d, a)
     return d
 def neck_head(p):
     d = rcone(p, V(0, 1730, 130), V(0, 1830, 300), 165, 130)
     for s in (-1, 1): d = smin(d, rcone(p, V(s*60, 1830, 180), V(s*390, 1745, 60), 120, 150), 60)   # traps
+    for s in (-1, 1):
+        d = smin(d, rcone(p, V(s*28, 1688, 262), V(s*360, 1742, 130), 21, 26), 14)                      # clavicle
+        d = smin(d, rcone(p, V(s*95, 1850, 250), V(s*35, 1700, 270), 26, 22), 14)                       # sternomastoid
     h = ell(p, HEAD, V(118, 138, 138))
     h = smin(h, ell(p, HEAD + V(0, -75, 30), V(102, 85, 105)), 30)                        # jaw
     for s in (-1, 1): h = smin(h, ell(p, HEAD + V(s*118, -5, -15), V(18, 38, 26)), 12)    # ears
@@ -146,7 +155,14 @@ def body(p):
     kp = np.maximum(lg - 11, sph(p, JL['knee'] + V(0, 5, 70), 112))                        # knee patch
     rope = torus(p, JR['knee'] + V(4, -105, 12), nrm(V(0.05, 1, 0.12)), 138, 11)           # cord under the knee
     rope = np.minimum(rope, torus(p, JR['knee'] + V(4, -128, 10), nrm(V(-0.04, 1, 0.1)), 134, 11))
-    return {SKIN: sk, PANTS: lg, BOOT: bt, SOLE: so, LEATHER: mn(ap, bl, bst, kp, rope), IRON: np.minimum(bk, bbk), PLAGA: plaga(p)}
+    # dirty linen bandage round the right upper arm (two turns), a rag tied on the right forearm
+    x = p[:, 0]; ang = np.arctan2(p[:, 2] - JR['sh'][2], p[:, 1] - JR['sh'][1])
+    bnd = np.maximum(sk - 7, np.abs(x + 735 - 16 * np.sin(ang) - 5 * np.sin(ang * 5)) - 52)
+    bnd = np.minimum(bnd, np.maximum(sk - 10, np.abs(x + 772 + 26 * np.sin(ang + 1.0)) - 30))
+    rag = np.maximum(sk - 8, np.abs(x + 1085 + 14 * np.sin(ang * 2 + 0.5)) - 26)
+    rag = np.minimum(rag, rcone(p, V(-1085, 1665 + 98, 60 + 30), V(-1040, 1665 + 150, 60 + 75), 15, 7))      # knot ends
+    rag = np.minimum(rag, rcone(p, V(-1085, 1665 + 98, 60 + 30), V(-1130, 1665 + 135, 60 - 10), 15, 7))
+    return {SKIN: sk, PANTS: lg, BOOT: bt, SOLE: so, LEATHER: mn(ap, bl, bst, kp, rope), IRON: np.minimum(bk, bbk), PLAGA: plaga(p), CLOTH: np.minimum(bnd, rag)}
 BODY_BOX = (V(-1420, -5, -480), V(1420, 2110, 560))
 
 # ---- mask ----------------------------------------------------------------------------------------
@@ -200,7 +216,7 @@ HDIR = nrm(V(0, 0, -1))                            # weapon: from the grip to th
 FD_R = nrm(JR['wr'] - JR['el']); GRIP = JR['wr'] + FD_R * 105
 def fist(p):
     d = ell(p, GRIP - FD_R * 22, V(86, 92, 84))
-    d = smin(d, rcone(p, JR['wr'] - FD_R * 60, JR['wr'] + FD_R * 30, 106, 96), 30)
+    d = smin(d, rcone(p, JR['wr'] - FD_R * 60, JR['wr'] + FD_R * 30, 84, 88), 30)
     for i in range(4):
         c = GRIP + HDIR * ((i - 1.5) * 41) + FD_R * 6
         f = torus(p, c, HDIR, 50, 22 - 1.5 * abs(i - 1.5))
@@ -215,7 +231,7 @@ def claw(p):
     n = V(0, -1, 0.12); n = nrm(n - FD_L * (n @ FD_L)); w = np.cross(FD_L, n)
     R = np.stack([w, FD_L, n])
     d = rbox(p, JL['wr'] + FD_L * 95 + n * 4, V(82, 90, 36), 32, R)
-    d = smin(d, rcone(p, JL['wr'] - FD_L * 60, JL['wr'] + FD_L * 30, 100, 92), 30)
+    d = smin(d, rcone(p, JL['wr'] - FD_L * 60, JL['wr'] + FD_L * 30, 82, 86), 30)
     def chain(base, lens, angs, r0, r1, wj=0.0):
         nonlocal d
         a = base; ang = 0.0; f = None

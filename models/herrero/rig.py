@@ -40,7 +40,7 @@ def weights(part):
     fixed = {'mask': 4, 'fist': 10, 'weapon': 10, 'claw': 16}
     if name in fixed: return np.tile([fixed[name], 0], (n, 1)), np.tile(np.float32([1, 0]), (n, 1))
     J_, W_ = auto_weights(v)
-    if name == 'body':
+    if name in ('body', 'legs'):
         bt = np.isin(part['mat'], (BOOT, SOLE)) & (v[:, 1] < 330)
         for s, legs in ((-1, (19, 20, 21)), (1, (23, 24, 25))):
             m = bt & (v[:, 0] * s > 0)

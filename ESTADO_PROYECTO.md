@@ -232,6 +232,13 @@ Reglas de trabajo del usuario:
      hombro, brazo, pecho): venas negras que engordan hacia el foco, piel necrosada gris, borde
      inflamado; 4 tentáculos de Plaga saliendo del cuello (material PLAGA, en body); ojos rojos tras la
      rendija (EYE, en mask); icor negro chorreando de las ranuras de la máscara al peto.
+   - v4 (el usuario: "subida grande, camino correcto"; el brazo sano estaba sin tocar y parece de juego
+     arcade: quiere que parezca una persona de verdad): anatomía real en los brazos (deltoides, bíceps/
+     tríceps separados, masas del antebrazo que se estrechan a una muñeca fina, codo y muñeca óseos),
+     clavículas y tendones del cuello; brazo derecho con venda de lino ensangrentada, trapo anudado,
+     vello, moreno de antebrazos, articulaciones enrojecidas, lunares, quemaduras de chispa y una
+     quemadura vieja; material CLOTH. La pieza body se parte en body (y>1100) y legs → 3 texturas 1024²
+     (0 torso/brazos/manos, 1 máscara/hierros/arma, 2 piernas/faldón/botas).
    - PENDIENTE (paso 4): formato del juego. em10.drs entrada 0 NO es el modelo (es un sub-archivo de 11
      entradas); hay que localizar y descifrar el modelo/texturas de un ganado (BIN/TPL), ver si admite
      pesos o es rígido por parte, su límite de polígonos (20.550 vértices tras partir por costuras UV:
