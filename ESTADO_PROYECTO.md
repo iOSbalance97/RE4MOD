@@ -665,3 +665,11 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   tools/mkch0txt.py; pasos con el stick forzado en pad.c; coordenadas de prueba; puerta B = fin
   de prueba → PlSelect(0), em_list_no −1 y el salto original a r100). Con Ashley se desactivan
   Recoil/Swap/Legs/Crouch y el mapeo de juego del mando (StealthFrame sigue: oído de los ganados).
+- **C0-02** (vídeo C0-01: recorrido completo; la ventana de la casa es la del juego; spawn en el bosque del
+  oeste de r111; cama de C en (2329, 3199, -9063); puerta de la casa por fuera (7169, -5545), dentro
+  (7309, -6724); planta baja (5644, -9100)): guardias en Keeper (rutina 1/1 sin Be_flg 0x100: solo el
+  em10FindCk del juego, cono 60°, pasos, muy cerca); puertas SceAt id 1 apagadas; zona "comprobar" de la
+  cama apagada hasta coger la llave (Cross); escena: SndCall(1,0x1E) + ganado con antorcha por EmSetEvent
+  (bit 1 a los 6 frames) y cámara SPF_CAM en la planta baja mirando a la puerta; B con llave = fin de la
+  Parte 1; captura = rutina del jugador 1 (derribo) → ROOM_JUMP(0x111) al último punto (inicio / cama).
+  Textos: atlas de letras I4 512x64 (tools/mkch0font.py → c/ch0_font.c) dibujado por hud.c Text().

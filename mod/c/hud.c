@@ -539,7 +539,6 @@ int StealthDiag(int i);
 void BarnFrame(void);
 void Ch0Frame(void);
 int Ch0Black(void); int Ch0Text(int k); int Ch0Coords(int i);
-extern const u8 ch0_t_hace[], ch0_t_salir[], ch0_t_fin[];
 void ModFrame(void)
 {
     mod_frame++;
@@ -651,11 +650,20 @@ static void BarnDraw(void)                         /* B88: the stealth panel; Le
     GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
 }
 
-/* C0-01: chapter 0 overlay: black screen, the two lines and the end text, Ashley's position (test) */
-static void TexQuad(const u8* img, int tw, int th, f32 x, f32 y, f32 w, f32 hh, u32 c)
+/* C0-01/02: chapter 0 overlay: black screen, the texts (glyph atlas, ch0_font.c), Ashley's position (test) */
+extern const u8 ch0_font[]; extern const u16 ch0_glyph[256][4];
+extern const int ch0_font_w, ch0_font_h, ch0_font_gh, ch0_font_space;
+static f32 TextW(const char* s, f32 k)
+{
+    f32 w = 0.0f;
+    for (; *s; s++) { u8 c = (u8)*s; w += c == ' ' ? (f32)ch0_font_space : ch0_glyph[c][3] * 0.25f; }
+    return w * k;
+}
+static void Text(const char* s, f32 cx, f32 y, f32 k, u32 c)     /* centred on cx; k = scale */
 {
     GXTexObj tx;
-    GXInitTexObj(&tx, img, tw, th, 0 /* I4 */, 0, 0, 0);
+    f32 x = cx - TextW(s, k) * 0.5f, iw = 1.0f / ch0_font_w, ih = 1.0f / ch0_font_h, gh = ch0_font_gh * k;
+    GXInitTexObj(&tx, ch0_font, ch0_font_w, ch0_font_h, 0 /* I4 */, 0, 0, 0);
     GXInitTexObjLOD(&tx, 1, 1, 0.0f, 0.0f, 0.0f, 0, 0, 0);
     GXLoadTexObj(&tx, 0);
     GXClearVtxDesc();
@@ -665,17 +673,32 @@ static void TexQuad(const u8* img, int tw, int th, f32 x, f32 y, f32 w, f32 hh, 
     GXSetTexCoordGen2(0, 1, 4, 60, 0, 125);
     GXSetTevOrder(0, 0, 0, 4);
     GXSetTevOp(0, 0);
-    GXBegin(0x80, 0, 4);
-    GXFIFO_F32 = x;     GXFIFO_F32 = y;      GXFIFO_F32 = 0.0f; GXFIFO_U32 = c; GXFIFO_F32 = 0.0f; GXFIFO_F32 = 0.0f;
-    GXFIFO_F32 = x + w; GXFIFO_F32 = y;      GXFIFO_F32 = 0.0f; GXFIFO_U32 = c; GXFIFO_F32 = 1.0f; GXFIFO_F32 = 0.0f;
-    GXFIFO_F32 = x + w; GXFIFO_F32 = y + hh; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c; GXFIFO_F32 = 1.0f; GXFIFO_F32 = 1.0f;
-    GXFIFO_F32 = x;     GXFIFO_F32 = y + hh; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c; GXFIFO_F32 = 0.0f; GXFIFO_F32 = 1.0f;
+    for (; *s; s++) {
+        u8 ch = (u8)*s; const u16* g = ch0_glyph[ch];
+        f32 w, u0, u1, v0, v1;
+        if (ch == ' ') { x += ch0_font_space * k; continue; }
+        if (!g[2]) continue;
+        w = g[2] * k; u0 = g[0] * iw; u1 = (g[0] + g[2]) * iw; v0 = g[1] * ih; v1 = (g[1] + ch0_font_gh) * ih;
+        x -= 2.0f * k;                                           /* the glyph cell's 2 px margin */
+        GXBegin(0x80, 0, 4);
+        GXFIFO_F32 = x;     GXFIFO_F32 = y;      GXFIFO_F32 = 0.0f; GXFIFO_U32 = c; GXFIFO_F32 = u0; GXFIFO_F32 = v0;
+        GXFIFO_F32 = x + w; GXFIFO_F32 = y;      GXFIFO_F32 = 0.0f; GXFIFO_U32 = c; GXFIFO_F32 = u1; GXFIFO_F32 = v0;
+        GXFIFO_F32 = x + w; GXFIFO_F32 = y + gh; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c; GXFIFO_F32 = u1; GXFIFO_F32 = v1;
+        GXFIFO_F32 = x;     GXFIFO_F32 = y + gh; GXFIFO_F32 = 0.0f; GXFIFO_U32 = c; GXFIFO_F32 = u0; GXFIFO_F32 = v1;
+        x += 2.0f * k + g[3] * 0.25f * k;
+    }
+}
+static void Line(const char* s, f32 cx, f32 y, f32 k, int a)    /* white text with a soft dark shadow */
+{
+    Text(s, cx + 1.5f * k, y + 1.5f * k, k, (u32)(a * 3 / 4));
+    Text(s, cx, y, k, 0xF2EEE600u | (u32)a);
 }
 static void Ch0Draw(void)
 {
-    Mtx44 p; Mtx m; int i;
-    int bk = Ch0Black(), a0 = Ch0Text(0), a1 = Ch0Text(1), a2 = Ch0Text(2), cx = Ch0Coords(0);
-    if (!bk && !a0 && !a1 && !a2 && cx == -999999) return;
+    Mtx44 p; Mtx m; int i, a[8], any = 0;
+    int bk = Ch0Black(), cx = Ch0Coords(0);
+    for (i = 0; i < 8; i++) { a[i] = Ch0Text(i); any |= a[i]; }
+    if (!bk && !any && cx == -999999) return;
     GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
     C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
     PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
@@ -687,9 +710,14 @@ static void Ch0Draw(void)
         Quad(96.0f, 70.0f, 3 * 96.0f, 26.0f, 0x000000A0, 0);
         for (i = 0; i < 3; i++) Num(98.0f + 96.0f * i, 74.0f, Ch0Coords(i), i == 1 ? 0x60FF60FF : 0xFFFFFFFF);
     }
-    if (a0) TexQuad(ch0_t_hace, 384, 64, 320.0f - 192.0f, 240.0f - 32.0f, 384.0f, 64.0f, 0xF2EEE600u | (u32)a0);
-    if (a1) TexQuad(ch0_t_salir, 512, 40, 320.0f - 256.0f, 372.0f, 512.0f, 40.0f, 0xFFFFFF00u | (u32)a1);
-    if (a2) TexQuad(ch0_t_fin, 512, 40, 320.0f - 256.0f, 220.0f, 512.0f, 40.0f, 0xFFFFFF00u | (u32)a2);
+    if (a[0]) Line("Hace 11 horas", 320.0f, 240.0f - 30.0f, 1.9f, a[0]);
+    if (a[1]) Line("\x93Tengo que salir de aqu\xed.\x94", 320.0f, 366.0f, 1.0f, a[1]);
+    if (a[2]) { Line("Est\xe1 cerrada.", 320.0f, 342.0f, 1.0f, a[2]); Line("Tiene que haber una llave en alg\xfan sitio.", 320.0f, 370.0f, 1.0f, a[2]); }
+    if (a[3]) Line("\x01 Coger la llave", 320.0f, 370.0f, 1.0f, a[3]);
+    if (a[4]) Line("Has cogido la llave.", 320.0f, 370.0f, 1.0f, a[4]);
+    if (a[5]) Line("La puerta se abre.", 320.0f, 370.0f, 1.0f, a[5]);
+    if (a[6]) Line("Ashley ha sido capturada", 320.0f, 224.0f, 1.3f, a[6]);
+    if (a[7]) Line("Fin de la Parte 1 (prueba)", 320.0f, 224.0f, 1.3f, a[7]);
     GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
 }
 

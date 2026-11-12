@@ -68,7 +68,7 @@ for k,a in HOOKS:
     while len(text)%0x20: text+=b'\0'
 # ---- C part (clang for the 750 + binutils ld), linked right after the asm blocks
 CMOD=TEXT_ADDR+len(text)
-C_SRCS=['c/item.c','c/pad.c','c/weapon.c','c/hud.c','c/icon.c','c/sil_data.c','c/mot_data.c','c/prefetch.c','c/legs.c','c/stealth.c','c/crouch.c','c/barn.c','c/ch0.c','c/ch0_text.c']; C_ASM=['c/hooks.s']
+C_SRCS=['c/item.c','c/pad.c','c/weapon.c','c/hud.c','c/icon.c','c/sil_data.c','c/mot_data.c','c/prefetch.c','c/legs.c','c/stealth.c','c/crouch.c','c/barn.c','c/ch0.c','c/ch0_font.c']; C_ASM=['c/hooks.s']
 C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame'),(0x80124A44,'hook_draw'),(0x800C5E84,'hook_dvdread'),(0x80169718,'hook_mesbar'),(0x8003EB6C,'hook_laser'),(0x80145A0C,'hook_hitchk'),(0x801472DC,'hook_sway'),(0x8003EA48,'hook_laserray'),(0x800BCD54,'hook_aimcam'),(0x800BDB00,'hook_cam'),(0x8011D47C,'hook_hud'),(0x80152E28,'hook_rjump'),(0x800CB20C,'hook_emlist')]
 def build_c(addr):
     objs=[]
