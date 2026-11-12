@@ -245,8 +245,8 @@ def weapon(p):
     q = (p - GRIP) @ WB.T                               # local: x along the beam, y up-ish
     x, y, z = q[:, 0], q[:, 1], q[:, 2]
     O = V(0, 0, 0)
-    hd = ccyl(q, V(-150, 0, 0), V(170, 0, 0), 31, 6)                                     # grip
-    hd = np.minimum(hd, ccyl(q, V(-185, 0, 0), V(-150, 0, 0), 44, 10))                   # pommel
+    hd = ccyl(q, V(-330, 0, 0), V(170, 0, 0), 31, 6)                                     # grip (B84: long enough for both hands)
+    hd = np.minimum(hd, ccyl(q, V(-365, 0, 0), V(-330, 0, 0), 44, 10))                   # pommel
     bm = rbox(q, V(170 + (BEAM_L - 170) / 2, 0, 0), V((BEAM_L - 170) / 2, 58, 58), 10)
     bm = np.maximum(bm, -(sph(q, V(520, 70, 20), 38)))                                   # chips
     bm = np.maximum(bm, -(sph(q, V(820, -30, -78), 42)))
@@ -267,7 +267,7 @@ def weapon(p):
     a = q - A
     return {WOOD: bm, IRON: np.minimum(an, hd)}
 def wbox():
-    c = [GRIP + WB.T @ V(x, y, z) for x in (-200, BEAM_L + 330) for y in (-110, 400) for z in (-170, 170)]
+    c = [GRIP + WB.T @ V(x, y, z) for x in (-380, BEAM_L + 330) for y in (-110, 400) for z in (-170, 170)]
     return box_of(c, 12)
 WEAPON_BOX = wbox()
 PARTS = [('body', body, BODY_BOX, 6.0, 1900), ('mask', mask, MASK_BOX, 2.5, 150), ('fist', fist, FIST_BOX, 3.0, 110),

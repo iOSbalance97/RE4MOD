@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B83** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B84** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -332,6 +332,14 @@ Reglas de trabajo del usuario:
      de los del ganado: rutina 1 0x10 Walk / 0x11 Dash → andar; 0x26 AxeAtk → golpe; 0x24 ThrowAxe →
      AxeAtk. El daño sigue siendo el del juego (AxeAtk barre desde la matriz del hacha oculta, ~1 m
      a lo largo del mango): POR COMPROBAR si coincide con el yunque.
+   - **B84**: el usuario pasa un golpe de Mixamo que le gusta (anim/mixamo/herrero/
+     Heavy_Weapon_Swing.fbx, arma a dos manos, 5,2 s). mkanim.swing(): retarget por rotaciones de
+     mundo (los dos esqueletos enlazan en T), frames 36–140 del clip (golpe abajo en 76–86 → Free 1;
+     sonido 4 antes; sigue girando hacia León hasta 8 antes). El puño se gira para que la viga siga el
+     mango (mano izq. → mano der. del clip), la viga se levanta si el yunque atravesaría el suelo, la
+     garra va por IK al mango 270 mm detrás de la empuñadura, la cadera se ajusta para que los pies
+     toquen el suelo. Modelo: mango alargado (empuñadura hasta −330 mm, pomo −365) para las dos manos
+     (model.py y model_hi.py). Sustituye al golpe procedural de B83 (smash() se queda en el archivo).
    - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
      em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
      material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.
