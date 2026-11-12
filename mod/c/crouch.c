@@ -246,6 +246,11 @@ void CrouchPress(void)
         if (want) { cur = CR_IDLE; phase = 0.0f; prev = -1; xf = 1.0f; }
     }
 }
+void CrouchStand(void)                     /* B90: a scene starts: stand up */
+{
+    if (!want) return;
+    want = 0; shot = CR_UP; shot_f = 0.0f; sxf = 0.0f;
+}
 int CrouchActive(void) { return want && w > 0.5f; }
 int CrouchLegs(void) { return want || w > 0.0f; }
 f32 CrouchDrop(void) { return drop; }

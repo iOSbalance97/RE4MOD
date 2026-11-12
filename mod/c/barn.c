@@ -11,6 +11,9 @@
  * Test build: Leon's position is shown at the top left while in r103 (to place the door exactly). */
 #include "game.h"
 #include "herrero_arc.h"
+void CrouchStand(void);
+#define SPF_SCEAT  0x00400000u            /* no area checks (the item the Ganado dropped, doors) */
+#define SPF_ACTBTN 0x00000100u            /* no action prompts */
 
 #define STAGE   G8(0x4FA8)
 #define ROOM    G8(0x4FA9)
@@ -157,7 +160,7 @@ void BarnFrame(void)
     if (!pG || !pl) return;
     b = Pad_data[0].button; press = b & ~pad_old; pad_old = b;
     if (STAGE != 1 || ROOM != 3) {                       /* left the farm: forget everything */
-        if (st) { STOPF &= ~(SPF_KEY | SPF_CAM | SPF_EM | SPF_PL); }
+        if (st) { STOPF &= ~(SPF_KEY | SPF_CAM | SPF_EM | SPF_PL | SPF_SCEAT | SPF_ACTBTN); }
         st = 0; list_no = -1; seen = 0; lock_n = 0; upper = 0; herrero = 0;
         return;
     }
@@ -201,11 +204,12 @@ void BarnFrame(void)
             a0 = *(f32*)(pl + 0xA4); a1 = atan2f_(dx - lx, dz - lz);
             ex = lx; ez = lz;
         }
-        STOPF |= SPF_KEY | SPF_CAM;
+        STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN;
+        CrouchStand();
         return;
     }
     case 3: {                                            /* the scene */
-        f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C), a, fx, fz, rx, rz;
+        f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C), a;
         t++;
         if (t == 36 && !herrero) herrero = HerreroSpawn(dx, 0.0f, dz, atan2f_(lx - dx, lz - dz));
         if (t == 40) {
@@ -215,20 +219,18 @@ void BarnFrame(void)
         a = a0;
         if (t > 52) a = a0 + Wrap(a1 - a0) * Sm((f32)(t - 52) / 34.0f);    /* Leon turns to the noise */
         *(f32*)(pl + 0xA4) = a; SetMat(pl, ex, ez, a);
-        fx = Sin(a); fz = Cos(a); rx = fz; rz = -fx;
         if (t < 96) {                                     /* on Leon's face, from the front */
             f32 sh = (t >= 40 && t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
             f32 fa = Sin(a0), fb = Cos(a0);
             Cam(lx + fa * 1350.0f + fb * 420.0f + sh, ly + 1700.0f + sh, lz + fb * 1350.0f - fa * 420.0f,
                 lx + fa * 60.0f, ly + 1560.0f, lz + fb * 60.0f, 38.0f);
-        } else {                                          /* over his shoulder, on El Herrero */
-            f32 hx = dx, hy = 1500.0f, hz = dz, k = Sm((f32)(t - 96) / 60.0f);
-            if (herrero) { hx = *(f32*)(herrero + 0x94); hy = *(f32*)(herrero + 0x98) + 1550.0f; hz = *(f32*)(herrero + 0x9C); }
-            Cam(lx - fx * (900.0f + 300.0f * k) - rx * 520.0f, ly + 1850.0f, lz - fz * (900.0f + 300.0f * k) - rz * 520.0f,
-                hx, hy, hz, 44.0f - 8.0f * k);
+        } else {                                          /* B90: down on the ground floor, facing the door: El Herrero coming in */
+            f32 hx = dx, hy = 1400.0f, hz = dz, k = Sm((f32)(t - 96) / 120.0f);
+            if (herrero) { hx = *(f32*)(herrero + 0x94); hy = *(f32*)(herrero + 0x98) + 1400.0f; hz = *(f32*)(herrero + 0x9C); }
+            Cam(dx + 900.0f, 1350.0f + 150.0f * k, dz - 4300.0f + 600.0f * k, hx, hy, hz, 46.0f - 8.0f * k);
         }
         if (t >= 300 || (t > 120 && (press & PAD_A))) {
-            STOPF &= ~(SPF_KEY | SPF_CAM); WindowsLock(0); st = 4; t = 0;
+            STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN); WindowsLock(0); st = 4; t = 0;
         }
         return;
     }
