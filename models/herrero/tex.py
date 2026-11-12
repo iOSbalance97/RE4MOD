@@ -160,6 +160,73 @@ def texcolour(name, fn, P, N):
     c = c * (1 - 0.7 * rustc[:, None]) + np.array([0.21, 0.085, 0.03], np.float32) * 0.7 * rustc[:, None]
     scuff = np.clip((vnoise(P * np.array([1, 0.2, 1], np.float32), 4.0) - 0.72) * 9, 0, 1) * ir * np.clip((ao - 0.7) * 4, 0, 1)
     c = c + np.array([0.07, 0.07, 0.075], np.float32) * scuff[:, None]
+    # ---- painted in the game's own way (studied on the disc: em18 / em2b textures): desaturated grey-browns,
+    # ---- thin dark crease lines with a light ridge beside them, long painted folds on cloth, dashed stitching
+    def aniso(Q, s_fast, s_slow, axis, seed):
+        sc = np.full(3, 1.0 / s_slow, np.float32); sc[axis] = 1.0 / s_fast
+        W_ = 26.0 * (fbm(Q + seed + 13, 90.0)[:, None] - 0.5)
+        return vnoise((Q + W_) * sc * 10.0 + seed, 10.0)
+    arm = np.abs(P[:, 0]) > 430
+    ax_u = np.where(arm, 0, 1)                                    # creases run round the limbs / across the trunk
+    def crease(Q, s_fast, s_slow, seed, wd):
+        n0 = np.where(arm, aniso(Q, s_fast, s_slow, 0, seed), aniso(Q, s_fast, s_slow, 1, seed))
+        dark = np.clip(1 - np.abs(n0 - 0.50) / wd, 0, 1); lite = np.clip(1 - np.abs(n0 - 0.50 - 2.2 * wd) / wd, 0, 1)
+        return dark, lite
+    if sk.any():
+        d1, l1 = crease(P, 7.0, 75.0, 3.0, 0.035); d2, l2 = crease(P + 40, 3.5, 34.0, 8.0, 0.045)
+        jw = np.zeros(len(P), np.float32)                         # deeper wrinkles at the joints and the neck
+        for j_ in (model.JR, model.JL):
+            for k_ in ('el', 'wr'): jw = np.maximum(jw, np.clip(1 - np.linalg.norm(P - j_[k_], axis=1) / 170.0, 0, 1))
+        jw = np.maximum(jw, np.clip(1 - np.linalg.norm(P - np.array([0, 1790, 200], np.float32), axis=1) / 260.0, 0, 1))
+        k1 = (0.42 + 0.5 * jw) * d1 + 0.22 * d2
+        c[sk] = c[sk] * (1 - np.clip(k1, 0, 0.8)[sk][:, None]) + (0.10 * l1 + 0.05 * l2)[sk][:, None] * np.array([0.9, 0.8, 0.7], np.float32) * 0.25
+        hatch = aniso(P + 99, 2.6, 16.0, 2, 5.0)                 # fine cross-grain of the skin
+        c[sk] *= (0.88 + 0.24 * hatch[sk])[:, None]
+        mott = np.clip((fbm(P + 808, 55.0) - 0.52) * 5, 0, 1)    # dark, dirty patches
+        c[sk] *= (1 - 0.38 * mott[sk])[:, None]
+        sc_ = np.clip(1 - np.abs(aniso(P + 5, 60.0, 4.0, 1, 21.0) - 0.5) / 0.012, 0, 1) * (vnoise(P + 3, 130.0) > 0.62) * sk   # scars: pink slashes
+        c = c * (1 - 0.7 * sc_[:, None]) + np.array([0.30, 0.13, 0.11], np.float32) * 0.7 * sc_[:, None]
+    fab = (mat == PANTS) | (mat == CLOTH)
+    if fab.any():
+        Q = P[fab]
+        fold = vnoise((Q + 20.0 * (fbm(Q, 120.0)[:, None] - 0.5)) * np.array([1 / 15.0, 1 / 260.0, 1 / 15.0], np.float32) * 10, 10.0)   # long folds down the leg
+        fold2 = vnoise(Q * np.array([1 / 60.0, 1 / 9.0, 1 / 60.0], np.float32) * 10 + 7, 10.0)                                       # bunching across
+        bunch = np.clip((Q[:, 1] - 250) / 150, 0, 1) * np.clip((700 - Q[:, 1]) / 250, 0, 1)
+        c[fab] *= (0.50 + 0.85 * fold + (0.45 * (fold2 - 0.5)) * bunch)[:, None]
+        weave = 0.90 + 0.10 * np.sin(Q[:, 1] * 2.1) * np.sin((Q[:, 0] + Q[:, 2]) * 2.1)
+        c[fab] *= weave[:, None]
+        # sewn patches with dashed stitching (thigh, shin, seat)
+        for (cx, cy, hw, hh, zs) in ((-330, 760, 75, 90, 1), (330, 450, 60, 70, 1), (-150, 900, 85, 70, -1), (270, 880, 70, 80, -1)):
+            ins = (np.abs(Q[:, 0] - cx) < hw) & (np.abs(Q[:, 1] - cy) < hh) & (Q[:, 2] * zs > 0)
+            edge = np.minimum(hw - np.abs(Q[:, 0] - cx), hh - np.abs(Q[:, 1] - cy))
+            st = ins & (np.abs(edge - 9) < 2.6) & (np.sin((Q[:, 0] + Q[:, 1]) * 0.55) > -0.2)
+            cc_ = c[fab]; cc_[ins] *= np.array([0.80, 0.78, 0.70], np.float32); cc_[st] = np.array([0.33, 0.30, 0.24], np.float32); c[fab] = cc_
+    if le.any():
+        Q = P[le]
+        crack = np.clip(1 - np.abs(fbm(Q + 70, 26.0) - 0.5) / 0.03, 0, 1) + 0.6 * np.clip(1 - np.abs(fbm(Q + 170, 11.0) - 0.5) / 0.035, 0, 1)
+        fold = vnoise(Q * np.array([1 / 22.0, 1 / 300.0, 1 / 22.0], np.float32) * 10 + 3, 10.0)
+        hang = np.clip((1250 - Q[:, 1]) / 200, 0, 1)             # the skirt hangs in folds, the bib is stretched
+        c[le] *= ((1 - 0.5 * np.clip(crack, 0, 1)) * (1 - hang * 0.45 + hang * 0.8 * fold))[:, None]
+        # stitching: bib edges, pocket, hem
+        x_ = np.abs(Q[:, 0]); y_ = Q[:, 1]
+        wtop = 175 + np.clip((1660 - y_) / 300, 0, 1) * 175
+        dash = np.sin((Q[:, 0] + y_) * 0.5) > -0.25
+        st = ((np.abs(x_ - (wtop - 16)) < 3) & (y_ > 1270) & (y_ < 1650) & (Q[:, 2] > 150)) | ((np.abs(y_ - 1648) < 3) & (x_ < 160) & (Q[:, 2] > 150))
+        st |= ((np.abs(np.maximum(x_ - 150, np.abs(y_ - 880) - 95) + 13) < 3) & (Q[:, 2] > 150))
+        st |= (np.abs(y_ - 1128 - 26) < 2.5) | (np.abs(y_ - 1128 + 26) < 2.5)
+        cc_ = c[le]; cc_[st & dash] = np.array([0.30, 0.25, 0.17], np.float32); c[le] = cc_
+    if ir.any():
+        Q = P[ir]
+        run = vnoise(Q * np.array([1 / 9.0, 1 / 140.0, 1 / 9.0], np.float32) * 10 + 11, 10.0)                   # rust runs down the plates
+        rr = np.clip((run - 0.52) * 4, 0, 1) * np.clip((0.9 - ao[ir]) * 3 + 0.35, 0, 1)
+        c[ir] = c[ir] * (1 - 0.75 * rr[:, None]) + np.array([0.16, 0.06, 0.022], np.float32) * 0.75 * rr[:, None]
+        scr = np.clip(1 - np.abs(aniso(Q, 45.0, 2.2, 0, 31.0) - 0.5) / 0.012, 0, 1) * (vnoise(Q + 8, 60.0) > 0.55) + np.clip(1 - np.abs(aniso(Q + 9, 50.0, 2.0, 1, 37.0) - 0.5) / 0.010, 0, 1) * (vnoise(Q + 80, 60.0) > 0.6)
+        c[ir] += 0.10 * np.clip(scr, 0, 1)[:, None]
+        ham = vnoise(Q, 16.0); c[ir] *= (0.72 + 0.5 * ham)[:, None]                                            # hammered, uneven plate
+    lum = (c @ np.array([0.30, 0.59, 0.11], np.float32))[:, None]
+    keep = ((mat == HOT) | (mat == EYE))[:, None]
+    desat = np.where((mat == PLAGA)[:, None], 0.15, 0.38)
+    c = np.where(keep, c, c * (1 - desat) + lum * desat * np.array([1.0, 0.96, 0.90], np.float32))
     # baked relief: light from above-front
     L = np.array([0.25, 0.9, 0.35], np.float32); L /= np.linalg.norm(L)
     T = L - N * (N @ L)[:, None]                             # light dir projected on the surface
@@ -175,7 +242,7 @@ def texcolour(name, fn, P, N):
     c[hot] = np.array([1.0, 0.36, 0.05], np.float32) * (0.8 + 0.5 * vnoise(P[hot], 15.0))[:, None]
     grime = (0.80 + 0.35 * fbm(P + 400, 45.0))[:, None]
     grime[hot | ey] = 1.0
-    return np.clip(c * shade[:, None] * grime * 1.2, 0, 1) ** (1 / 2.2)   # display space
+    return np.clip(c * shade[:, None] * grime * 1.05, 0, 1) ** (1 / 2.2)   # display space
 def bake(parts, uvs):
     imgs = [np.zeros((SZ, SZ, 3), np.float32) for _ in range(NAT)]; msk = [np.zeros((SZ, SZ), bool) for _ in range(NAT)]
     for p, uv in zip(parts, uvs):

@@ -239,6 +239,17 @@ Reglas de trabajo del usuario:
      vello, moreno de antebrazos, articulaciones enrojecidas, lunares, quemaduras de chispa y una
      quemadura vieja; material CLOTH. La pieza body se parte en body (y>1100) y legs → 3 texturas 1024²
      (0 torso/brazos/manos, 1 máscara/hierros/arma, 2 piernas/faldón/botas).
+   - v5 (el usuario: proporciones bien; falta detalle en cada punto; "fíjate en el Dr. Salvador y copia
+     la forma en que está hecho", que parezca un personaje original del juego). Estudiadas texturas
+     reales del disco con models/herrero/tpl.py (decodificador TPL: CMPR, C8+paleta, I4/I8...):
+     em18.drs = el Buhonero (no el de la motosierra), em2b.drs = El Gigante. **Aún no localizado el
+     .drs del Dr. Salvador** (buscar entre em1x/em2x-em3x por sus texturas). Hallazgos de formato:
+     .drs parte 0 = archivo con entradas; em2b: por variante [modelo ~200 KB][~111 KB][~41 KB][TPL
+     229 KB con 256²+512²+256²+256² CMPR]; em18: TPL de 256², 256×128 y 128² CMPR + C8 pequeñas. O sea:
+     un personaje usa ~1×512² + 3×256² (el Herrero usa 3×1024²: habrá que reducir). Estilo aplicado a
+     tex.py: paleta gris-parda desaturada, arrugas finas oscuras con borde claro siguiendo el miembro,
+     pliegues largos pintados en la tela, parches cosidos y pespuntes, cuero cuarteado, óxido en
+     regueros y arañazos en el hierro.
    - PENDIENTE (paso 4): formato del juego. em10.drs entrada 0 NO es el modelo (es un sub-archivo de 11
      entradas); hay que localizar y descifrar el modelo/texturas de un ganado (BIN/TPL), ver si admite
      pesos o es rígido por parte, su límite de polígonos (20.550 vértices tras partir por costuras UV:
