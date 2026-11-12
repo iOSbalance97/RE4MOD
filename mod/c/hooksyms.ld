@@ -15,3 +15,5 @@ ret_laserray       = 0x8003EA4C;
 ret_aimcam         = 0x800BCD58;
 ret_cam            = 0x800BDB04;
 ret_hud            = 0x8011D480;
+ret_rjump          = 0x80152E2C;
+ret_emlist         = 0x800CB210;

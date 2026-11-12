@@ -21,6 +21,8 @@ u32 StealthPad(u32 out);
 int StealthKilling(void);
 static u32 prev_raw;
 extern int barn_padlock;                    /* barn.c */
+extern int ch0_padlock, ch0_stick;          /* ch0.c: chapter 0 intro (no input / a forced stick) */
+extern s8 ch0_sx, ch0_sy;
 u16 barn_pad;                               /* the remapped buttons before barn.c's lock */
 
 void PadRemap(void)
@@ -38,6 +40,7 @@ void PadRemap(void)
     r3 = !r2 && p->triggerRight > 0x40;
     out = in & (PAD_LEFT | PAD_RIGHT | PAD_DOWN | PAD_UP | PAD_START);
 
+    if (modvars[VB_GAMEPLAY] && G8(0x4FC4) == 1) modvars[VB_GAMEPLAY] = 0;   /* C0-01: Ashley keeps the plain layout */
     if (modvars[VB_GAMEPLAY]) {
         modvars[VB_GAMEPLAY]--;
         out &= ~WeaponPad(in, p->stickX, p->stickY);      /* D-pad: quick weapons */
@@ -76,6 +79,10 @@ void PadRemap(void)
     }
     prev_raw = p->button;
     barn_pad = (u16)out;
+    if (ch0_padlock) {                             /* C0-01: chapter 0 intro: no input, or the scripted steps */
+        out = 0; p->substickX = p->substickY = 0;
+        p->stickX = ch0_stick ? ch0_sx : 0; p->stickY = ch0_stick ? ch0_sy : 0;
+    }
     if (barn_padlock) {                            /* B105: barn.c's scene: Leon gets no input at all (sticks too:
                                                       the camera's C-stick look and his walk) */
         out = 0; p->stickX = p->stickY = p->substickX = p->substickY = 0;

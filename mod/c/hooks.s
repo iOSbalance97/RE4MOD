@@ -227,3 +227,38 @@ hook_hud:
 hud_top: .float 182.0
 hud_off: .float 600.0
 hud_dy: .float 60.0
+
+# C0-01: SceAtExecRoomJump (0x80152E28) entry: Ch0Jump may change the room / pos / rot (the intro's jump).
+    .globl hook_rjump
+hook_rjump:
+    stwu  r1,-32(r1)
+    mflr  r0
+    stw   r0,36(r1)
+    stw   r3,8(r1)
+    stw   r4,12(r1)
+    stw   r5,16(r1)
+    stw   r6,20(r1)
+    addi  r3,r1,8
+    bl    Ch0Jump
+    lwz   r0,36(r1)
+    mtlr  r0
+    lwz   r3,8(r1)
+    lwz   r4,12(r1)
+    lwz   r5,16(r1)
+    lwz   r6,20(r1)
+    addi  r1,r1,32
+    stwu  r1,-192(r1)         # original instruction
+    b     ret_rjump
+
+# C0-01: EmSetFromList (0x800CB20C) entry: the chapter 0 guards replace r111's list before it is read.
+    .globl hook_emlist
+hook_emlist:
+    stwu  r1,-16(r1)
+    mflr  r0
+    stw   r0,20(r1)
+    bl    Ch0EmList
+    lwz   r0,20(r1)
+    mtlr  r0
+    addi  r1,r1,16
+    stwu  r1,-80(r1)          # original instruction
+    b     ret_emlist

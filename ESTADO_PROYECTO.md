@@ -640,3 +640,28 @@ Reglas de trabajo del usuario:
   revisar; escribe c/take_data.h (necesita em10.drs extraído en /home/claude/disc/ext1/files/em/;
   extractor de ficheros de ISO: `python3 gciso.py iso extract 'em/em10.drs' destino`).
 - Ojo: archivos con piel (>1,8 MB) llegan cortados en la subida → pedir "Without Skin".
+
+## 7. Capítulo 0 (rama `capitulo0`, builds C0-NN; no mezclar con `mod-builds`)
+Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herramientas en `tools/ch0/`.
+- **Descompresor yz2 de las salas (.das)**: `tools/ch0/gen.py` traduce el asm del decomp
+  (src/game/yz2asm.cpp) a C (`dec.c`); `main.c` hace lo de Yz2DecodeExec. Compilar:
+  `clang -O2 -w -o yz2 main.c dec.c`; uso `./yz2 rNNN.das 0x400 rNNN.bin` (cabecera de texto
+  "empaquetado\tdesempaquetado\n" en 0x400). Salida = archivo con entradas (arc.py: n, offsets
+  desde 0x10, etiquetas de 4 letras): AEV, SAT, ITA, RTP, ESL no (ESL en etc/emleonNN.esl).
+- `aev.py` (áreas: puertas id 1 con destino/next_pos +0x5C/+0x6C), `satdraw.py` (colisión SAT:
+  cabecera 0x80 + nº en byte 1 + offsets; ficheros con versión 0x20, 0x14 de cabecera, vértices,
+  normales, aristas, polígonos de 20 B), `place.py` (altura de suelo y distancia a muros).
+- r111 = pueblo de noche (mismo mapa y coordenadas que r101). Puertas r101: 0→r100 (camino),
+  1→r105, 2→r103, 25→r102 = **la puerta del símbolo B del mapa del usuario** (centro 19713, 2003).
+  Entrada desde el camino (puerta de r100 a r101): (-52144, 91, 22524), ángulo 2.122.
+- Mapa del usuario → mundo: afín ajustada con las 4 puertas (`map_inv.npy`, `map_fwd.npy`;
+  `check.py` dibuja el pueblo con la orientación del mapa del juego, `guardias_parte1.png`).
+- PAL: SceAtExecRoomJump 0x80152E28 (r3 sala, r4 pos, r5 rot, r6), PlSelect 0x80143984,
+  EmSetFromList 0x800CB20C, pl_type pG+0x4FC4, em_list_no pG+0x4FAF. Ganado con antorcha:
+  flag de lista 0x00020000 (Wep_type 9); el bit 8 hace que miren siempre al jugador (no usarlo).
+- **C0-01**: ch0.c (Ch0Jump en la entrada de SceAtExecRoomJump: el salto de la intro r120→0x100 pasa
+  a PlSelect(1) + r111 en la entrada; Ch0EmList en la entrada de EmSetFromList: fuera los 0x17 de
+  r111 y dentro 11 guardias con antorcha; intro con pantalla negra y textos I4 de
+  tools/mkch0txt.py; pasos con el stick forzado en pad.c; coordenadas de prueba; puerta B = fin
+  de prueba → PlSelect(0), em_list_no −1 y el salto original a r100). Con Ashley se desactivan
+  Recoil/Swap/Legs/Crouch y el mapeo de juego del mando (StealthFrame sigue: oído de los ganados).
