@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B99** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B100** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -494,6 +494,18 @@ Reglas de trabajo del usuario:
      · Ganados de fuera: desde que León entra al granero hasta el fin de la escena, cada Ganado fuera del
        granero queda en Keeper (Guard_r 0, Be_flg 0x100): quieto mirando. Al acabar: su Guard_r, flag
        bit 1 y Wait → saben dónde está León y vienen.
+   - **B100** (vídeo B99: escena bien; el Herrero desaparece LEJOS de la cámara, a ~6 m, en plena puerta;
+     León también desaparece al andar; hueco de control antes del cartel). CAUSA REAL (de B88 a B99):
+     con SPF_CAMERA, CameraMove (camera.cpp) hace la vista (v_mat) con param, pero pG->Camera.mat —con la
+     que VIEW::orientation() (view.cpp) gira el frustum de recorte— solo se copia de CamCtrl, que SPF_CAMERA
+     para: todo se recortaba con el frustum de la cámara de juego congelada → un personaje solo se veía
+     dentro de lo que veía ESA cámara (por eso dependía de dónde estaba León). Arreglo: Cam() rehace
+     pG->Camera.mat (+0x74), Up/Look/Right (+0xC4/D0/DC) como CameraSetOrientationZeroRoll.
+     · Cartel del sigilo: sale el primer frame libre arriba (antes 20) y con SPF_CAM (la cámara no gira).
+     · León: sin el giro rápido (daba un paso hacia la ventana): el andar de evento le gira (0,2 rad/f) y
+       le lleva; la cámara sigue en su cara 26 frames y luego baja a sus pies; al llegar se queda quieto.
+     · Cámara final: del pie de la escalera se aleja y se centra en (−13300, 1750, −7450) en 70 frames,
+       a 4,5 m de la marca del Herrero, siguiéndole.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

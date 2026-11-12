@@ -85,6 +85,9 @@ static const f32 WP[][2] = { { -13256.0f, -2179.0f }, { -12837.0f, -2096.0f }, {
 #define LC_X (-12440.0f)
 #define LC_Y 163.0f
 #define LC_Z (-7749.0f)
+#define END_X (-13300.0f)                /* B100: where the camera ends: the barn's back middle, 4.5 m from MARK */
+#define END_Y 1750.0f
+#define END_Z (-7450.0f)
 void HerreroRoarSnd(u8* e);
 static int hph, hph_t;                  /* B98: his scripted entrance: 0 walk in, 1 roar, 2 idle; frame it began */
 static f32 hlx, hlz;                    /* his position last frame */               /* tracking camera */                         /* test: 1 create failed, 2 bad archive, 3 created; +10*routine */
@@ -100,8 +103,8 @@ static f32 Sin(f32 a)
 }
 static f32 Cos(f32 a) { return Sin(a + 1.57079633f); }
 static f32 Sq(f32 x) { f32 r = x > 1.0f ? x : 1.0f; int i; if (x <= 0.0f) return 0.0f; for (i = 0; i < 14; i++) r = 0.5f * (r + x / r); return r; }
-static f32 Wrap(f32 a) { while (a > 3.14159265f) a -= 6.2831853f; while (a < -3.14159265f) a += 6.2831853f; return a; }
-static void SetMat(u8* m, f32 x, f32 z, f32 a)
+static __attribute__((unused)) f32 Wrap(f32 a) { while (a > 3.14159265f) a -= 6.2831853f; while (a < -3.14159265f) a += 6.2831853f; return a; }
+static __attribute__((unused)) void SetMat(u8* m, f32 x, f32 z, f32 a)
 {
     f32* q = (f32*)(m + 0x0C); f32 s = Sin(a), c = Cos(a);
     q[0] = c; q[1] = 0.0f; q[2] = s; q[3] = x; q[4] = 0.0f; q[5] = 1.0f; q[6] = 0.0f; q[8] = -s; q[9] = 0.0f; q[10] = c; q[11] = z;
@@ -236,6 +239,26 @@ static void Cam(f32 cx, f32 cy, f32 cz, f32 tx, f32 ty, f32 tz, f32 fovy)
 {
     CAMP[0] = cx; CAMP[1] = cy; CAMP[2] = cz; CAMP[3] = tx; CAMP[4] = ty; CAMP[5] = tz; CAMP[6] = 0.0f; CAMP[7] = fovy;
     CAMP[8] = 0.0f; CAMP[9] = 1.0f; CAMP[10] = 0.0f;               /* Up */
+    /* B100: THE reason El Herrero (and in B99 Leon) vanished since B88: with SPF_CAMERA, CameraMove builds
+     * the view (v_mat) from param, but pG->Camera.mat -- the camera-to-world matrix VIEW::orientation()
+     * turns the cull frustum with (view.cpp) -- is only ever copied from CamCtrl, which SPF_CAMERA stops:
+     * every model was culled against the frozen game camera's frustum, so a character was drawn only
+     * while inside what THAT camera saw (why it depended on where Leon stood). Rebuilt here like
+     * CameraSetOrientationZeroRoll (cam_sys.cpp): columns right, up, look (pos - at), pos; Up/Look/Right. */
+    {
+        f32* m = (f32*)(pG + 0x74);                    /* pG->Camera.mat (3x4, rows) */
+        f32 lx = cx - tx, ly = cy - ty, lz = cz - tz, rx, rz, ux, uy, uz, n;
+        n = Sq(lx * lx + ly * ly + lz * lz); if (n < 1.0f) n = 1.0f; lx /= n; ly /= n; lz /= n;
+        rx = lz; rz = -lx;                             /* (0,1,0) x look */
+        n = Sq(rx * rx + rz * rz); if (n < 1e-4f) { rx = 1.0f; rz = 0.0f; n = 1.0f; }
+        rx /= n; rz /= n;
+        ux = ly * rz; uy = lz * rx - lx * rz; uz = -ly * rx;   /* look x right */
+        m[0] = rx; m[1] = ux; m[2] = lx; m[3] = cx;
+        m[4] = 0.0f; m[5] = uy; m[6] = ly; m[7] = cy;
+        m[8] = rz; m[9] = uz; m[10] = lz; m[11] = cz;
+        m = (f32*)(pG + 0x74 + 0xC4);                  /* Up, Look, Right */
+        m[0] = ux; m[1] = uy; m[2] = uz; m[3] = lx; m[4] = ly; m[5] = lz; m[6] = rx; m[7] = 0.0f; m[8] = rz;
+    }
 }
 
 int BarnPanel(void) { return st == 1; }
@@ -334,12 +357,14 @@ void BarnFrame(void)
         lx = *(f32*)(pl + 0x94); lz = *(f32*)(pl + 0x9C); ux = *(f32*)(upper + 0x94); uz = *(f32*)(upper + 0x9C);
         if (*(f32*)(pl + 0x98) > 2500.0f && (lx - ux) * (lx - ux) + (lz - uz) * (lz - uz) < 12000.0f * 12000.0f
             && pl[0xFC] == 0 && (pl[0xFD] <= 3 || pl[0xFD] == 6)) {
-            if (++t >= 20) { st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_KEY | SPF_EM | SPF_PL; MusicQuiet(); }
+            /* B100: the very first free frame up there (B99 left 20: the camera could be turned, and it kept
+             * turning under the panel); the camera stays put under the panel (SPF_CAM) */
+            st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_KEY | SPF_EM | SPF_PL | SPF_CAM; MusicQuiet();
         } else t = 0;
         return;
     }
     case 1:                                              /* the tutorial panel */
-        if (++t > 20 && (press & PAD_A)) { STOPF &= ~(SPF_KEY | SPF_EM | SPF_PL); st = 2; t = 0; }
+        if (++t > 20 && (press & PAD_A)) { STOPF &= ~(SPF_KEY | SPF_EM | SPF_PL | SPF_CAM); st = 2; t = 0; }
         return;
     case 2: {                                            /* until that Ganado is dead */
         u8* e = EmFind(list_no);
@@ -363,14 +388,13 @@ void BarnFrame(void)
             }
             if (best < 500.0f * 500.0f && wi < NWP - 1) wi++;
             a1 = atan2f_(WP[wi][0] - lx, WP[wi][1] - lz);   /* where he will face after the turn */
-            a0 = Wrap(a1 + 3.14159265f);                   /* back to it now (a cut: the camera is on his face) */
+            a0 = *(f32*)(pl + 0xA4);                       /* B100: as he is (B99's quick turn stepped him toward the window) */
             ex = lx; ez = lz;
         }
         STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN;
         CrouchStand();
         /* B96: Leon in the game's event routine (cPlayer::beginEvent(0): routine 5, idle, no pad) */
         PlVirt(pl, 16, 0);
-        *(f32*)(pl + 0xA4) = a0; SetMat(pl, ex, ez, a0);
         STA1 |= STA_SUSPEND; *(u32*)pl |= 0x800;          /* B92: the game's own event pause: only Leon and El Herrero move */
         turn_t = 0;
         return;
@@ -407,16 +431,9 @@ void BarnFrame(void)
         /* ---- Leon */
         if (ph == 0) {                                    /* hears the door, turns where he is */
             if (t == 40) SndCall(1, 0x1E, 0, 0, 0, 0);   /* a door kicked in (Leon's bank, always loaded) */
-            if (t == 48) {                                /* his quick 180 turn (m_MotTbl 0xB/0xC, hurt 0x6B/0x6C) */
-                void** tb = *(void***)(pl + 0x424);
-                if (tb && tb[0xB] && tb[0x6B]) { PL_MOTSET(pl, tb[0xB], tb[0xC], tb[0x6B], tb[0x6C], 5, 0); turn_t = t; }
-            }
-            if (t == 69) {                                /* turned: idle facing the way to the ladder, then walks */
-                PlVirt(pl, 16, 0);
-                *(f32*)(pl + 0xA4) = a1; SetMat(pl, lx, lz, a1);
-                cex = lx - Sin(a1) * 1700.0f; cey = ly + 650.0f; cez = lz - Cos(a1) * 1700.0f;
-                ctx = lx; cty = ly + 250.0f; ctz = lz;
-                WalkTo(pl, wi); best_d = 1e30f; ph = 1; ph_t = t;
+            if (t == 46) {                                /* B100: the game's event walk turns him round on the spot (its
+                                                             own turn motion, quick) and walks him off toward the ladder */
+                WalkTo(pl, wi); *(f32*)(pl + 0x400) = 0.2f; best_d = 1e30f; ph = 1; ph_t = t;
             }
             {   /* on his face, from the front; a shake with the bang */
                 f32 sh = (t >= 40 && t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
@@ -428,7 +445,7 @@ void BarnFrame(void)
                                                              the loft to almost the ladder; the camera low at his feet */
             f32 qx = WP[wi][0] - lx, qz = WP[wi][1] - lz, d = qx * qx + qz * qz;
             f32 fa = Sin(*(f32*)(pl + 0xA4)), fb = Cos(*(f32*)(pl + 0xA4));
-            if (d < best_d - 2500.0f) { best_d = d; stuck = 0; } else stuck++;
+            if (d < best_d - 2500.0f) { best_d = d; stuck = 0; } else if (t > ph_t + 30) stuck++;
             if (wi < NWP - 1 && (d < 600.0f * 600.0f || stuck > 45)) {      /* next point, without stopping */
                 wi++; best_d = 1e30f; stuck = 0;
                 *(f32*)(pl + 0x404) = WP[wi][0]; *(f32*)(pl + 0x408) = ly; *(f32*)(pl + 0x40C) = WP[wi][1];
@@ -437,9 +454,18 @@ void BarnFrame(void)
                 PlVirt(pl, 16, 0);                        /* there: stands */
                 ph = 2; ph_t = t; c0x = cex; c0y = cey; c0z = cez; t0x = ctx; t0y = cty; t0z = ctz;
             }
-            CamTo(lx - fa * 1700.0f + fb * 500.0f, ly + 650.0f, lz - fb * 1700.0f - fa * 500.0f,
-                  lx + fa * 400.0f, ly + 250.0f, lz + fb * 400.0f, 0.10f, 0.15f);
-            Cam(cex, cey, cez, ctx, cty, ctz, 46.0f);
+            if (t < ph_t + 26) {                          /* the turn, still on his face */
+                f32 sh = (t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
+                f32 ga = Sin(a0), gb = Cos(a0);
+                Cam(lx + ga * 1350.0f + gb * 420.0f + sh, ly + 1700.0f + sh, lz + gb * 1350.0f - ga * 420.0f,
+                    lx + ga * 60.0f, ly + 1560.0f, lz + gb * 60.0f, 38.0f);
+            } else {                                      /* then low, at his feet */
+                if (t == ph_t + 26) { cex = lx - fa * 1700.0f + fb * 500.0f; cey = ly + 650.0f; cez = lz - fb * 1700.0f - fa * 500.0f;
+                                      ctx = lx + fa * 400.0f; cty = ly + 250.0f; ctz = lz + fb * 400.0f; }
+                CamTo(lx - fa * 1700.0f + fb * 500.0f, ly + 650.0f, lz - fb * 1700.0f - fa * 500.0f,
+                      lx + fa * 400.0f, ly + 250.0f, lz + fb * 400.0f, 0.10f, 0.15f);
+                Cam(cex, cey, cez, ctx, cty, ctz, 46.0f);
+            }
         } else if (ph == 2) {                             /* to the top of the ladder, at head height */
             f32 k = Sm((f32)(t - ph_t) / 30.0f);
             cex = c0x + (LA_X - c0x) * k; cey = c0y + (LA_Y + 1300.0f - c0y) * k; cez = c0z + (LA_Z - c0z) * k;
@@ -462,10 +488,12 @@ void BarnFrame(void)
                     SndCall(1, 0x1E, 0, 0, 0, 0); MusicOn(); music = 1;
                 }
             }
-            if (t >= ph_t + 100) { ph = 4; ph_t = t; }
-        } else {                                          /* at the foot of the ladder: watching him come */
-            f32 hx = DOOR_X, hy = 163.0f, hz = DOOR_IN;
+            if (t >= ph_t + 100) { ph = 4; ph_t = t; c0x = cex; c0y = cey; c0z = cez; }
+        } else {                                          /* B100: from the foot of the ladder on, back and to the middle
+                                                             (out of the ladder; Leon walked there in the videos), watching him */
+            f32 hx = DOOR_X, hy = 163.0f, hz = DOOR_IN, k = Sm((f32)(t - ph_t) / 70.0f);
             if (herrero) { hx = *(f32*)(herrero + 0x94); hy = *(f32*)(herrero + 0x98); hz = *(f32*)(herrero + 0x9C); }
+            cex = c0x + (END_X - c0x) * k; cey = c0y + (END_Y - c0y) * k; cez = c0z + (END_Z - c0z) * k;
             ctx += (hx - ctx) * 0.08f; cty += (hy + 1250.0f - cty) * 0.08f; ctz += (hz - ctz) * 0.08f;
             Cam(cex, cey, cez, ctx, cty, ctz, 42.0f);
             if ((hph == 2 && t > hph_t + 25) || !herrero || t > ph_t + 330) t = 2000;   /* walked in, roared: back to the game */
