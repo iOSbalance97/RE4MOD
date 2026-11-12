@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B87** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B88** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -368,7 +368,30 @@ Reglas de trabajo del usuario:
      Sonidos de seq de em10: Se 1/2 pasos andar, 3/4 pasos correr, 5/6 golpes de cuerpo, 120, 62
      (serie), 124–127, 148, 169–171 sin identificar. GRITO GRAVE pendiente: no hay forma de oírlos
      aquí; los bancos están en los .das de cada sala (core.das común) → descifrar y elegir/sintetizar.
-   - PENDIENTE Herrero: grito GRAVE (usuario); luego registrarlo como enemigo nuevo.
+   - PENDIENTE Herrero: grito GRAVE (usuario).
+   - **B88 – Herrero como enemigo NUEVO + escena del granero** (granja r103, stage 1 room 3; el Ganado de
+     arriba es la entrada 99 de emleon00.esl, id 0x12, horca). Se acabó sustituir: em10/13/15/17 vuelven
+     a ser los originales y em12.drs lleva 4 entradas extra en sus huecos vacíos 690–693 (antes del REL):
+     BIN del Herrero, su TPL, una COPIA de la tabla de offsets del archivo rebasada a sí misma con las
+     palabras 0x1BC/0x1BD (EM10_BIN_BODY/TPL_BODY de Em10Set) apuntando a nuestro cuerpo, y la textura I4
+     del panel de sigilo (mod/tools/mktut.py). barn.c crea el Herrero como EmSetEvent PAL (0x800CB76C:
+     create 0x801DE5F8 sobre EmMgr 0x80283160, campos de la lista, move por la vtable +40/+44) pero antes
+     del primer move apunta su subArc/subArc2 (+0x378/+0x37C) a esa tabla: ARC(no) sigue siendo válido
+     para todo y da nuestro cuerpo (tipo 0, flag 0x20000000 = arma clase hacha → rutina 0x26 = mazazo).
+     Datos PAL: Em_list pG+0x52F4 (32 B), stage/room pG+0x4FA8/9, Stop_flg pG+0x170 (bits MSB primero:
+     KEY 0x80000000, CAMERA 0x40000000 = CameraMove no mueve CamCtrl y usa pG->Camera.param tal cual,
+     EM 0x20000000, PL 0x10000000), pG->Camera.param pG+0x74+0xA4 (Campos, Target, Roll, Fovy, Up +0xC4),
+     SceAt OT pS+140 (be_flg +0x34, id +0x35, act_type +0x4A: 2 saltar fuera / 4 saltar abajo; escalera
+     id 0x10, pos +0x5C, ang +0x68), em alive (be_flag & 0x201)==1, emset_no +0x398.
+     Flujo: León arriba (y>2,5 m, cerca del Ganado vivo, libre 20 frames) → panel (juego parado con
+     KEY|EM|PL, se cierra con A) y ventanas de salto desactivadas; muere el Ganado (y León libre 50 fr) →
+     escena 300 fr: cámara a la cara de León, f36 aparece el Herrero en la "puerta", f40 SndCall(6,0x37)
+     (puerta rota, emdoor) + temblor, f52–86 León se gira, f96+ cámara por encima del hombro siguiendo al
+     Herrero; A salta tras 120 fr; luego se reactivan las ventanas. PUERTA: aún estimada desde la escalera
+     (DOOR_KNOWN 0) → la prueba muestra x z y ángulo de León arriba a la izquierda en r103 para fijarla.
+   - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
+     para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
+     cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.
    - **El Rastrero** (2º enemigo, bocetos del usuario: Ganado mutado rápido que va a 4 patas unos pasos para
      acercarse, poca vida, muy ágil): models/rastrero (mismo proceso que el Herrero, /home/claude/rastrero).
      Capucha de saco (ojos rotos, boca cosida, sangre), camisa rota en el hombro izq. y en la columna,

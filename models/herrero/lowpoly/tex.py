@@ -249,7 +249,7 @@ def texcolour(name, fn, P, N):
     shade[hot] = 1.0
     ey = mat == EYE; shade[ey] = 1.6
     shade[pg] *= 1.25
-    c[hot] = np.array([1.0, 0.36, 0.05], np.float32) * (0.8 + 0.5 * vnoise(P[hot], 15.0))[:, None]
+    c[hot] = np.array([0.05, 0.045, 0.04], np.float32)   # B88: no glowing coals on the low-poly (an orange spot on the thigh)
     grime = (0.80 + 0.35 * fbm(P + 400, 45.0))[:, None]
     grime[hot | ey] = 1.0
     return np.clip(c * shade[:, None] * grime * 1.05, 0, 1) ** (1 / 2.2)   # display space

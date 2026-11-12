@@ -536,9 +536,11 @@ void CrouchFrame(void);
 void StealthFrame(void);
 int StealthDiag(int i);
 
+void BarnFrame(void);
 void ModFrame(void)
 {
     mod_frame++;
+    BarnFrame();
     RecoilFrame();
     StealthFrame();
     SwapFrame();
@@ -591,6 +593,58 @@ static void DiagDraw(void)
     GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
 }
 
+int BarnPanel(void); u8* BarnText(void); int BarnCoords(int i);
+static void Num(f32 x, f32 y, int n, u32 c)        /* signed number, seven-segment */
+{
+    char buf[8]; int nd = 0, k, neg = n < 0;
+    if (neg) n = -n;
+    do { buf[nd++] = (char)(n % 10); n /= 10; } while (n && nd < 7);
+    if (neg) { Quad(x, y + 8.0f, 8.0f, 2.0f, c, 0); x += 11.0f; }
+    for (k = 0; k < nd; k++) Digit(x + 13.0f * (nd - 1 - k), y, buf[k], c);
+}
+static void BarnDraw(void)                         /* B88: the stealth panel; Leon's position in r103 (test) */
+{
+    Mtx44 p; Mtx m; int i;
+    int panel = BarnPanel(), cx = BarnCoords(0);
+    const u8* img = BarnText();
+    if (!panel && cx == -999999) return;
+    GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
+    C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
+    PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
+    GXSetBlendMode(1, 4, 5, 0); GXSetNumTevStages(1); GXSetNumChans(1);
+    GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
+    ModeFlat();
+    if (cx != -999999) {
+        Quad(96.0f, 70.0f, 300.0f, 26.0f, 0x000000A0, 0);
+        for (i = 0; i < 4; i++) Num(100.0f + 74.0f * i, 74.0f, BarnCoords(i), i == 3 ? 0xFFE040FF : 0xFFFFFFFF);
+    }
+    if (panel && img) {
+        const f32 w = 480.0f, h = 240.0f, x = 320.0f - w / 2, y = 240.0f - h / 2;
+        Quad(0.0f, 0.0f, 640.0f, 480.0f, 0x00000070, 0);
+        QuadH(x - 6.0f, y - 6.0f, w + 12.0f, h + 12.0f, 0x141210E8, 0x0C0B0AE8);
+        Quad(x - 6.0f, y - 6.0f, w + 12.0f, 2.0f, 0x8A7A5AFF, 0); Quad(x - 6.0f, y + h + 4.0f, w + 12.0f, 2.0f, 0x8A7A5AFF, 0);
+        {
+            GXTexObj tx;
+            GXInitTexObj(&tx, img, 512, 256, 0 /* I4 */, 0, 0, 0);
+            GXInitTexObjLOD(&tx, 1, 1, 0.0f, 0.0f, 0.0f, 0, 0, 0);
+            GXLoadTexObj(&tx, 0);
+            GXClearVtxDesc();
+            GXSetVtxDesc(9, 1); GXSetVtxDesc(11, 1); GXSetVtxDesc(13, 1);
+            GXSetVtxAttrFmt(0, 9, 1, 4, 0); GXSetVtxAttrFmt(0, 11, 1, 5, 0); GXSetVtxAttrFmt(0, 13, 1, 4, 0);
+            GXSetNumTexGens(1);
+            GXSetTexCoordGen2(0, 1, 4, 60, 0, 125);
+            GXSetTevOrder(0, 0, 0, 4);
+            GXSetTevOp(0, 0);
+            GXBegin(0x80, 0, 4);
+            GXFIFO_F32 = x;     GXFIFO_F32 = y;     GXFIFO_F32 = 0.0f; GXFIFO_U32 = 0xF0E6D2FF; GXFIFO_F32 = 0.0f; GXFIFO_F32 = 0.0f;
+            GXFIFO_F32 = x + w; GXFIFO_F32 = y;     GXFIFO_F32 = 0.0f; GXFIFO_U32 = 0xF0E6D2FF; GXFIFO_F32 = 1.0f; GXFIFO_F32 = 0.0f;
+            GXFIFO_F32 = x + w; GXFIFO_F32 = y + h; GXFIFO_F32 = 0.0f; GXFIFO_U32 = 0xF0E6D2FF; GXFIFO_F32 = 1.0f; GXFIFO_F32 = 1.0f;
+            GXFIFO_F32 = x;     GXFIFO_F32 = y + h; GXFIFO_F32 = 0.0f; GXFIFO_U32 = 0xF0E6D2FF; GXFIFO_F32 = 0.0f; GXFIFO_F32 = 1.0f;
+        }
+    }
+    GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
+}
+
 void ModDraw(void)
 {
     static const u32 black = 0;
@@ -618,6 +672,11 @@ void ModDraw(void)
         dbg_frame = 0;
     }
 #endif
+    {
+        static const u32 blk = 0;
+        GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &blk);
+        ViewportOn(); BarnDraw(); ViewportOff();
+    }
     if (!draw_now) return;
     draw_now = 0;
     GXSetFog(0, 0.0f, 1.0f, 0.1f, 1.0f, &black);            /* messages leave the room fog on */
