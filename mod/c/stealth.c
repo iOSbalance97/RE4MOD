@@ -581,15 +581,13 @@ static void HerreroFrame(void)
             HrSlot* hs = HrSlotOf(e);
             if (r == 0x24) { e[0xFD] = 0x26; e[0xFE] = 0; e[0xFF] = 0; r = 0x26; }
             if (r == 0x26) {
-                /* B104 (user): a combo: first the one-armed blow from below (HR_UP), then -- chained before it
-                 * ends, so the game's attack routine does not see a motion end -- the two-handed smash */
+                /* B105 (user): the combo -- the one-armed blow from below, then the two-handed smash -- as ONE
+                 * motion (HR_SMASH, mkanim.py): B104 chained two and the game's attack routine ended with the
+                 * first. Light hit in the first window, the knockdown in the second */
                 f32 fr = *(f32*)(e + 0x1D8 + 0xB8);
                 hs->chase = 0; hs->roar = 0;
-                if (cur != HRM(HR_SMASH) && cur != HRM(HR_UP)) MotionSetCore(e, e + 0x1D8, HRM(HR_UP), HRM(HR_UP + 1), 8, 1, 0);
-                else if (cur == HRM(HR_UP)) {
-                    HerreroHit(e, HR_UP_HIT0, HR_UP_HIT1, 0);
-                    if (fr >= (f32)HR_UP_N - 2.0f) { hr_hit_em = 0; MotionSetCore(e, e + 0x1D8, HRM(HR_SMASH), HRM(HR_SMASH + 1), 8, 3, 0); }
-                }
+                if (cur != HRM(HR_SMASH)) MotionSetCore(e, e + 0x1D8, HRM(HR_SMASH), HRM(HR_SMASH + 1), 8, 3, 0);
+                else if (fr < (f32)HR_UP_HIT1 + 2.0f) HerreroHit(e, HR_UP_HIT0, HR_UP_HIT1, 0);
                 else HerreroHit(e, HR_HIT0, HR_HIT1, 1);
             } else if (r == 0x10 || r == 0x11) {
                 /* B86: chasing too long without reaching Leon: it stops and roars (motion with no travel, so

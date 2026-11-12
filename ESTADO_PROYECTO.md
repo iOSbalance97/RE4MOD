@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B104** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B105** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -553,6 +553,20 @@ Reglas de trabajo del usuario:
        cabeza y vuelve sobre el hombro derecho, donde empieza el mazazo); daño 1/3 y tambaleo (PlSetDamage
        4); enlazado al mazazo a dos manos antes de acabar (la rutina AxeAtk no ve fin de movimiento).
        Agarre de la mano igual que antes. models/herrero/anim/upswing_preview.png.
+   - **B105** (vídeo B104):
+     · Cámara tras el cartel: B100-B104 congelaban la cámara (SPF_CAM) bajo el cartel en plena cámara de la
+       escalera y al salir seguía desde ahí. Ahora la cámara corre bajo el cartel; la entrada se corta en
+       pad.c (barn_padlock: botones y sticks a 0, también el C-stick); León se gira al Ganado al SALIR el
+       cartel (la cámara se asienta detrás mientras); al cerrarlo, init flag igualmente.
+     · Ventana: el punto es el centro del área de "saltar por la ventana" del juego (SceAt act 2,
+       área +0x04: xz4 / cilindro en +0x14), la más cercana; antes era un punto adivinado.
+     · Sigilo: la escena empieza con León agachado en su rutina (sin beginEvent, sin mando), t 10 se
+       levanta (CrouchStand, en cámara), t 48 rutina de evento y anda a la ventana. B104 hacía beginEvent
+       al momento → salía del agachado de golpe (el corte).
+     · Toda la escena con barn_padlock (sin entrada); el A para saltar se lee de barn_pad (antes del bloqueo).
+     · Combo del Herrero en UN solo movimiento (HR_SMASH = golpe de abajo + mazazo, 113 frames, 8 de mezcla
+       con slerp): B104 encadenaba dos y la rutina AxeAtk terminaba con el primero. Golpe flojo 15-21,
+       mazazo 64-73.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

@@ -20,6 +20,8 @@ int StealthPress(void);
 u32 StealthPad(u32 out);
 int StealthKilling(void);
 static u32 prev_raw;
+extern int barn_padlock;                    /* barn.c */
+u16 barn_pad;                               /* the remapped buttons before barn.c's lock */
 
 void PadRemap(void)
 {
@@ -73,6 +75,11 @@ void PadRemap(void)
         if (StealthKilling()) { out = StealthPad(0); p->stickX = p->stickY = 0; p->substickX = p->substickY = 0; }
     }
     prev_raw = p->button;
+    barn_pad = (u16)out;
+    if (barn_padlock) {                            /* B105: barn.c's scene: Leon gets no input at all (sticks too:
+                                                      the camera's C-stick look and his walk) */
+        out = 0; p->stickX = p->stickY = p->substickX = p->substickY = 0;
+    }
     p->button = (u16)out;
     p->triggerLeft = (out & PAD_L) ? 0xFF : 0;     /* the game also turns any analog L/R into L/R */
     p->triggerRight = (out & PAD_R) ? 0xFF : 0;

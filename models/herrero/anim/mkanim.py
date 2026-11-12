@@ -374,6 +374,15 @@ def upswing(f):
     low = min(P[20][1] - BP[20][1], P[24][1] - BP[24][1], P[21][1] - BP[21][1], P[25][1] - BP[25][1])
     p.root[1] -= low
     return p
+def blendpose(a, b, w):
+    """B105: a between two poses: joint rotations slerped, root and travel lerped"""
+    from scipy.spatial.transform import Rotation as Rr, Slerp
+    p = Pose()
+    for k in B:
+        r = Rr.from_matrix(np.stack([a.W[k], b.W[k]])); p.W[k] = Slerp([0, 1], r)([w]).as_matrix()[0]
+    p.root = lerp(a.root, b.root, w); p.travel = lerp(a.travel, b.travel, w)
+    return p
+COMBO_BL = 8                                         # frames the blow from below blends into the smash
 def steps(poses):
     """B87: footsteps (Se 1/2, as the Ganado's walks) where each foot comes down"""
     ev = {}
@@ -388,12 +397,20 @@ if __name__ == '__main__':
     IP = [idle(f, IN) for f in range(IN + 1)]; FP = [flex(f) for f in range(FLEX1 - FLEX0 + 1)]
     RP = [roar(f) for f in range(ROAR_N + 1)]
     UP = [upswing(f) for f in range(UP_N + 1)]
+    # B105: the combo is ONE motion (the blow from below, then the smash): B104 chained two and the game's
+    # attack routine ended with the first. The smash part shifted by CO; the last COMBO_BL frames of the
+    # first blow blend into the smash's first ones.
+    CO = UP_N + 1 - COMBO_BL
+    CP = UP[:CO] + [blendpose(UP[CO + k], SP[k], sm((k + 1) / (COMBO_BL + 1))) for k in range(COMBO_BL)] + SP[COMBO_BL:]
+    SP = CP
     wm = build(WP); sm_ = build(SP); im = build(IP); fm = build(FP); rm = build(RP); um = build(UP)
     print('walk', check(wm, WP), len(wm), '| smash', check(sm_, SP), len(sm_), '| idle', len(im), '| flex', len(fm))
     print('walk travel per frame', WP[-1].travel[2] * S / WN2)
-    NS = len(SP); h0, h1 = int(round((SW_HIT[0] - SW0) / SW_SPEED)), int(round((SW_HIT[1] - SW0) / SW_SPEED))
-    ev = {f: (0, 8) for f in range(0, h0 - 6)}              # 8: keep turning to Leon (wind-up)
-    ev.update({h0 - 4: (0, 0x20)})                           # 0x20: the swing sound
+    NS = len(SP); h0, h1 = CO + int(round((SW_HIT[0] - SW0) / SW_SPEED)), CO + int(round((SW_HIT[1] - SW0) / SW_SPEED))
+    ev = {f: (0, 8) for f in range(0, 9)}                   # 8: keep turning to Leon (the first wind-up)
+    ev[10] = (0, 0x20)                                       # 0x20: the swing sound (blow from below)
+    ev.update({f: (0, 8) for f in range(UP_HIT[1] + 4, h0 - 6)})   # turning to him again for the smash
+    ev.update({h0 - 4: (0, 0x20)})
     # B85: no Free 1 (the game's check sweeps the hidden axe): stealth.c HerreroHit checks the anvil itself
     ss = seq(NS, ev); ws = seq(WN2 + 1, steps(WP)); is_ = seq(IN + 1, {}); fs = seq(len(FP), {}); rs = seq(len(RP), {})
     uev = {f: (0, 8) for f in range(0, 9)}; uev[10] = (0, 0x20)            # B104: turning to Leon, then the swing sound

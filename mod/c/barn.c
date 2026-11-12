@@ -76,8 +76,14 @@ static f32 best_d, c0x, c0y, c0z, t0x, t0y, t0z;
 static const f32 WP[][2] = { { -13164.0f, -3146.0f }, { -13032.0f, -3755.0f }, { -12846.0f, -4300.0f },
                              { -12811.0f, -4929.0f }, { -12639.0f, -5493.0f } };
 #define NWP 5
-#define WIN_X (-13550.0f)                /* B102 (user): first a few steps toward the window, where the noise is; */
-#define WIN_Z (-2080.0f)                 /* B104: up to it, as if to look out */
+/* B105: the window he walks to: the middle of the window's own jump-out area (the place where the game
+ * offers the jump, SceAt record: area +0x04, type +0x05, xz4 points / cylinder centre at +0x14) -- B102-B104
+ * guessed it and he stopped well short of it. Fallback if none is found. */
+static f32 winx = -13550.0f, winz = -2080.0f, wcx[8], wcz[8]; static u8 wat[8];
+#define WIN_X winx
+#define WIN_Z winz
+int barn_padlock;                        /* B105: pad.c gives Leon no input at all while it is set */
+extern u16 barn_pad;                     /* pad.c: the remapped buttons, before that lock */
 static int skill, vs;                    /* B104: the Ganado died by a takedown; the scene's stealth variant */
 #define QFPS_DIR (*(f32*)(0x80217104 + 0x204))   /* CamCtrl.m_QuasiFPS (PAL 0x80217104, from resetCameraAngle */
 #define QFPS_DEP (*(f32*)(0x80217104 + 0x200))   /* 0x800078DC): the C-stick look angles */
@@ -179,7 +185,10 @@ static void WindowsLock(int on)
         for (p = OtNext(pS + 140); p && lock_n < 8; p = OtNext(p)) {
             u8 at = p[0x4A];
             if ((at == 2 || at == 4 || at == 5 || at == 26) && (p[0x34] & 1) && *(f32*)(p + 0x08) > 1500.0f) {   /* jump out / down / jump (B92), up high */
-                p[0x34] &= ~1; locked[lock_n++] = p;
+                f32* q = (f32*)(p + 0x14);
+                if (p[0x05] == 1) { wcx[lock_n] = (q[0] + q[2] + q[4] + q[6]) * 0.25f; wcz[lock_n] = (q[1] + q[3] + q[5] + q[7]) * 0.25f; }
+                else { wcx[lock_n] = q[0]; wcz[lock_n] = q[1]; }
+                wat[lock_n] = at; p[0x34] &= ~1; locked[lock_n++] = p;
             }
         }
     } else {
@@ -363,7 +372,7 @@ void BarnFrame(void)
 {
     u8* pl = pPL; u16 b, press;
     if (!pG || !pl) return;
-    b = Pad_data[0].button; press = b & ~pad_old; pad_old = b;
+    b = barn_pad; press = b & ~pad_old; pad_old = b;   /* B105: before the scene's pad lock */
     {   /* B95: cinema bars while a stealth takedown is offered (the cross over a Ganado) and while it runs */
         static int bars;
         if (StealthTarget() || StealthKilling()) bars = 8; else if (bars > 0) bars--;
@@ -371,7 +380,7 @@ void BarnFrame(void)
     }
     if (STAGE != 1 || ROOM != 3) {                       /* left the farm: forget everything */
         if (st) { STOPF &= ~(SPF_KEY | SPF_CAM | SPF_EM | SPF_PL | SPF_SCEAT | SPF_ACTBTN); if (st == 3) { STA1 &= ~STA_SUSPEND; Hud(1); } }
-        st = 0; list_no = -1; seen = 0; lock_n = 0; upper = 0; herrero = 0; hold_n = 0; hr_scene_em = 0;
+        st = 0; list_no = -1; seen = 0; lock_n = 0; upper = 0; herrero = 0; hold_n = 0; hr_scene_em = 0; barn_padlock = 0;
         return;
     }
     if (list_no < 0) {                                   /* the Ganado upstairs: list entry high up */
@@ -398,12 +407,21 @@ void BarnFrame(void)
             && pl[0xFC] == 0 && (pl[0xFD] <= 3 || pl[0xFD] == 6)) {
             /* B100: the very first free frame up there (B99 left 20: the camera could be turned, and it kept
              * turning under the panel); the camera stays put under the panel (SPF_CAM) */
-            st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_KEY | SPF_EM | SPF_PL | SPF_CAM; MusicQuiet();
-            QFPS_DIR = 0.0f; QFPS_DEP = 0.0f;              /* B102: a C-stick look held now kept turning the camera */
+            /* B105: the camera is NOT frozen under the panel (B100-B104 froze it in the ladder's own camera,
+             * and after the panel it went on from there: "it worked before" = B95-B99, which let it run).
+             * No input reaches the game (pad.c lock: no C-stick spin either); Leon is turned to the Ganado
+             * now, so the camera settles behind him toward it while the panel is up */
+            st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_EM | SPF_PL; MusicQuiet(); barn_padlock = 1;
+            QFPS_DIR = 0.0f; QFPS_DEP = 0.0f;
+            {
+                f32 a = atan2f_(ux - lx, uz - lz);
+                *(f32*)(pl + 0xA4) = a; SetMat(pl, lx, lz, a);
+            }
         } else t = 0;
         return;
     }
     case 1:                                              /* the tutorial panel */
+        QFPS_DIR = 0.0f; QFPS_DEP = 0.0f;
         if (++t > 20 && (press & PAD_A)) {
             /* B102 (user): out of the panel Leon (and the shoulder camera, which sits behind his facing)
              * look at the Ganado */
@@ -413,10 +431,8 @@ void BarnFrame(void)
                 *(f32*)(pl + 0xA4) = a; SetMat(pl, lx, lz, a);
             }
             QFPS_DIR = 0.0f; QFPS_DEP = 0.0f;
-            *(u8*)(0x80217104 + 0x1B2) = 1;            /* B104: m_init_flag: the shoulder camera snaps behind him on its
-                                                          next frame (CamSmth.setFlag) instead of easing round from where
-                                                          it was (B102/B103: it was still looking elsewhere) */
-            STOPF &= ~(SPF_KEY | SPF_EM | SPF_PL | SPF_CAM); st = 2; t = 0; skill = 0;
+            *(u8*)(0x80217104 + 0x1B2) = 1;            /* B104: m_init_flag: the shoulder camera snaps behind him */
+            STOPF &= ~(SPF_KEY | SPF_EM | SPF_PL | SPF_CAM); st = 2; t = 0; skill = 0; barn_padlock = 0;
         }
         return;
     case 2: {                                            /* until that Ganado is dead */
@@ -435,6 +451,13 @@ void BarnFrame(void)
         {
             f32 lx = *(f32*)(pl + 0x94), lz = *(f32*)(pl + 0x9C);
             dx = DOOR_X; dz = DOOR_Z; wi = 0;
+            {   /* B105: the nearest window area */
+                int i; f32 bd = 1e30f;
+                for (i = 0; i < lock_n && i < 8; i++) {
+                    f32 qx = wcx[i] - lx, qz = wcz[i] - lz, d = qx * qx + qz * qz;
+                    if (wat[i] == 2 && d < bd && d < 6000.0f * 6000.0f) { bd = d; winx = wcx[i]; winz = wcz[i]; }   /* JUMP_OUT: a window */
+                }
+            }
             a1 = atan2f_(WIN_X - lx, WIN_Z - lz);          /* B102: after the turn he faces the window */
             /* B104 (user): after a takedown he already faces it: he gets up and walks there, no turn */
             vs = skill && Wrap(*(f32*)(pl + 0xA4) - a1) < 1.3f && Wrap(*(f32*)(pl + 0xA4) - a1) > -1.3f;
@@ -445,10 +468,15 @@ void BarnFrame(void)
             ex = lx; ez = lz;
         }
         STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN;
-        CrouchStand();
-        /* B96: Leon in the game's event routine (cPlayer::beginEvent(0): routine 5, idle, no pad) */
-        PlVirt(pl, 16, 0);
-        SetMat(pl, ex, ez, a0);
+        barn_padlock = 1;                                /* B105: no input at all through the scene */
+        if (!vs) {
+            CrouchStand();
+            /* B96: Leon in the game's event routine (cPlayer::beginEvent(0): routine 5, idle, no pad) */
+            PlVirt(pl, 16, 0);
+            SetMat(pl, ex, ez, a0);
+        }   /* B105 (user): after a takedown he stays as he is (crouched, his own routine, no input) and the
+             * scene shows him getting up (t 10) before the event routine takes him at t 48: B104's
+             * beginEvent at once snapped him out of the crouch -- the cut */
         STA1 |= STA_SUSPEND; *(u32*)pl |= 0x800;          /* B92: the game's own event pause: only Leon and El Herrero move */
         Hud(0);
         turn_t = 0;
@@ -496,7 +524,9 @@ void BarnFrame(void)
         /* ---- Leon */
         if (ph == 0) {                                    /* hears the door, turns where he is */
             if (t == 40) SndCall(1, 0x1E, 0, 0, 0, 0);   /* a door kicked in (Leon's bank, always loaded) */
-            if (t == 48 && vs) {                          /* B104: stealth variant: up (CrouchStand above) and to the window */
+            if (t == 10 && vs) CrouchStand();             /* B105: he gets up, on camera */
+            if (t == 48 && vs) {                          /* B104: stealth variant: then to the window */
+                PlVirt(pl, 16, 0);
                 WalkTo(pl, 0); *(f32*)(pl + 0x404) = WIN_X; *(f32*)(pl + 0x40C) = WIN_Z;
                 ph = 1; ph_t = t; ls = 1; lt = t; best_d = 1e30f; stuck = 0;
             }
@@ -592,6 +622,7 @@ void BarnFrame(void)
         }
         if (t >= 2000 || (t > 120 && (press & PAD_A))) {
             PlVirt(pl, 24, 2);                            /* cPlayer::endEvent(2): routine 0, pad back */
+            barn_padlock = 0;
             Hud(1);
             {
                 u8* wp = *(u8**)(pl + 0x788);
