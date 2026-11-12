@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B90** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B91** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -401,6 +401,13 @@ Reglas de trabajo del usuario:
      (Stop_flg SCE_AT 0x00400000, ACTBTN 0x100) y el 2º plano pasa a la planta baja, de frente a la
      puerta (cámara en puerta + (900, 1350, −4300)) siguiendo al Herrero. Datos del vídeo: León arriba
      en (−12630, −5635), altura 3334; el Ganado de la horca muere en (−14190, −2664).
+   - **B91** (vídeo B90, dos pruebas: en una el Herrero sale pero no anda, en otra no sale; el Ganado de
+     fuera detecta a León durante la escena): flag del Herrero 0x20000001 (bit 1: em10 Wait llama a
+     setFindPL → sabe dónde está León y va a por él; 0x40 = siempre activo); durante la escena SPF_EM
+     (cEmMgr::move PAL 0x800C994C no mueve a nadie) y barn.c mueve solo a León y al Herrero con emMove
+     PAL 0x800C9D5C; cámara de la planta baja más atrás (puerta + (1100, 1600, −6500), fovy 50→42).
+     Diagnóstico en pantalla (5º número, verde): 1 = create falló, 2 = archivo raro, 3 = creado; con
+     Herrero vivo 3000 + r_no_0·100 + r_no_1.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

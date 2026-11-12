@@ -615,8 +615,8 @@ static void BarnDraw(void)                         /* B88: the stealth panel; Le
     GXSetChanCtrl(0, 0, 0, 1, 0, 0, 2); GXSetChanCtrl(2, 0, 0, 1, 0, 0, 2); GXSetZMode(0, 7, 0);
     ModeFlat();
     if (cx != -999999) {
-        Quad(96.0f, 70.0f, 372.0f, 26.0f, 0x000000A0, 0);
-        for (i = 0; i < 4; i++) Num(100.0f + 92.0f * i, 74.0f, BarnCoords(i), i == 3 ? 0xFFE040FF : 0xFFFFFFFF);
+        Quad(96.0f, 70.0f, 464.0f, 26.0f, 0x000000A0, 0);
+        for (i = 0; i < 5; i++) Num(100.0f + 92.0f * i, 74.0f, BarnCoords(i), i == 3 ? 0xFFE040FF : (i == 4 ? 0x60FF60FF : 0xFFFFFFFF));
     }
     if (panel && img) {
         const f32 w = 480.0f, h = 240.0f, x = 320.0f - w / 2, y = 240.0f - h / 2;

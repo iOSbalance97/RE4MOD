@@ -26,6 +26,7 @@ void CrouchStand(void);
 #define EMLIST(i) (pG + 0x52F4 + (i) * 32)
 #define EM_CREATE ((u8* (*)(void*, int))0x801DE5F8)
 #define EMMGR ((void*)0x80283160)
+#define EM_MOVE ((void (*)(u8*))0x800C9D5C)
 typedef f32 (*Atan2F)(f32, f32);
 #define atan2f_ ((Atan2F)0x8005FFE8)
 
@@ -43,6 +44,7 @@ static u8* arc12;                       /* em12.drs archive base */
 static f32 dx, dz, ex, ez, a0, a1;      /* door; Leon's start and end angle */
 static u8* locked[8];
 static u16 pad_old;
+static int dbg;                         /* test: 1 create failed, 2 bad archive, 3 created; +10*routine */
 
 static f32 Sin(f32 a)
 {
@@ -115,14 +117,16 @@ static u8* HerreroSpawn(f32 x, f32 y, f32 z, f32 ang)
 {
     u8* e = EM_CREATE(EMMGR, 0x12);
     u8* real; u8* vt;
-    if (!e) return 0;
+    if (!e) { dbg = 1; return 0; }
     real = *(u8**)(e + 0x378);
-    if (!real || *(u32*)real < (u32)HR_ARC_W - 3u) return 0;
+    if (!real || *(u32*)real < (u32)HR_ARC_W - 3u) { dbg = 2; return 0; }
+    dbg = 3;
     arc12 = real;
     *(u8**)(e + 0x378) = *(u8**)(e + 0x37C) = real + *(u32*)(real + 4 * HR_ARC_W);
     e[0x101] = 0;                         /* type 0: male villager (Em10Set) */
     e[0x38D] = 0;                         /* set */
-    *(u32*)(e + 0x3C8) = 0x20000000u;     /* weapon: the axe class (routine 0x26 = our smash) */
+    *(u32*)(e + 0x3C8) = 0x20000001u;     /* weapon: the axe class (routine 0x26 = our smash); B91: bit 1 =
+                                             Wait calls setFindPL(): it knows where Leon is and comes for him */
     e[0x3D0] = 0;
     *(f32*)(e + 0x3CC) = 20000.0f;        /* Guard_r */
     *(s16*)(e + 0x320) = *(s16*)(e + 0x322) = 4000;
@@ -151,6 +155,7 @@ int BarnCoords(int i)
     if (i == 0) return (int)*(f32*)(pPL + 0x94);
     if (i == 1) return (int)*(f32*)(pPL + 0x9C);
     if (i == 2) return (int)*(f32*)(pPL + 0x98);
+    if (i == 4) return herrero ? dbg * 1000 + herrero[0xFC] * 100 + herrero[0xFD] : dbg;
     return (int)(*(f32*)(pPL + 0xA4) * 57.29578f);
 }
 
@@ -204,7 +209,7 @@ void BarnFrame(void)
             a0 = *(f32*)(pl + 0xA4); a1 = atan2f_(dx - lx, dz - lz);
             ex = lx; ez = lz;
         }
-        STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN;
+        STOPF |= SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN | SPF_EM;     /* B91: the other enemies wait */
         CrouchStand();
         return;
     }
@@ -212,6 +217,10 @@ void BarnFrame(void)
         f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C), a;
         t++;
         if (t == 36 && !herrero) herrero = HerreroSpawn(dx, 0.0f, dz, atan2f_(lx - dx, lz - dz));
+        /* B91: SPF_EM stops every character (the Ganado outside would see Leon): the game's own emMove
+         * (PAL 0x800C9D5C, what cEmMgr::move runs on each work) for Leon and El Herrero only */
+        EM_MOVE(pl);
+        if (herrero && t > 36 && (*(u32*)herrero & 0x201) == 1) EM_MOVE(herrero);
         if (t == 40) {
             Vec v; v.x = dx; v.y = 1200.0f; v.z = dz;
             SndCall(6, 0x37, (int)&v, 0, 0, 0);          /* a door smashed in */
@@ -227,10 +236,10 @@ void BarnFrame(void)
         } else {                                          /* B90: down on the ground floor, facing the door: El Herrero coming in */
             f32 hx = dx, hy = 1400.0f, hz = dz, k = Sm((f32)(t - 96) / 120.0f);
             if (herrero) { hx = *(f32*)(herrero + 0x94); hy = *(f32*)(herrero + 0x98) + 1400.0f; hz = *(f32*)(herrero + 0x9C); }
-            Cam(dx + 900.0f, 1350.0f + 150.0f * k, dz - 4300.0f + 600.0f * k, hx, hy, hz, 46.0f - 8.0f * k);
+            Cam(dx + 1100.0f, 1600.0f + 150.0f * k, dz - 6500.0f + 900.0f * k, hx, hy, hz, 50.0f - 8.0f * k);
         }
         if (t >= 300 || (t > 120 && (press & PAD_A))) {
-            STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN); WindowsLock(0); st = 4; t = 0;
+            STOPF &= ~(SPF_KEY | SPF_CAM | SPF_SCEAT | SPF_ACTBTN | SPF_EM); WindowsLock(0); st = 4; t = 0;
         }
         return;
     }
