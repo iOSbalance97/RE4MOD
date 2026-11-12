@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B86** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B87** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -361,6 +361,13 @@ Reglas de trabajo del usuario:
      Andar al 70 % (61 fr, ~31 mm/fr), golpe ×1,3 (80 fr, impacto 31–40). Grito procedural roar()
      (96 fr: se encoge, echa la cabeza atrás, garra arriba, tiembla) sobre el breathing idle; HrSlot por
      Herrero: 240 frames andando (Walk/Dash) sin golpear → grito, luego sigue. Pack con 10 offsets.
+   - **B87**: hombrera = cáscara cerrada de 14 mm (era un casquete macizo recortado dentro del cuerpo →
+     abierto); 'acc' ya no se recorta contra el cuerpo (mesh.py NOCULL) y game.py solo dobla sus partes
+     abiertas (brazaletes, sheets.open_sheets). Grito: brazo de la garra por IK (girar huesos daba el codo
+     al revés), codo hacia fuera/abajo. Pasos (Se 1/2 como los Ganados) en el andar, frames 21/48.
+     Sonidos de seq de em10: Se 1/2 pasos andar, 3/4 pasos correr, 5/6 golpes de cuerpo, 120, 62
+     (serie), 124–127, 148, 169–171 sin identificar. GRITO GRAVE pendiente: no hay forma de oírlos
+     aquí; los bancos están en los .das de cada sala (core.das común) → descifrar y elegir/sintetizar.
    - PLAN enemigo NUEVO (no sustituir): ESL (emleon00–09.esl, 255 entradas × 32 B) → entrada Ganado
      (id 0x10) con una marca en un campo libre; hook en la creación/carga de modelo de em10: si lleva
      la marca, usar el BIN/TPL del Herrero añadidos como entradas NUEVAS de em10.drs (restaurar las

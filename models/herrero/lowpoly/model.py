@@ -234,7 +234,8 @@ def acc(p):
         c = ccyl(p, j['wr'] - fd * 95, j['wr'] - fd * 25, rb + 26, 5)
         iron = c if iron is None else np.minimum(iron, c)
     c = JR['sh'] + V(-5, 15, 0); ax = nrm(V(-0.55, 0.8, 0.05)); h = (p - c) @ ax
-    pl = np.maximum(np.maximum(sph(p, c, 226) - 6, -45 - h), (p[:, 0] - c[0]) - 70)
+    # B87: a closed iron shell 14 mm thick (was a solid cap culled inside the body: open, the user saw a hole)
+    pl = np.maximum(np.maximum(np.abs(sph(p, c, 222)) - 7, -45 - h), (p[:, 0] - c[0]) - 70)
     return {IRON: np.minimum(iron, pl)}
 ACC_BOX = (V(-1400, 640, -330), V(1760, 1990, 620))
 
@@ -271,7 +272,7 @@ def wbox():
     return box_of(c, 12)
 WEAPON_BOX = wbox()
 PARTS = [('body', body, BODY_BOX, 6.0, 1900), ('mask', mask, MASK_BOX, 2.5, 150), ('fist', fist, FIST_BOX, 3.0, 110),
-         ('claw', claw, CLAW_BOX, 2.5, 250), ('acc', acc, ACC_BOX, 3.0, 150), ('weapon', weapon, WEAPON_BOX, 3.0, 380)]
+         ('claw', claw, CLAW_BOX, 2.5, 250), ('acc', acc, ACC_BOX, 3.0, 230), ('weapon', weapon, WEAPON_BOX, 3.0, 380)]
 def field(fn, p):
     g = fn(p); mats = list(g.keys()); D = np.stack([g[m] for m in mats])
     return D.min(0), np.array(mats)[D.argmin(0)]

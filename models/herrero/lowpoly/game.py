@@ -1,5 +1,6 @@
 """El Herrero -> the game's own formats: .BIN on a Ganado body as template + CMPR textures into its TPL,
 written in place over the donor (same sizes) in the em1x.drs that carry that body."""
+from sheets import open_sheets
 import numpy as np, pickle, struct, sys, glob, os, cv2
 sys.path.insert(0, '/home/claude/re4mod/models/tools')
 import re4bin, tpl, rig
@@ -79,7 +80,7 @@ def build(parts):
     POS = []; NRM = {}; UV = {}; mats = {0: [], 1: []}; base = 0
     for p, wi in zip(parts, widx):
         POS.append(np.concatenate([np.round(p['v'] * 16 * S).astype(np.int64), wi[:, None]], 1))
-        f = p['f']
+        f = p['f']; op = open_sheets(p['v'], f) if p['name'] == 'acc' else None   # B87: only its open bits (bracers)
         for t in range(len(f)):
             cor = []
             for k in (0, 1, 2):                              # B81: same winding as ours (B80 inverted it: insides showed)
@@ -90,7 +91,7 @@ def build(parts):
             mats[p['atlas']].append(cor)
             # B86: open sheets (the apron flaps: LEATHER of 'legs'; the iron straps/pauldron 'acc') get a back side:
             # the game culls back faces and the body showed through them from behind
-            if p['name'] == 'acc' or (p['name'] == 'legs' and p['mat'][f[t, 0]] == 3):
+            if (p['name'] == 'acc' and op[t]) or (p['name'] == 'legs' and p['mat'][f[t, 0]] == 3):
                 back = []
                 for k in (0, 2, 1):
                     vi = int(f[t, k]); n = -np.clip(np.round(p['cn'][t, k] * 127), -127, 127).astype(int)
