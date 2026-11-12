@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B92** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B93** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -418,6 +418,12 @@ Reglas de trabajo del usuario:
      mesh.py ya no recorta nada (NOCULL total), puño y garra cerrados en la muñeca (plano a 41,3 mm, no
      justo en la rejilla), CLAW_BOX ampliada (el pulgar se salía → abierto), puño 170 y garra 320 tris,
      game.py dobla también el peto (LEATHER de 'body'). Pendiente: sonido de sorpresa (no sé el SE).
+   - **B93** (vídeo B92: sigue invisible con 3116; la ventana "SALTAR SOBRE" = ACT_JUMP_OVER 5; música
+     nada): la invisibilidad era el dibujo: cModel be_flag bit 2 (se dibuja) y alfa +0x154 solo los pone
+     em10 Wait cuando León está cerca; el Herrero con flag 1 se salta Wait → se fuerzan cada frame
+     mientras vive. Ventanas: tipos 2, 4, 5, 26. Música: el estado "en combate" no es la música (solo lo
+     usa la cámara); la de combate de la granja es el stream de sala (r103.cpp la arranca a los 30 s con
+     SndRoomStrStart(1, 0xF, 1)) → la escena la arranca al mostrar al Herrero (PAL 0x800586F8).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

@@ -28,6 +28,7 @@ void CrouchStand(void);
 #define EMMGR ((void*)0x80283160)
 #define STA1 (*(u32*)(pG + 0x501C))      /* Status_flg[1]: 0x10000000 = STA_SUSPEND: only works with be_flag 0x800 move */
 #define STA_SUSPEND 0x10000000u
+#define SND_STR_START ((void (*)(int, int, int))0x800586F8)   /* SndRoomStrStart(flag, fade s, play_ck): r103 starts it 30 s in */
 typedef f32 (*Atan2F)(f32, f32);
 #define atan2f_ ((Atan2F)0x8005FFE8)
 
@@ -82,7 +83,7 @@ static void WindowsLock(int on)
         if (lock_n) return;
         for (p = OtNext(pS + 140); p && lock_n < 8; p = OtNext(p)) {
             u8 at = p[0x4A];
-            if ((at == 2 || at == 4 || at == 26) && (p[0x34] & 1) && *(f32*)(p + 0x08) > 1500.0f) {   /* jump out / down / jump (B92), up high */
+            if ((at == 2 || at == 4 || at == 5 || at == 26) && (p[0x34] & 1) && *(f32*)(p + 0x08) > 1500.0f) {   /* jump out / down / jump (B92), up high */
                 p[0x34] &= ~1; locked[lock_n++] = p;
             }
         }
@@ -221,7 +222,12 @@ void BarnFrame(void)
         if (t == 36 && !herrero) herrero = HerreroSpawn(dx, 0.0f, dz, atan2f_(lx - dx, lz - dz));
         /* B91: SPF_EM stops every character (the Ganado outside would see Leon): the game's own emMove
          * (PAL 0x800C9D5C, what cEmMgr::move runs on each work) for Leon and El Herrero only */
-        if (herrero && (*(u32*)herrero & 0x201) == 1) { *(u32*)herrero |= 0x800; *(u32*)(herrero + 0x3C4) |= 1; }
+        if (herrero && (*(u32*)herrero & 0x201) == 1) {
+            /* B93: shown at once (be_flag bit 2 = drawn, model alpha +0x154): Wait would set them, but he
+             * skips it (he knows where Leon is), so he stayed invisible until some later routine did */
+            *(u32*)herrero |= 0x800 | 2; *(f32*)(herrero + 0x154) = 1.0f;
+        }
+        if (t == 96) SND_STR_START(1, 1, 1);            /* B93: the farm's battle music, from the moment he is shown */
         if (t == 40) {
             Vec v; v.x = dx; v.y = 1200.0f; v.z = dz;
             SndCall(6, 0x37, (int)&v, 0, 0, 0);          /* a door smashed in */
@@ -247,7 +253,7 @@ void BarnFrame(void)
         return;
     }
     default:                                             /* B92: while he lives, the game's battle music */
-        if (herrero && (*(u32*)herrero & 0x201) == 1 && *(s16*)(herrero + 0x320) > 0) *(u32*)(herrero + 0x3C4) |= 1;
+        if (herrero && (*(u32*)herrero & 0x201) == 1 && *(s16*)(herrero + 0x320) > 0) { *(u32*)herrero |= 2; *(f32*)(herrero + 0x154) = 1.0f; }
         return;
     }
 }
