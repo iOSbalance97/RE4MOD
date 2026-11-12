@@ -21,6 +21,23 @@ for n in ('disc1','disc2'):
     with open(dst,'r+b') as f:
         f.seek(0x420); f.write(struct.pack('>I',NEW_OFF))
         f.seek(NEW_OFF); f.write(dol)
+        # replaced data files (mod/files/<path in the disc>): same size, written in place. Only where the
+        # disc's own copy is the clean one the replacement was made from (/home/claude/disc/ext1/files)
+        st=cnt*12; paths={}; stack=[(cnt,'')]; i=1
+        while i<cnt:
+            while stack and i>=stack[-1][0]: stack.pop()
+            typ=t[i*12]; no=int.from_bytes(t[i*12+1:i*12+4],'big'); a,b=struct.unpack('>II',t[i*12+4:i*12+12])
+            nm=t[st+no:t.index(b'\0',st+no)].decode('latin1'); base=stack[-1][1] if stack else ''
+            if typ: stack.append((b,base+nm+'/'))
+            else: paths[(base+nm).lower()]=(a,b)
+            i+=1
+        for root,_,fs in os.walk('files'):
+            for fn in fs:
+                rel=os.path.relpath(os.path.join(root,fn),'files'); new=open(os.path.join(root,fn),'rb').read()
+                off,size=paths[rel.lower()]; f.seek(off); cur=f.read(size)
+                clean=open('/home/claude/disc/ext1/files/'+rel,'rb').read()
+                if cur!=clean or len(new)!=size: print(n,rel,'SKIPPED (differs from the clean copy)'); continue
+                f.seek(off); f.write(new); print(n,rel,'replaced')
     pat=f'out/RE4_PAL_{n}_{TAG}.xdelta'
     if os.path.exists(pat): os.remove(pat)
     subprocess.check_call(['/home/claude/tools/xdelta3','-e','-9','-S','djw','-s',src,dst,pat])

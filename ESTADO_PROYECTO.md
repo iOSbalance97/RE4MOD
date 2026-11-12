@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B78** (11-11-2026). Responder **siempre en español**.
+Última versión entregada: **B79** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -270,6 +270,22 @@ Reglas de trabajo del usuario:
      Normales suaves con índice propio (por eso no se ven aristas); el detalle va pintado en texturas
      de 256² (512² como mucho). El Herrero (14.981 tri, 3×1024²) hay que rehacerlo a ~3.000–4.500
      triángulos y 1×512² + 3×256² para que entre.
+   - **B79 = primera prueba del Herrero dentro del juego** (el usuario: dejar a Salvador, implementar
+     ya). Sustitución EN SITIO (mismos tamaños, sin mover nada) del cuerpo de ganado 34 huesos/770
+     vértices (em10.drs entrada 440 @0x3ab040, 32.352 B; el mismo modelo está en em12, em13, em15 y
+     em17) y de las texturas 1 y 2 (256² CMPR) del TPL que le sigue (entrada 441; la 0 = cara/manos
+     del ganado, intacta). models/herrero/lowpoly/: versión de 887 triángulos/545 vértices (sin arma,
+     cadenas ni herraduras; decimado automático, tosco) → game.py escribe el .BIN sobre la plantilla
+     del donante (tabla de huesos del donante con NUESTRAS posiciones de las partes 0–25 ×0,95, porque
+     s16 a 16 u/mm solo llega a ±2047 mm; pesos de 2 huesos en pasos del 20 %; tiras GX; tablas 0x40/
+     0x44 copiadas) y codifica CMPR. mod/mkfiles.py genera mod/files/ (no se sube: datos del juego) y
+     mkiso.py reemplaza en la ISO los archivos de mod/files/ (mismo tamaño, por FST). Comprobado
+     leyendo el modelo y las texturas desde la ISO parcheada. Escala de posiciones = 16 u/mm (byte
+     0x28 = 4 bits fraccionarios, sin confirmar que se pueda cambiar). UV = téxeles (s16).
+     Archivo .drs parte 0: [nº][fin de datos][..] + offsets desde 0x10; tras "fin de datos" hay
+     ~0x68b20 B sin descifrar (¿tabla de reubicación?) → por eso aún no se mueven entradas ni se
+     agrandan. POR VER en la prueba: si carga, qué aldeanos usan ese cuerpo, si el esqueleto toma
+     nuestras proporciones, si cabeza y manos del ganado asoman.
    - PENDIENTE: localizar al Dr. Salvador (no es em18 = Buhonero ni em2b = Gigante; mirar modelos de
      em10–em1f con view.py), escala exacta de posiciones, tablas 0x40/0x44, resto de la cabecera del
      material, escritor de .BIN/TPL y cómo cargar un enemigo nuevo.
