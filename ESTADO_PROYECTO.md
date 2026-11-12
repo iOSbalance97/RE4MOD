@@ -368,6 +368,14 @@ Reglas de trabajo del usuario:
      Sonidos de seq de em10: Se 1/2 pasos andar, 3/4 pasos correr, 5/6 golpes de cuerpo, 120, 62
      (serie), 124–127, 148, 169–171 sin identificar. GRITO GRAVE pendiente: no hay forma de oírlos
      aquí; los bancos están en los .das de cada sala (core.das común) → descifrar y elegir/sintetizar.
+   - PENDIENTE Herrero: grito GRAVE (usuario); luego registrarlo como enemigo nuevo.
+   - **El Rastrero** (2º enemigo, bocetos del usuario: Ganado mutado rápido que va a 4 patas unos pasos para
+     acercarse, poca vida, muy ágil): models/rastrero (mismo proceso que el Herrero, /home/claude/rastrero).
+     Capucha de saco (ojos rotos, boca cosida, sangre), camisa rota en el hombro izq. y en la columna,
+     tirantes, delantal hecho jirones, pantalón roto, botas; hoz oxidada en la mano der.; brazo izq. de la
+     Plaga (fibras rojas, púas de hueso, garras de hueso); púas en la columna. Materiales nuevos SACK, BONE.
+     Hoja 1 de diseño: rastrero_sheet.png (13.623 tris de detalle). Siguiente: opinión del usuario → pose a
+     4 patas con IK, low-poly/formato del juego.
    - PLAN enemigo NUEVO (no sustituir): ESL (emleon00–09.esl, 255 entradas × 32 B) → entrada Ganado
      (id 0x10) con una marca en un campo libre; hook en la creación/carga de modelo de em10: si lleva
      la marca, usar el BIN/TPL del Herrero añadidos como entradas NUEVAS de em10.drs (restaurar las
