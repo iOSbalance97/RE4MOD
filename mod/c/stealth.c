@@ -483,26 +483,29 @@ u8* hr_scene_em;
  * what em10_R1_Find plays) pitched down 7 semitones (SndSetDopPitch PAL 0x80056E5C, cents; held a few
  * frames: the SE system may set it again) */
 #define SND_DOP_PITCH ((int (*)(u32, int))0x80056E5C)
-static u32 hr_roar_id; static int hr_roar_n;
+static u32 hr_roar_id[2]; static int hr_roar_n, hr_layer; static s16 hr_roar_p[2]; static u8* hr_roar_e;
 static f32 hr_yell_pos[3];
-/* B101: B99/B100's played nothing: the enemy bank's voices are 3D SEs and were called with no position.
- * Now at a position (the Herrero's, or the door's before he is there), like em10 does (Ctrl11SetSe2:
- * SndCall(8, no, &parts0 world, id, 0, em)); the pitch held for the whole yell. Type-0 villager table
- * (Em10SetSeTbl): 0x1A = the "found you" yell, 0x4B = the attack shout */
+/* B103 (user): not a yell -- under the mask he cannot shout: a growl of pain. The Ganado's own
+ * getting-up groan (Em10SetSeTbl type 0: Se_tbl[11] = 0x4A, em10_R1_DownWake) twice at once: 8
+ * semitones down and, under it, 15 down (an octave and a bit: the rumble). Enemy bank 8: SndCall's 4th
+ * argument is the enemy id (em +0x100) so emSeCheck finds the bank (B102); at a position, like em10
+ * (3D voices). Pitch (SndSetDopPitch, cents) held while it sounds. */
 void HerreroYellAt(f32 x, f32 y, f32 z, u8* e, int se)
 {
+    int id = e ? e[0x100] : 0x10;
+    (void)se;
     hr_yell_pos[0] = x; hr_yell_pos[1] = y; hr_yell_pos[2] = z;
-    /* B102: the 4th argument is the enemy's id (em->id, +0x100: 0x10 for the Ganado): SndCall's emSeCheck
-     * picks the enemy bank (8 + i) whose snd_em_id matches it; B101 passed 0 -> no bank -> silence */
-    hr_roar_id = (u32)SndCall(8, se, (int)hr_yell_pos, e ? e[0x100] : 0x10, 0, (int)e);
-    hr_roar_n = 100;
-    if (hr_roar_id) SND_DOP_PITCH(hr_roar_id, -700);
+    hr_roar_p[0] = -800; hr_roar_p[1] = -1500;
+    hr_roar_id[0] = (u32)SndCall(8, 0x4A, (int)hr_yell_pos, id, 0, (int)e);
+    if (hr_roar_id[0]) SND_DOP_PITCH(hr_roar_id[0], hr_roar_p[0]);
+    hr_roar_id[1] = 0; hr_roar_e = e;
+    hr_layer = 3;          /* the low layer 3 frames on: emSeCheck drops the same SE from the same enemy
+                              while its history entry (one frame) is there */
+    hr_roar_n = 150;
 }
 void HerreroRoarSnd(u8* e)
 {
-    int se = e[0xAA6 + 4];
-    if (!se) se = 0x1A;
-    HerreroYellAt(*(f32*)(e + 0x94), *(f32*)(e + 0x98) + 1800.0f, *(f32*)(e + 0x9C), e, se);
+    HerreroYellAt(*(f32*)(e + 0x94), *(f32*)(e + 0x98) + 1800.0f, *(f32*)(e + 0x9C), e, 0x4A);
 }
 f32 HerreroSceneMot(u8* e, int m)
 {
@@ -520,7 +523,12 @@ f32 HerreroSceneMot(u8* e, int m)
 }
 static void HerreroFrame(void)
 {
-    if (hr_roar_n > 0) { hr_roar_n--; if (hr_roar_id) SND_DOP_PITCH(hr_roar_id, -700); }
+    if (hr_layer > 0 && --hr_layer == 0)
+        hr_roar_id[1] = (u32)SndCall(8, 0x4A, (int)hr_yell_pos, hr_roar_e ? hr_roar_e[0x100] : 0x10, 0, (int)hr_roar_e);
+    if (hr_roar_n > 0) {
+        int i; hr_roar_n--;
+        for (i = 0; i < 2; i++) if (hr_roar_id[i]) SND_DOP_PITCH(hr_roar_id[i], hr_roar_p[i]);
+    }
     if (hr_pin > 0) {
         u8* pl = pPL;
         hr_pin--;

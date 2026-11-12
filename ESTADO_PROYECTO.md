@@ -1,6 +1,6 @@
 # RE4 MOD — estado del proyecto (para continuar en otro chat)
 
-Última versión entregada: **B102** (12-11-2026). Responder **siempre en español**.
+Última versión entregada: **B103** (12-11-2026). Responder **siempre en español**.
 
 ## 1. Qué es
 Mod de **Resident Evil 4 GameCube PAL (G4BP08 rev 0)** para que se juegue como el **RE4 Remake**:
@@ -533,6 +533,13 @@ Reglas de trabajo del usuario:
      · Cámara de los pies: gira ALREDEDOR de León (ángulo y distancia ≥ 1,4 m) en vez de atravesarle; el
        paso a lo alto de la escalera hace un arco por encima de él.
      · Rugido: cabeza menos levantada (−0,22 en vez de −0,50).
+   - **B103** (usuario: todo funciona; pulir la escena y cambiar el grito por un gruñido de dolor):
+     · Cámara: plano fijo en la cara desde el golpe hasta el grito en la ventana (León se da la vuelta y
+       se aleja); al girarse hacia la escalera empieza a rodearle despacio mientras ANDA (ritmo con
+       rampa de 2 s), bajando a los pies; la subida a lo alto de la escalera empieza en sus últimos pasos
+       (a 1,1 m del final, sin parar) y dura 50 frames con arco de 0,7 m. Pausa en la ventana 0,8 s.
+     · Gruñido: el quejido de levantarse del Ganado (Se_tbl[11] = 0x4A) en dos capas: −800 cents y, 3
+       frames después (emSeCheck descarta el mismo SE del mismo enemigo en el mismo frame), −1500 cents.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

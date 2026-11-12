@@ -502,19 +502,20 @@ void BarnFrame(void)
                 ls = 3; lt = t;
             } else if (ls == 3) {                         /* listens, then turns where he stands (the event walk turns on the
                                                              spot past 60 degrees) and goes */
-                if (t > lt + 40) { WalkTo(pl, wi); ls = 4; lt = t; best_d = 1e30f; stuck = 0; }
+                if (t > lt + 24) { WalkTo(pl, wi); ls = 4; lt = t; best_d = 1e30f; stuck = 0; }
             } else {
                 if (d < best_d - 2500.0f) { best_d = d; stuck = 0; } else if (t > lt + 30) stuck++;
                 if (wi < NWP - 1 && (d < 600.0f * 600.0f || stuck > 45)) {      /* next point, without stopping */
                     wi++; best_d = 1e30f; stuck = 0;
                     *(f32*)(pl + 0x404) = WP[wi][0]; *(f32*)(pl + 0x408) = ly; *(f32*)(pl + 0x40C) = WP[wi][1];
                 }
-                if ((wi == NWP - 1 && (*(u32*)(pl + 0x3E0) == 1 || d < 150.0f * 150.0f || stuck > 45)) || t > lt + 360) {
-                    PlVirt(pl, 16, 0);                    /* there: stands */
+                /* B103: the camera starts up while he takes his last steps (the event walk stops him there) */
+                if ((wi == NWP - 1 && (*(u32*)(pl + 0x3E0) == 1 || d < 1100.0f * 1100.0f || stuck > 45)) || t > lt + 360) {
                     ph = 2; ph_t = t; c0x = cex; c0y = cey; c0z = cez; t0x = ctx; t0y = cty; t0z = ctz;
                 }
             }
-            if (t < ph_t + 30) {                          /* the turn, still on his face */
+            if (ls < 4) {                                 /* B103: one still shot from the bang to his yell at the window
+                                                             (he turns his back to it and walks off) */
                 f32 sh = (t < 52) ? 18.0f * Sin((f32)t * 2.1f) : 0.0f;
                 f32 ga = Sin(a0), gb = Cos(a0);
                 Cam(lx + ga * 1350.0f + gb * 420.0f + sh, ly + 1700.0f + sh, lz + gb * 1350.0f - ga * 420.0f,
@@ -522,23 +523,24 @@ void BarnFrame(void)
                 cang = atan2f_(ga * 1350.0f + gb * 420.0f, gb * 1350.0f - ga * 420.0f);
                 crad = 1414.0f; cey = ly + 1700.0f;
                 ctx = lx + ga * 60.0f; cty = ly + 1560.0f; ctz = lz + gb * 60.0f;
-            } else {                                      /* B102: then low at his feet, going ROUND him (B101's went
-                                                             straight through him): angle and distance about Leon */
-                f32 want = la + 3.14159265f + 0.35f;
-                cang += Wrap(want - cang) * 0.06f;
-                crad += (1800.0f - crad) * 0.08f;
-                cey += (ly + 700.0f - cey) * 0.08f;
+            } else {                                      /* B103: as he turns and walks to the ladder the camera goes
+                                                             round him, slowly, down to his feet (B102's swung round while he
+                                                             stood): angle and distance about Leon, never through him */
+                f32 want = la + 3.14159265f + 0.35f, k = Sm((f32)(t - lt) / 60.0f) * 0.035f;
+                cang += Wrap(want - cang) * k;
+                crad += (1800.0f - crad) * k;
+                cey += (ly + 700.0f - cey) * k;
                 cex = lx + Sin(cang) * crad; cez = lz + Cos(cang) * crad;
-                ctx += (lx + fa * 400.0f - ctx) * 0.15f; cty += (ly + 300.0f - cty) * 0.15f; ctz += (lz + fb * 400.0f - ctz) * 0.15f;
+                ctx += (lx + fa * 400.0f - ctx) * k * 2.0f; cty += (ly + 300.0f - cty) * k * 2.0f; ctz += (lz + fb * 400.0f - ctz) * k * 2.0f;
                 Cam(cex, cey, cez, ctx, cty, ctz, 46.0f);
             }
         } else if (ph == 2) {                             /* to the top of the ladder, at head height */
-            f32 k = Sm((f32)(t - ph_t) / 30.0f);
-            cex = c0x + (LA_X - c0x) * k; cey = c0y + (LA_Y + 1300.0f - c0y) * k + Sin(k * 3.14159265f) * 900.0f; cez = c0z + (LA_Z - c0z) * k;
+            f32 k = Sm((f32)(t - ph_t) / 50.0f);       /* B103: 50 frames (was 30) */
+            cex = c0x + (LA_X - c0x) * k; cey = c0y + (LA_Y + 1300.0f - c0y) * k + Sin(k * 3.14159265f) * 700.0f; cez = c0z + (LA_Z - c0z) * k;
             /* B102: up and over him, not through him */
             ctx = t0x + (lx - t0x) * k; cty = t0y + (ly + 900.0f - t0y) * k; ctz = t0z + (lz - t0z) * k;
             Cam(cex, cey, cez, ctx, cty, ctz, 46.0f);
-            if (t >= ph_t + 30) { ph = 3; ph_t = t; t0x = ctx; t0y = cty; t0z = ctz; }
+            if (t >= ph_t + 50) { ph = 3; ph_t = t; t0x = ctx; t0y = cty; t0z = ctz; }
         } else if (ph == 3) {                             /* B99: down the hole along Leon's own climb (his head went
                                                              through there, so nothing is in the way), turning to the door */
             f32 k = Sm((f32)(t - ph_t) / 100.0f), k1, w;
