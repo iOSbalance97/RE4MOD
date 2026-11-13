@@ -23,6 +23,7 @@ static u32 prev_raw;
 extern int barn_padlock;                    /* barn.c */
 extern int ch0_padlock, ch0_stick;          /* ch0.c: chapter 0 intro (no input / a forced stick) */
 extern s8 ch0_sx, ch0_sy;
+extern int ch0_btn;                          /* C0-12: buttons held for her in a scene */
 u16 barn_pad;                               /* the remapped buttons before barn.c's lock */
 
 void PadRemap(void)
@@ -84,7 +85,8 @@ void PadRemap(void)
     prev_raw = p->button;
     barn_pad = (u16)out;
     if (ch0_padlock) {                             /* C0-01: chapter 0 intro: no input, or the scripted steps */
-        out = 0; p->substickX = p->substickY = 0;
+        out = ch0_padlock == 1 ? (u32)ch0_btn : 0;
+        if (ch0_padlock != 2) p->substickX = p->substickY = 0;   /* C0-12: 2 = hidden, the camera stays free */
         p->stickX = ch0_stick ? ch0_sx : 0; p->stickY = ch0_stick ? ch0_sy : 0;
     }
     if (barn_padlock) {                            /* B105: barn.c's scene: Leon gets no input at all (sticks too:

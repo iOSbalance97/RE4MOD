@@ -740,3 +740,11 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   sobre EatMgr 0x8027DE48 (SatMgr 0x8027DE28; en PAL cSatMgr mide 0x20). Patrullas R_PAT (PATS: vigía,
   NE, plaza norte/sur), cyc2 de 960 f; escondites con los 5 barriles (ETS id 17/30) movidos en Ch0Ets;
   escalera = ETS 5 (-4939, -17683).
+- **C0-12** (revisión C0-11): r13 = 0x802BEA20 (no 0x802BE620): g_pItemModelSys 0x802B83D4 (C0-11 escribía
+  en una dirección equivocada). em10: bandera de lista 0x04000000 → antorcha (Wep 6), 0x20000 → dinamita
+  (Wep 9, subArc 0xA2). Contenedores de Ashley: son escenario (SMD) de r310 (isla, tapas obra 8/10, cuerpos
+  9/11) y armarios de r113/r11d, con la TPL única de la sala (~1 MB): traerlos pide extraer el modelo y
+  rehacer una TPL pequeña. Vigía nacido en la escena del cruce norte (Spawn), ronda en bucle (PATS loop/hold);
+  Steer() orienta a los que caminan; tras la llave R_RING (5 puntos delante/este); B con Cruz; ch0_padlock 2 =
+  escondida con C-stick libre; ch0_btn botones forzados en escenas. Controles de tanque: para mover a Ashley
+  en una escena se fija su ángulo (pPL+0xA4) y stick arriba.

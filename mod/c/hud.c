@@ -762,6 +762,7 @@ static void Ch0Draw(void)
     }
     if (hd == 1) Line("\x01 Esconderse", 320.0f, 400.0f, 1.0f, 230);
     if (hd == 2) Line("\x01 Salir", 320.0f, 400.0f, 1.0f, 230);
+    if (hd == 3) Line("\x01 Abrir", 320.0f, 400.0f, 1.0f, 230);
     if (a[0]) Line("Hace 11 horas", 320.0f, 240.0f - 30.0f, 1.9f, a[0]);
     if (a[6]) Line("Ashley ha sido capturada", 320.0f, 224.0f, 1.3f, a[6]);
     if (a[7]) Line("Fin de la Parte 1 (prueba)", 320.0f, 224.0f, 1.3f, a[7]);
