@@ -748,12 +748,17 @@ static void Ch0Draw(void)
             "\x01  Esconderse donde se pueda.",
             "Si te atrapan, vuelves al \xfaltimo punto." };
         ModeFlat();
-        Quad(60.0f, 92.0f, 520.0f, 300.0f, (u32)(cd * 200 / 255), 0);
-        Quad(60.0f, 92.0f, 520.0f, 2.0f, 0xC8B89000u | (u32)(cd * 200 / 255), 0);
-        Quad(60.0f, 390.0f, 520.0f, 2.0f, 0xC8B89000u | (u32)(cd * 200 / 255), 0);
-        Line("Cap\xedtulo 0 \x97 Hace 11 horas", 320.0f, 104.0f, 1.15f, cd);
-        for (i = 0; i < 7; i++) Line(L[i], 320.0f, 152.0f + 30.0f * i + (i >= 3 ? 10.0f : 0.0f), 0.78f, cd);
-        Line("\x01 Continuar", 320.0f, 356.0f, 0.85f, cd);
+        Quad(56.0f, 88.0f, 528.0f, 304.0f, (u32)(cd * 205 / 255), 0);
+        Quad(56.0f, 88.0f, 528.0f, 2.0f, 0xC8B89000u | (u32)(cd * 200 / 255), 0);
+        Quad(56.0f, 390.0f, 528.0f, 2.0f, 0xC8B89000u | (u32)(cd * 200 / 255), 0);
+        Quad(200.0f, 140.0f, 240.0f, 1.0f, 0xC8B89000u | (u32)(cd * 120 / 255), 0);   /* under the title */
+        Line("Cap\xedtulo 0 \x97 Hace 11 horas", 320.0f, 100.0f, 1.1f, cd);
+        for (i = 0; i < 7; i++) {                            /* C0-05: no overlap; the controls in one column */
+            f32 y = 146.0f + 27.0f * i + (i >= 3 ? 8.0f : 0.0f);
+            if (i >= 3 && i <= 5) Line(L[i], 138.0f + TextW(L[i], 0.72f * 32.0f / 24.0f) * 0.5f, y, 0.72f, cd);
+            else Line(L[i], 320.0f, y + (i == 6 ? 6.0f : 0.0f), 0.72f, cd);
+        }
+        Line("\x01 Continuar", 320.0f, 354.0f, 0.8f, cd);
     }
     if (hd == 1) Line("\x01 Esconderse", 320.0f, 400.0f, 1.0f, 230);
     if (hd == 2) Line("\x01 Salir", 320.0f, 400.0f, 1.0f, 230);

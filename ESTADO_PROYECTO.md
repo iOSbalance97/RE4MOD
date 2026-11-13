@@ -687,3 +687,8 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   del camino de espaldas y quieto (road_wait) hasta que Ashley coge el desvío (z < 5000), patrulla hacia
   el este (−21956, 9224). Atlas de letras 24 px con tabla índice (ch0_gidx) para ahorrar dol.
   mkscared.py usa mkcrouch_min.py = mkcrouch.py hasta "# name, file, loop" (se genera al vuelo).
+- **C0-05** (vídeo C0-04: dos ganados venían de lejos por el bosque hacia el inicio): todos los guardias con
+  ronda de 2,5 m de través (BEAT 1250) y correa de 4 m a casa (LEASH); sin patrullas largas (PT quitado);
+  Native(): flag &= ~0x41, Be_flg |= 0x100 y &= ~0x08000000; tras persecución vuelven a casa; Sq() nueva
+  (la anterior arrancaba Newton desde x y no convergía con distancias grandes); cartel recolocado
+  (comprobado con una simulación del dibujo en Python sobre el atlas).

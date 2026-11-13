@@ -37,7 +37,11 @@
  *     the game's stance (30 frames, holding its last frame).
  *   - a card with the level's explanation after the intro (Cross closes it; nothing moves meanwhile).
  *   - the road guard starts with his back to her and does not look round; his patrol (east only, away
- *     from the start) begins once she has taken the turn into the alley (z < 5000). */
+ *     from the start) begins once she has taken the turn into the alley (z < 5000).
+ * C0-05 (user's C0-04 video: two guards came from far through the wood): every guard keeps to a 2.5 m
+ *   beat across its facing and walks back if it is more than 4 m from home; the game's own detection is
+ *   kept off harder (flag 0x40 / Be_flg 0x08000000 too); after a chase they go back home; the square root
+ *   behind the distances was wrong far away (Newton from x itself); the card is re-spaced. */
 #include "game.h"
 
 #define STAGE G8(0x4FA8)
@@ -89,7 +93,14 @@ static void Hud(int sw)
     ((void (*)(void*, int))0x800C0518)((void*)0x8027E4A8, sw);
     ((void (*)(void*, int, int))0x8011C3CC)((void*)0x8028481C, 33, sw);
 }
-static f32 Sq(f32 x) { f32 r = x > 1.0f ? x : 1.0f; int i; if (x <= 0.0f) return 0.0f; for (i = 0; i < 14; i++) r = 0.5f * (r + x / r); return r; }
+static f32 Sq(f32 x)                                 /* sqrt: a power-of-4 start, then Newton */
+{
+    f32 r = 1.0f; int i;
+    if (x <= 0.0f) return 0.0f;
+    while (r * r * 16.0f < x) r *= 4.0f;
+    for (i = 0; i < 6; i++) r = 0.5f * (r + x / r);
+    return r;
+}
 static f32 PX(void) { return *(f32*)(pPL + 0x94); }
 static f32 PY(void) { return *(f32*)(pPL + 0x98); }
 static f32 PZ(void) { return *(f32*)(pPL + 0x9C); }
@@ -168,10 +179,6 @@ static u8* EmFind(int no)                            /* the live work made from 
 
 /* ---- stealth (C0-03) ---- */
 int CrouchActive(void);
-static const f32 PT[][4] = {                         /* patrols: guard no, the other point (x, z) */
-    { 0, -21956.0f, 9224.0f, 0 },   /* road: east, away from the start (C0-04) */ { 2, -11352.0f, 6898.0f, 0 }, { 10, 9189.0f, -15688.0f, 0 },
-};
-#define NPT (int)(sizeof(PT) / sizeof(PT[0]))
 static const f32 HIDE[][3] = {                       /* hiding places: x, z, radius */
     { -5578.0f, 12832.0f, 1300.0f },                 /* the stable (cow) */
 };
@@ -186,17 +193,6 @@ static f32 Sn(f32 a)
     return a * (1.0f - a2 / 6.0f * (1.0f - a2 / 20.0f * (1.0f - a2 / 42.0f)));
 }
 static f32 Cs(f32 a) { return Sn(a + 1.5707963f); }
-static f32 Atan2(f32 y, f32 x)                       /* a, b: atan2 for the facing (x, z) */
-{
-    f32 ax = x < 0 ? -x : x, ay = y < 0 ? -y : y, a, r;
-    if (ax < 1e-6f && ay < 1e-6f) return 0.0f;
-    r = ax > ay ? ay / ax : ax / ay;
-    a = r * (0.9998660f + r * r * (-0.3302995f + r * r * (0.1801410f + r * r * (-0.0851330f + r * r * 0.0208351f))));
-    if (ay > ax) a = 1.5707963f - a;
-    if (x < 0) a = 3.14159265f - a;
-    if (y < 0) a = -a;
-    return a;
-}
 static void Hold(Guard* g)                           /* guard where it stands: no game detection */
 {
     u8* e = g->e;
@@ -219,20 +215,30 @@ static void Chase(Guard* g)                          /* the game's own chase (ba
     e[0xFD] = 0; e[0xFE] = 0; e[0xFF] = 0;
     g->st = G_CHASE; g->lost = 0; g->meter = 1.0f;
 }
+static void Native(u8* e)                            /* the game's own detection off */
+{
+    *(u32*)(e + 0x3C8) &= ~0x41u; *(f32*)(e + 0x3CC) = 0.0f;
+    *(u32*)(e + 0x3E0) = (*(u32*)(e + 0x3E0) | 0x100) & ~0x08000000u;
+}
+/* C0-05: every guard keeps to its spot: a 2.5 m beat across its facing (1.25 m each side), a pause
+ * looking around at each end; farther than 4 m from home (pushed, after a chase) it walks back.
+ * Only our meter starts a chase. */
+#define BEAT 1250.0f
+#define LEASH 4000.0f
 static void Guards(void)
 {
-    int k, j, alarm = -1, crouched = CrouchActive(), running = pPL[0xFC] == 0 && pPL[0xFD] == 3;
+    int k, alarm = -1, crouched = CrouchActive(), running = pPL[0xFC] == 0 && pPL[0xFD] == 3;
     f32 rv = running ? 13000.0f : crouched ? 7000.0f : 11000.0f;
     for (k = 0; k < ngidx; k++) {
         Guard* g = &gd[k];
         u8* e = EmFind(gidx[k]);
-        f32 ex, ez, dx, dz, d, fw, ang;
+        f32 ex, ez, dx, dz, d, fw, ang, hx;
         if (e != g->e) {                             /* new room / new work: start guarding */
-            g->e = e; g->meter = 0.0f; g->leg = 0; g->pt = 0xFF; g->lost = 0;
+            g->e = e; g->meter = 0.0f; g->leg = 0; g->lost = 0;
             if (!e) continue;
             g->base = *(f32*)(e + 0xA4);
-            g->ax = *(f32*)(e + 0x94); g->az = *(f32*)(e + 0x9C);
-            for (j = 0; j < NPT; j++) if ((int)PT[j][0] == k) { g->pt = (u8)j; g->bx = PT[j][1]; g->bz = PT[j][2]; }
+            g->ax = *(f32*)(e + 0x94); g->az = *(f32*)(e + 0x9C);          /* home */
+            g->bx = Cs(g->base) * BEAT; g->bz = -Sn(g->base) * BEAT;         /* across the facing */
             Hold(g);
         }
         if (!e || e[0xFC] != 1 || *(s16*)(e + 0x320) <= 0) continue;     /* hit, dying... */
@@ -241,11 +247,11 @@ static void Guards(void)
         if (g->st == G_CHASE) {
             if (d > 15000.0f || (hidden && !g->lost)) g->lost++;
             else if (!hidden) g->lost = 0;
-            if (g->lost > 120) { g->meter = 0.6f; g->base = *(f32*)(e + 0xA4); if (g->pt != 0xFF) Walk(g, g->leg ? g->bx : g->ax, g->leg ? g->bz : g->az); else Hold(g); }
+            if (g->lost > 120) { g->meter = 0.6f; g->leg = 2; Walk(g, g->ax, g->az); }   /* back home */
             continue;
         }
-        /* keep the game's detection off while guarding / patrolling */
-        *(u32*)(e + 0x3C8) &= ~1u; *(f32*)(e + 0x3CC) = 0.0f; *(u32*)(e + 0x3E0) |= 0x100;
+        Native(e);
+        hx = (ex - g->ax) * (ex - g->ax) + (ez - g->az) * (ez - g->az);
         if (g->st == G_HOLD) {
             if (e[0xFD] != 1) { e[0xFD] = 1; e[0xFE] = 0; e[0xFF] = 0; }
             g->tm++;
@@ -254,18 +260,25 @@ static void Guards(void)
                 g->tm = 0;
                 if (PZ() < 5000.0f && ph == 1 && !card) road_wait = 0;
             } else if (e[0xFE] == 1) {               /* look slowly left and right */
-                ang = g->base + 0.45f * Sn((f32)g->tm * 0.017f + (f32)k);
+                ang = g->base + 0.45f * Sn((f32)g->tm * 0.02f + (f32)k);
                 while (ang > 3.14159265f) ang -= 6.2831853f;
                 while (ang < -3.14159265f) ang += 6.2831853f;
                 *(f32*)(e + 0xA4) = ang;
             }
-            if (g->pt != 0xFF && g->tm > 150) { g->leg ^= 1; Walk(g, g->leg ? g->bx : g->ax, g->leg ? g->bz : g->az); }
+            if (hx > LEASH * LEASH) { g->leg = 2; Walk(g, g->ax, g->az); }
+            else if (!(k == 0 && road_wait) && g->tm > 110) {               /* the other end of the beat */
+                g->leg = g->leg == 0 ? 1 : 0;
+                Walk(g, g->ax + (g->leg ? g->bx : -g->bx), g->az + (g->leg ? g->bz : -g->bz));
+            }
         } else if (g->st == G_WALK) {
-            f32 tx = g->leg ? g->bx : g->ax, tz = g->leg ? g->bz : g->az;
+            f32 tx = g->leg == 2 ? g->ax : g->ax + (g->leg ? g->bx : -g->bx);
+            f32 tz = g->leg == 2 ? g->az : g->az + (g->leg ? g->bz : -g->bz);
             *(s32*)(e + 0x3E4) = 300;                /* GuardWalk's timer: no wandering off */
             if (e[0xFD] != 0x14) { e[0xFD] = 0x14; e[0xFE] = 0; e[0xFF] = 0; }
-            if ((ex - tx) * (ex - tx) + (ez - tz) * (ez - tz) < 900.0f * 900.0f || ++g->tm > 900) {
-                g->base = *(f32*)(e + 0xA4); Hold(g);
+            *(f32*)(e + 0x92C) = tx; *(f32*)(e + 0x934) = tz;
+            if ((ex - tx) * (ex - tx) + (ez - tz) * (ez - tz) < 450.0f * 450.0f || ++g->tm > 600) {
+                if (g->leg == 2) g->leg = 0;
+                Hold(g);
             }
         }
         /* the alert meter */
@@ -281,7 +294,6 @@ static void Guards(void)
             if (rate > 0.0f) g->meter += rate; else { g->meter -= 0.006f; if (g->meter < 0.0f) g->meter = 0.0f; }
             if (g->meter >= 1.0f) alarm = k;
         } else { g->meter -= 0.006f; if (g->meter < 0.0f) g->meter = 0.0f; }
-        (void)Atan2;
     }
     if (alarm >= 0) {                                /* found: it and the ones near it */
         u8* a = gd[alarm].e;
