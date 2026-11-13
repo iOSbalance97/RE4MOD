@@ -42,6 +42,8 @@
  *   beat across its facing and walks back if it is more than 4 m from home; the game's own detection is
  *   kept off harder (flag 0x40 / Be_flg 0x08000000 too); after a chase they go back home; the square root
  *   behind the distances was wrong far away (Newton from x itself); the card is re-spaced.
+ * C0-08 (the user's corrected map): one watch at the north-west, two at the north-east, the pair by B and
+ *   the south pair as before; the gathering further west; boxes in the three black-marked passages.
  * C0-06 (user): the road guard walks along the road (his beat ran into a wall), in step with the watch
  *   over the crossing so that there is a moment to slip to the stable; only two in the square, by door B
  *   first and then back toward the start (not past her) once she is round the south side. */
@@ -129,35 +131,41 @@ void Ch0Jump(u32* a)
  * C0-07: the two of the south alley are gone from the start: they come in by the south gate later. */
 static const s16 GU[][5] = {
     { -27951, 0,   9471,   8407,  0 },   /* 0 road, just past the start */
-    { -15795, 0,  -6400,  -9054,  1 },   /* 1 centre-west, by the north houses */
-    { -12682, 0,   -991,    871,  3 },   /* 2 the watch over the crossing to the stable, in step with the road */
-    {  11000, 0,   1000,  -8192, 12 },   /* 3, 4 the square pair, by door B first */
-    {  12500, 0,   3500,  -8192,  0 },
-    { -13795, 0,  27131,   -136,  1 },   /* 5 south alley, by the gate */
-    {  16956, 0, -17604,  -6931,  3 },   /* 6 north-east road */
+    { -15761, 0,  -2050,    834,  3 },   /* 1 the watch over the crossing to the stable, in step with the road */
+    {  11688, 0,  -1077,  -8192, 12 },   /* 2, 3 the square pair, by door B first */
+    {  11940, 0,   3763,  -8192,  0 },
+    {  13121, 0, -17642,  -6931,  3 },   /* 4, 5 north-east (C0-08 map) */
+    {  15561, 0, -19534,  -6931,  1 },
 };
 #define NGU (int)(sizeof(GU) / sizeof(GU[0]))
-#define G_RUN0 NGU                       /* 7, 8: the two who run in by the south gate (EmSetEvent) */
+#define G_RUN0 NGU                       /* the two who run in by the south gate (EmSetEvent) */
 #define NG (NGU + 2)
+#define G_WATCH 1
 #define CYC 600
 static const f32 ROAD_W[2] = { -27951.0f, 9471.0f }, ROAD_E[2] = { -22081.0f, 9007.0f };
-/* the crossing: (-14239, 7377); the watch looks at it from -0.184 rad, away = 2.957 */
-static const f32 BV[NGU][2] = { { 0, 0 }, { 120, 1244 }, { 0, 0 }, { 0, 1250 }, { 0, 1250 }, { 1250, 33 }, { -348, 1201 } };
-/* C0-07: the gathering west of the bonfire (3, 4 and the two runners), all 2 m+ clear of walls */
-static const f32 GATHER[4][2] = { { -6900.0f, 3500.0f }, { -8300.0f, 3500.0f }, { -6900.0f, 4900.0f }, { -8300.0f, 4900.0f } };
-/* the runners' way in: south gate, up the alley, past the blocked corner, to the square (lines 0.5 m+ clear) */
+/* the crossing: (-14239, 7377); the watch looks at it at 0.160 rad, away = -2.98 */
+static const f32 BV[NGU][2] = { { 0, 0 }, { 0, 0 }, { 0, 1250 }, { 0, 1250 }, { -901, 866 }, { 0, 0 } };
+/* C0-08 map: the gathering west of the bonfire where the user's arrows end, 2.4 m+ clear of walls */
+static const f32 GATHER[4][2] = { { -10000.0f, 3500.0f }, { -10000.0f, 5000.0f }, { -11500.0f, 3500.0f }, { -11500.0f, 5000.0f } };
+#define VIA_X 0.0f                                   /* the square pair go round north of the bonfire */
+#define VIA_Z (-3000.0f)
 static const f32 RUNWAY[][2] = { { -15500.0f, 29000.0f }, { -14500.0f, 26000.0f }, { -13641.0f, 21193.0f },
                                  { -12529.0f, 15216.0f }, { -13000.0f, 10000.0f } };
 #define NRUN (int)(sizeof(RUNWAY) / sizeof(RUNWAY[0]))
-#define GATE_X (-16248.0f)
-#define GATE_Z 31000.0f
-#define BLOCK_X (-12529.0f)                          /* the path beside the stable: closed to Ashley */
-#define BLOCK_Z 15216.0f
-#define BLOCK_R 1700.0f
+static const f32 RUN0[2][2] = { { -16248.0f, 31000.0f }, { -14383.0f, 30634.0f } };   /* inside the south gate */
 #define STABLE_X (-5772.0f)
 #define STABLE_Z 12963.0f
+/* C0-08: the user's black marks, closed with boxes (the room's own et01 box, EtcModelSet PAL 0x8010ACF0)
+ * across the narrowest line of each passage (work: wall-to-wall chords), and an invisible stop behind them */
+static const f32 BLK[3][5] = {                       /* centre x, z, direction (rad), width, boxes */
+    { -10953.0f, 14439.0f, 1.5708f, 1200.0f, 2 },    /* the alley beside the stable */
+    {  -6245.0f, -5123.0f, 2.4435f, 1800.0f, 3 },    /* west of the house */
+    {  12960.0f, -12682.0f, 2.7925f, 2000.0f, 3 },   /* north-east of the house */
+};
+#define ETC_SET ((int (*)(void*))0x8010ACF0)
+static u8 boxes[8][0x28] __attribute__((aligned(4)));
 static const f32 SIEGE[3][2] = { { 7169.0f, -4800.0f }, { 8700.0f, -5000.0f }, { 6300.0f, -4300.0f } };   /* house C's front */
-static const f32 LADDER[2] = { -13500.0f, -9000.0f };                                                   /* foot of the ladder up */
+static const f32 LADDER[2] = { -13518.0f, -10294.0f };   /* the room's ladder (ETS, id 6) */                                                   /* foot of the ladder up */
 
 /* hook at EmSetFromList's entry: r111's list -> our guards */
 void Ch0EmList(void)
@@ -177,7 +185,7 @@ void Ch0EmList(void)
         *(u32*)(e + 4) = 0x00020000u;                /* torch; no bit 8 (that one keeps them turned to the player) */
         *(u16*)(e + 8) = 1000;
         *(s16*)(e + 0x0C) = GU[k][0] / 10; *(s16*)(e + 0x0E) = GU[k][1] / 10; *(s16*)(e + 0x10) = GU[k][2] / 10;
-        if (stage && (k == 3 || k == 4)) { *(s16*)(e + 0x0C) = (s16)(GATHER[k - 3][0] / 10.0f); *(s16*)(e + 0x10) = (s16)(GATHER[k - 3][1] / 10.0f); }
+        if (stage && (k == 2 || k == 3)) { *(s16*)(e + 0x0C) = (s16)(GATHER[k - 2][0] / 10.0f); *(s16*)(e + 0x10) = (s16)(GATHER[k - 2][1] / 10.0f); }
         *(s16*)(e + 0x14) = GU[k][3];
         *(u16*)(e + 0x18) = 0x111;
         *(s16*)(e + 0x1A) = 10;
@@ -271,10 +279,10 @@ static void Turn(u8* e, f32 want, f32 step)          /* turn its facing toward `
 static void Group(int k)                             /* to its place in the gathering west of the bonfire */
 {
     Guard* g = &gd[k];
-    int s = k == 3 ? 0 : k == 4 ? 1 : k == G_RUN0 ? 2 : 3;
+    int s = k == 2 ? 0 : k == 3 ? 1 : k == G_RUN0 ? 2 : 3;
     g->ax = GATHER[s][0]; g->az = GATHER[s][1]; g->bx = g->bz = 0.0f;
     g->role = R_GROUP;
-    if (g->e && g->st != G_CHASE && k < G_RUN0) { g->leg = 3; Walk(g, -4000.0f, -2000.0f); }   /* round the bonfire, north */
+    if (g->e && g->st != G_CHASE && k < G_RUN0) { g->leg = 3; Walk(g, VIA_X, VIA_Z); }   /* round the bonfire, north */
 }
 static u8 rrec[32] __attribute__((aligned(4)));
 static u8* Spawn(f32 x, f32 z, f32 ang, int type)    /* a torch Ganado (EmSetEvent) */
@@ -307,7 +315,7 @@ static void Guards(void)
             g->base = *(f32*)(e + 0xA4);
             g->ax = *(f32*)(e + 0x94); g->az = *(f32*)(e + 0x9C);          /* home */
             g->bx = BV[k][0]; g->bz = BV[k][1];
-            if (stage && (k == 3 || k == 4)) { g->role = R_GROUP; g->bx = g->bz = 0.0f; }
+            if (stage && (k == 2 || k == 3)) { g->role = R_GROUP; g->bx = g->bz = 0.0f; }
             Hold(g);
         }
         if (!e || e[0xFC] != 1 || *(s16*)(e + 0x320) <= 0) continue;     /* hit, dying, being born... */
@@ -359,13 +367,13 @@ static void Guards(void)
             *(s32*)(e + 0x3E4) = 300;
             if ((ex - LADDER[0]) * (ex - LADDER[0]) + (ez - LADDER[1]) * (ez - LADDER[1]) < 900.0f * 900.0f || ++g->tm > 900) Chase(g);
             continue;
-        } else if (k == 2 && g->role == R_NONE) {    /* the watch: at the crossing, then away, in step */
+        } else if (k == G_WATCH && g->role == R_NONE) {   /* the watch: at the crossing, then away, in step */
             int look = road_wait || (cyc % CYC) < CYC / 2;
             if (g->st != G_HOLD) { if (hx > 450.0f * 450.0f) { if (g->st != G_WALK) Walk(g, g->ax, g->az); *(s32*)(e + 0x3E4) = 300; } else Hold(g); }
             else {
                 if (e[0xFD] != 1) { e[0xFD] = 1; e[0xFE] = 0; e[0xFF] = 0; }
                 if (hx > LEASH * LEASH) Walk(g, g->ax, g->az);
-                else if (e[0xFE] == 1) Turn(e, (look ? -0.184f : 2.957f) + 0.15f * Sn((f32)cyc * 0.025f), 0.035f);
+                else if (e[0xFE] == 1) Turn(e, (look ? 0.160f : -2.98f) + 0.15f * Sn((f32)cyc * 0.025f), 0.035f);
             }
         } else if (g->st == G_HOLD) {
             if (e[0xFD] != 1) { e[0xFD] = 1; e[0xFE] = 0; e[0xFF] = 0; }
@@ -566,7 +574,7 @@ static void Runners(int at_gate)                     /* the two from the south g
     for (j = 0; j < 2; j++) {
         Guard* g = &gd[G_RUN0 + j];
         memclr_asm(g, sizeof(*g));
-        g->e = at_gate ? Spawn(GATE_X + (j ? 900.0f : -900.0f), GATE_Z + (j ? 1200.0f : 0.0f), 3.0f, j ? 1 : 3)
+        g->e = at_gate ? Spawn(RUN0[j][0], RUN0[j][1], 3.0f, j ? 1 : 3)
                        : Spawn(GATHER[2 + j][0], GATHER[2 + j][1], 0.0f, j ? 1 : 3);
         if (!g->e) continue;
         g->ax = GATHER[2 + j][0]; g->az = GATHER[2 + j][1];
@@ -584,13 +592,34 @@ static void AfterKey(void)                           /* some go in after her, th
         else Chase(g);
     }
 }
-static void Block(void)                              /* the path beside the stable: Ashley can't go in */
+static void Block(void)                              /* behind the boxes: Ashley can't get through */
 {
-    f32 dx = PX() - BLOCK_X, dz = PZ() - BLOCK_Z, d2 = dx * dx + dz * dz, d;
-    if (d2 >= BLOCK_R * BLOCK_R || PY() > 1500.0f) return;
-    d = Sq(d2); if (d < 1.0f) { dx = 1.0f; dz = 0.0f; d = 1.0f; }
-    *(f32*)(pPL + 0x94) = BLOCK_X + dx / d * BLOCK_R;
-    *(f32*)(pPL + 0x9C) = BLOCK_Z + dz / d * BLOCK_R;
+    int i;
+    if (PY() > 1500.0f) return;
+    for (i = 0; i < 3; i++) {
+        f32 r = BLK[i][3] * 0.5f + 300.0f, dx = PX() - BLK[i][0], dz = PZ() - BLK[i][1], d2 = dx * dx + dz * dz, d;
+        if (d2 >= r * r) continue;
+        d = Sq(d2); if (d < 1.0f) { dx = 1.0f; dz = 0.0f; d = 1.0f; }
+        *(f32*)(pPL + 0x94) = BLK[i][0] + dx / d * r;
+        *(f32*)(pPL + 0x9C) = BLK[i][1] + dz / d * r;
+    }
+}
+static void Boxes(void)                              /* the boxes (room etc slots 48-55) */
+{
+    int i, j, n = 0;
+    for (i = 0; i < 3; i++) {
+        int c = (int)BLK[i][4];
+        f32 sx = Sn(BLK[i][2]), sz = Cs(BLK[i][2]);
+        for (j = 0; j < c && n < 8; j++, n++) {
+            u8* d = boxes[n];
+            f32 o = ((f32)j - (f32)(c - 1) * 0.5f) * (BLK[i][3] / (f32)c);
+            memclr_asm(d, 0x28);
+            *(u16*)d = 1; *(u16*)(d + 2) = (u16)(48 + n);
+            *(f32*)(d + 0x14) = BLK[i][2] + 0.3f * (f32)j;
+            *(f32*)(d + 0x1C) = BLK[i][0] + sx * o; *(f32*)(d + 0x20) = 0.0f; *(f32*)(d + 0x24) = BLK[i][1] + sz * o;
+            ETC_SET(d);
+        }
+    }
 }
 static void Restart(void)                            /* caught: the room again from the checkpoint */
 {
@@ -614,6 +643,7 @@ void Ch0Frame(void)
         if (Ashley()) {
             ready = 1; t = 0;
             if (ph == 0) Hud(0); else { ch0_padlock = 0; Hud(1); }
+            Boxes();
             if (ph == 1 && stage >= 1) Runners(0);
             if (ph == 1 && cp == 1 && !Alive(hman)) hman = HouseGanado(DOOR_IN_X, DOOR_IN_Z - 900.0f, 3.02f);
             if (ph == 1 && key) after_key = 30;
@@ -673,7 +703,7 @@ void Ch0Frame(void)
         if (after_key && --after_key == 0) AfterKey();
         if (stage == 0 && !scene && D2(STABLE_X, STABLE_Z) < 2500.0f * 2500.0f) {   /* passing the stable */
             scene_gate = 1; Hud(0);
-            Runners(1); Group(3); Group(4);
+            Runners(1); Group(2); Group(3);
             return;
         }
         if (pPL[0xFC] == 1 && !scene) { caught = 1; cap_t = 0; msg = 0; hidden = 0; ch0_crouch_force = 0; Hud(0); return; }

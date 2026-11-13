@@ -72,9 +72,10 @@ C_SRCS=['c/item.c','c/pad.c','c/weapon.c','c/hud.c','c/icon.c','c/sil_data.c','c
 C_HOOKS=[(0x80150EAC,'hook_item'),(0x8013792C,'hook_pad'),(0x80148D64,'hook_pzl_init'),(0x80149058,'hook_pzl_quit'),(0x801249B8,'hook_frame'),(0x80124A44,'hook_draw'),(0x800C5E84,'hook_dvdread'),(0x80169718,'hook_mesbar'),(0x8003EB6C,'hook_laser'),(0x80145A0C,'hook_hitchk'),(0x801472DC,'hook_sway'),(0x8003EA48,'hook_laserray'),(0x800BCD54,'hook_aimcam'),(0x800BDB00,'hook_cam'),(0x8011D47C,'hook_hud'),(0x80152E28,'hook_rjump'),(0x800CB20C,'hook_emlist')]
 def build_c(addr):
     objs=[]
+    OPT={'c/ch0.c':'-Os','c/hud.c':'-Os','c/crouch.c':'-Os','c/stealth.c':'-Os','c/barn.c':'-Os'}   # C0-08: the chapter's own code for size (the dol ends at the DVD buffer, 0x80300000)
     for f in C_SRCS:
         o=f[:-2]+'.o'
-        subprocess.check_call(['clang','--target=powerpc-unknown-eabi','-mcpu=750','-O2','-ffreestanding','-fno-builtin',
+        subprocess.check_call(['clang','--target=powerpc-unknown-eabi','-mcpu=750',OPT.get(f,'-O2'),'-ffreestanding','-fno-builtin',
             '-fno-common','-fno-asynchronous-unwind-tables','-Wall','-Werror','-c',f,'-o',o]); objs.append(o)
     for f in C_ASM:
         o=f[:-2]+'.o'; subprocess.check_call([B+'as','-mgekko','-mregnames',f,'-o',o]); objs.append(o)

@@ -708,3 +708,10 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   después AfterKey(): alternos persiguen / van al pie de la escalera (−13500, −9000) y luego persiguen.
   stage 0/1/2 sobrevive al reinicio (cp 1 repone corredores en el grupo y reparte tras 30 frames).
   Dol: 5 KB libres.
+- **C0-08** (mapa corregido del usuario, tools/ch0/mapa_usuario_c008.jpg; registrado sobre el primero con
+  4 puntos): espacio con -Os por archivo (bake.py OPT: ch0, hud, crouch, stealth, barn; 5 → ~16 KB libres; la
+  frontera es el búfer de DVD en 0x80300000). Cajas: entradas ETS propias (id 1 = et01, slots 48-55) con
+  EtcModelSet (PAL 0x8010ACF0, hallado desde la cadena "ETS" → EtcModelListSet 0x80106B68) al cargar la sala,
+  en la cuerda más estrecha de cada paso (BLK) + tope invisible. ETS de r111: puertas id 3 (casa C en
+  6540, −6422), escaleras id 6 (−13518, −10294 y −4939, −17683), ventanas id 0, cajas id 1/2.
+  Guardias: 0 camino, 1 vigía (−15761, −2050), 2/3 pareja de B, 4/5 noreste; reunión GATHER más al oeste.
