@@ -644,6 +644,10 @@ Reglas de trabajo del usuario:
      más lo usa; B111 el 3) y, mientras dura su tiempo (85 frames), si el slot deja de estar vivo o cambia
      su atributo se vuelve a poner (se pinta de golpe, sin parpadeo visible). Causa exacta de que se cerrara
      sin confirmar (no se ve en el código del motor de mensajes; algo de la escena cierra el slot).
+   - **B113** (usuario: las frases solo parpadean): CAUSA: solo los slots de mensaje 0-2 tienen cola de glifos
+     (MessageControl::init, PAL 0x8002393C: slot ≤ 2 → cola, separadas 0x12C0; el resto +0xB8 = 0). Un slot
+     sin cola mide y recorre su texto pero no pone ningún glifo. B111 usaba el 3, B112 el 12. Ahora el slot 12
+     tiene su propia cola (sub_queue, 0x12C0 bytes) puesta en +0xB8 en cada MesSet.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

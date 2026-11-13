@@ -143,9 +143,15 @@ static const u16 SUB_DONDE[] = { 0x0, 0x122, 0xAA, 0xC5, 0x80, 0xC4, 0xF2, 0xCE,
 static int sub_left;
 static u32 sub_attr;
 static const u16* sub_txt;
+/* B113: THE reason the lines only blinked (B111 slot 3, B112 slot 12): only message slots 0-2 get a glyph
+ * queue (MessageControl::init: MesRegistQueue for i <= 2, MesReleaseQueue for the rest); a slot with no
+ * queue (+0xB8 = 0; PAL 0x8002394C) measures and runs its text but queues no glyph, so nothing stays on screen. Our slot
+ * gets its own queue (0x100 entries x 16 bytes, what code00 clears) */
+static u32 sub_queue[0x12C0 / 4] __attribute__((aligned(32)));   /* as the game's own (0x12C0 apart) */
 static void SubSet(void)
 {
     u8* m0 = cMes + 4; u8* m = SUB_SLOT;
+    *(u32**)(m + 0xB8) = sub_queue;
     int fh = *(s8*)(m0 + 0x19), lg = *(s8*)(m0 + 0x77);
     *(s8*)(m + 0x18) = *(s8*)(m0 + 0x18); *(s8*)(m + 0x19) = *(s8*)(m0 + 0x19);   /* the game's size, as slot 0 */
     *(u16*)(m + 0x76) = *(u16*)(m0 + 0x76);
