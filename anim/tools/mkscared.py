@@ -4,9 +4,9 @@ import numpy as np, math
 from conv import convert
 from leon import PAR
 from mot import euler_zyx
-import mkcrouch_min as M
+import mkcrouch_min as M   # mkcrouch.py up to its clip table (make it with: head of mkcrouch.py)
 F='/home/claude/re4mod/anim/mixamo/ashley/Scared.fbx'
-FPS=10; T0=2.2; T1=7.0
+FPS=10; T0=2.2; T1=5.9   # C0-04: ends when she has looked both ways (the arms come up after 6 s)
 fr=convert(F,fps=FPS,inplace=True,t0=T0,t1=T1)   # the standing part: up at 2 s, down again at 7.5 s
 r=-M.facing(fr)
 Rr=M.Ry(r); rows=[]; ys=[]

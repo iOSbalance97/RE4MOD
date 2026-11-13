@@ -31,7 +31,13 @@
  *   - patrols: road (the map's left-right arrows), centre-west and north-east walk between two points
  *     (Ganado routine 1/0x14 GuardWalk to Go_pos, +0x92C), stop, look, and go back.
  *   - Ashley crouches (Circle, crouch.c with Leon's clips on her parts 0-25), slower and less seen.
- *   - hiding places (Cross): she stays crouched and still, unseen; a chaser within 4 m sees her go in. */
+ *   - hiding places (Cross): she stays crouched and still, unseen; a chaser within 4 m sees her go in.
+ * C0-04 (the user's C0-03 test: the intro is good):
+ *   - the scared clip ends when she has looked both ways (no shoulders up) and fades out slowly into
+ *     the game's stance (30 frames, holding its last frame).
+ *   - a card with the level's explanation after the intro (Cross closes it; nothing moves meanwhile).
+ *   - the road guard starts with his back to her and does not look round; his patrol (east only, away
+ *     from the start) begins once she has taken the turn into the alley (z < 5000). */
 #include "game.h"
 
 #define STAGE G8(0x4FA8)
@@ -66,7 +72,7 @@ extern int ch0_crouch_force;                 /* crouch.c: kept crouched (hidden)
 enum { G_HOLD, G_WALK, G_CHASE };
 typedef struct { u8* e; u8 st, pt, leg, pad; f32 base, meter, ax, az, bx, bz; int tm, lost; } Guard;
 static Guard gd[16];
-static int hidden, hide_no;
+static int hidden, hide_no, card, card_t, road_wait;
 
 #define BX 19713.0f                                  /* door B */
 #define BZ 2003.0f
@@ -97,7 +103,7 @@ void Ch0Jump(u32* a)
     lpos = *(Vec*)a[1]; lrot = *(Vec*)a[2]; larg = (int)a[3];
     PL_SELECT(1);
     a[0] = 0x111; a[1] = (u32)&apos; a[2] = (u32)&arot;
-    hidden = 0; ch0_crouch_force = 0;
+    hidden = 0; ch0_crouch_force = 0; card = 0; road_wait = 1;
     on = 1; ph = 0; t = 0; ready = 0; endt = 0; key = 0; b_seen = 0; cp = 0; caught = 0; scene = 0; msg = 0;
 }
 
@@ -163,7 +169,7 @@ static u8* EmFind(int no)                            /* the live work made from 
 /* ---- stealth (C0-03) ---- */
 int CrouchActive(void);
 static const f32 PT[][4] = {                         /* patrols: guard no, the other point (x, z) */
-    { 0, -32500.0f, 10496.0f, 0 }, { 2, -11352.0f, 6898.0f, 0 }, { 10, 9189.0f, -15688.0f, 0 },
+    { 0, -21956.0f, 9224.0f, 0 },   /* road: east, away from the start (C0-04) */ { 2, -11352.0f, 6898.0f, 0 }, { 10, 9189.0f, -15688.0f, 0 },
 };
 #define NPT (int)(sizeof(PT) / sizeof(PT[0]))
 static const f32 HIDE[][3] = {                       /* hiding places: x, z, radius */
@@ -243,7 +249,11 @@ static void Guards(void)
         if (g->st == G_HOLD) {
             if (e[0xFD] != 1) { e[0xFD] = 1; e[0xFE] = 0; e[0xFF] = 0; }
             g->tm++;
-            if (e[0xFE] == 1) {                      /* look slowly left and right */
+            if (k == 0 && road_wait) {               /* the road guard: back to her, still, until the turn */
+                if (e[0xFE] == 1) *(f32*)(e + 0xA4) = g->base;
+                g->tm = 0;
+                if (PZ() < 5000.0f && ph == 1 && !card) road_wait = 0;
+            } else if (e[0xFE] == 1) {               /* look slowly left and right */
                 ang = g->base + 0.45f * Sn((f32)g->tm * 0.017f + (f32)k);
                 while (ang > 3.14159265f) ang -= 6.2831853f;
                 while (ang < -3.14159265f) ang += 6.2831853f;
@@ -259,7 +269,7 @@ static void Guards(void)
             }
         }
         /* the alert meter */
-        if (!hidden && ph == 1 && !scene) {
+        if (!hidden && ph == 1 && !scene && !card) {
             f32 dy = PY() - *(f32*)(e + 0x98), rate = 0.0f;
             if (dy < 0.0f) dy = -dy;
             if (dy < 2500.0f) {
@@ -288,7 +298,7 @@ static void Guards(void)
 int Ch0Mark(int k, f32* x, f32* y, f32* z)
 {
     Guard* g;
-    if (!on || !ready || ph != 1 || scene || caught || k >= ngidx) return 0;
+    if (!on || !ready || ph != 1 || scene || caught || card || k >= ngidx) return 0;
     g = &gd[k];
     if (!Alive(g->e) || g->e[0xFC] != 1) return 0;
     *x = *(f32*)(g->e + 0x94); *y = *(f32*)(g->e + 0x98) + 2050.0f; *z = *(f32*)(g->e + 0x9C);
@@ -321,7 +331,8 @@ static void HideFrame(u16 trg)
     ch0_padlock = 1;                                 /* still, crouched; Cross: out */
     if (trg & PAD_A) { hidden = 0; ch0_crouch_force = 0; ch0_padlock = 0; }
 }
-int Ch0Hide(void) { if (!on || !ready || ph != 1 || scene || caught) return 0; return hidden ? 2 : (HideSpot() >= 0 ? 1 : 0); }
+int Ch0Card(void) { if (!on || !card) return 0; return card == 1 ? (card_t < 12 ? card_t * 255 / 12 : 255) : 255 - card_t * 255 / 12; }
+int Ch0Hide(void) { if (!on || !ready || ph != 1 || scene || caught || card) return 0; return hidden ? 2 : (HideSpot() >= 0 ? 1 : 0); }
 
 /* SceAt areas (pS->ot): doors off for the chapter; the bed's own check off until the key is taken */
 static u8* OtNext(u8* p)
@@ -394,8 +405,9 @@ static u8* HouseGanado(f32 x, f32 z, f32 ang)        /* a torch Ganado (EmSetEve
 #define T_LIT      265
 #define T_WALK     232
 #define T_STOP     (T_WALK + 48)
-#define T_SAY      (T_STOP + 75)
-#define T_FREE     (T_STOP + 165)
+#define T_SC_END   (T_STOP + 111)           /* 37 clip frames at 10 fps */
+#define T_SAY      (T_STOP + 55)
+#define T_FREE     (T_SC_END + 30)
 void ScaredApply(f32 f, f32 k);                      /* crouch.c */
 static f32 Sm(f32 x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) return 1.0f; return x * x * (3.0f - 2.0f * x); }
 static void IntroCam(void)                           /* from her feet, in front, up to her whole body */
@@ -412,6 +424,7 @@ static void Msg(int m) { msg = m; msg_t = 0; }       /* texts: 1 locked, 2 key, 
 static void Restart(void)                            /* caught: the room again from the checkpoint */
 {
     hidden = 0; ch0_crouch_force = 0;
+    if (!cp) road_wait = 1;
     PL_LIFE = PL_LIFE_MAX;
     ready = 0; scene = 0; caught = 0; ch0_padlock = 1; msg = 0;
     ROOM_JUMP(0x111, cp ? &kpos : &apos, cp ? &krot : &arot, 0);
@@ -438,7 +451,7 @@ void Ch0Frame(void)
     if (msg) msg_t++;
     if (msg && msg != 3 && msg_t > 150) msg = 0;
     Areas();
-    if (ph == 1 && !caught && !scene) ch0_padlock = 0;
+    if (ph == 1 && !caught && !scene && !card) ch0_padlock = 0;
     Guards();
     if (Alive(hman)) {                               /* born without bit 1 (else it stays hidden, barn.c B94) */
         hman_t++;
@@ -448,14 +461,20 @@ void Ch0Frame(void)
         ch0_padlock = 1; ch0_stick = 0;
         if (t >= T_WALK && t < T_STOP) { ch0_stick = 1; ch0_sx = 0; ch0_sy = 56; }     /* four steps */
         IntroCam();
-        if (t >= T_STOP) {                           /* the scared clip, in and out */
-            f32 k = (f32)(t - T_STOP) / 12.0f;
-            f32 ko = (f32)(T_FREE - t) / 12.0f;
-            if (k > 1.0f) k = 1.0f;
-            if (ko < k) k = ko;
-            ScaredApply((f32)(t - T_STOP) * (10.0f / 30.0f), k);
+        if (t >= T_STOP) {                           /* the scared clip: in, then a slow fade on its last frame */
+            f32 k = Sm((f32)(t - T_STOP) / 14.0f), f = (f32)(t - T_STOP) * (10.0f / 30.0f);
+            if (t >= T_SC_END) { k = 1.0f - Sm((f32)(t - T_SC_END) / 30.0f); f = 36.99f; }
+            if (f > 36.99f) f = 36.99f;
+            ScaredApply(f, k);
         }
-        if (t >= T_FREE) { ph = 1; ch0_padlock = 0; ch0_stick = 0; STOPF &= ~SPF_CAM; Hud(1); }
+        if (t >= T_FREE) { ph = 1; ch0_stick = 0; STOPF &= ~SPF_CAM; card = 1; card_t = 0; }
+        return;
+    }
+    if (ph == 1 && card) {                           /* the level's card: Cross closes it */
+        ch0_padlock = 1;
+        card_t++;
+        if (card == 1 && card_t > 30 && (trg & PAD_A)) { card = 2; card_t = 0; }
+        if (card == 2 && card_t > 12) { card = 0; ch0_padlock = 0; Hud(1); }
         return;
     }
     if (ph == 1) {
@@ -538,6 +557,6 @@ int Ch0Text(int k)
 }
 int Ch0Coords(int i)                                  /* test: Ashley x, y, z; -999999 = off */
 {
-    if (!on || !ready || ph != 1 || caught || scene || !Ashley()) return -999999;
+    if (!on || !ready || ph != 1 || caught || scene || card || !Ashley()) return -999999;
     return (int)*(f32*)(pPL + 0x94 + 4 * i);
 }

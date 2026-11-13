@@ -539,7 +539,7 @@ int StealthDiag(int i);
 void BarnFrame(void);
 void Ch0Frame(void);
 int Ch0Black(void); int Ch0Text(int k); int Ch0Coords(int i);
-int Ch0Mark(int k, f32* x, f32* y, f32* z); int Ch0Hide(void);
+int Ch0Mark(int k, f32* x, f32* y, f32* z); int Ch0Hide(void); int Ch0Card(void);
 void ModFrame(void)
 {
     mod_frame++;
@@ -652,12 +652,12 @@ static void BarnDraw(void)                         /* B88: the stealth panel; Le
 }
 
 /* C0-01/02: chapter 0 overlay: black screen, the texts (glyph atlas, ch0_font.c), Ashley's position (test) */
-extern const u8 ch0_font[]; extern const u16 ch0_glyph[256][4];
+extern const u8 ch0_font[], ch0_gidx[256]; extern const u16 ch0_glyph[][4];
 extern const int ch0_font_w, ch0_font_h, ch0_font_gh, ch0_font_space;
 static f32 TextW(const char* s, f32 k)
 {
     f32 w = 0.0f;
-    for (; *s; s++) { u8 c = (u8)*s; w += c == ' ' ? (f32)ch0_font_space : ch0_glyph[c][3] * 0.25f; }
+    for (; *s; s++) { u8 c = (u8)*s; w += c == ' ' ? (f32)ch0_font_space : ch0_gidx[c] ? ch0_glyph[ch0_gidx[c] - 1][3] * 0.25f : 0.0f; }
     return w * k;
 }
 static void Text(const char* s, f32 cx, f32 y, f32 k, u32 c)     /* centred on cx; k = scale */
@@ -675,10 +675,11 @@ static void Text(const char* s, f32 cx, f32 y, f32 k, u32 c)     /* centred on c
     GXSetTevOrder(0, 0, 0, 4);
     GXSetTevOp(0, 0);
     for (; *s; s++) {
-        u8 ch = (u8)*s; const u16* g = ch0_glyph[ch];
+        u8 ch = (u8)*s; const u16* g;
         f32 w, u0, u1, v0, v1;
         if (ch == ' ') { x += ch0_font_space * k; continue; }
-        if (!g[2]) continue;
+        if (!ch0_gidx[ch]) continue;
+        g = ch0_glyph[ch0_gidx[ch] - 1];
         w = g[2] * k; u0 = g[0] * iw; u1 = (g[0] + g[2]) * iw; v0 = g[1] * ih; v1 = (g[1] + ch0_font_gh) * ih;
         x -= 2.0f * k;                                           /* the glyph cell's 2 px margin */
         GXBegin(0x80, 0, 4);
@@ -691,13 +692,14 @@ static void Text(const char* s, f32 cx, f32 y, f32 k, u32 c)     /* centred on c
 }
 static void Line(const char* s, f32 cx, f32 y, f32 k, int a)    /* white text with a soft dark shadow */
 {
+    k *= 32.0f / 24.0f;                                      /* C0-04: the atlas cells are 24 px now */
     Text(s, cx + 1.5f * k, y + 1.5f * k, k, (u32)(a * 3 / 4));
     Text(s, cx, y, k, 0xF2EEE600u | (u32)a);
 }
 static void Ch0Draw(void)
 {
     Mtx44 p; Mtx m; int i, a[8], any = 0;
-    int bk = Ch0Black(), cx = Ch0Coords(0), hd = Ch0Hide(), nm = 0;
+    int bk = Ch0Black(), cx = Ch0Coords(0), hd = Ch0Hide(), nm = 0, cd = Ch0Card();
     f32 mx[16], my[16]; int ml[16];
     for (i = 0; i < 8; i++) { a[i] = Ch0Text(i); any |= a[i]; }
     for (i = 0; i < 16; i++) {                               /* C0-03: the guards' markers, projected */
@@ -715,7 +717,7 @@ static void Ch0Draw(void)
             if (qw > 1.0f) { mx[nm] = 320.0f * (1.0f + qx / qw); my[nm] = 240.0f * (1.0f - qy / qw); ml[nm] = lv; nm++; }
         }
     }
-    if (!bk && !any && cx == -999999 && !hd && !nm) return;
+    if (!bk && !any && cx == -999999 && !hd && !nm && !cd) return;
     GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
     C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
     PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
@@ -735,6 +737,23 @@ static void Ch0Draw(void)
         Disc(mx[i], my[i], 7.5f, al * 2 / 3);
         Disc(mx[i], my[i], 6.0f, col | al);
         if (lv >= 100) Line("!", mx[i], my[i] - 26.0f, 0.9f, 255);
+    }
+    if (cd) {                                                /* C0-04: the level's card */
+        static const char* const L[] = {
+            "Ashley tiene que escapar del pueblo sin que la atrapen.",
+            "Los ganados vigilan. La marca sobre su cabeza avisa:",
+            "blanca, te intuye \xb7 amarilla, sospecha \xb7 roja, te ha visto.",
+            "\x02  Agacharse: m\xe1s lenta, pero tardan m\xe1s en verte.",
+            "L3  Correr: haces ruido.",
+            "\x01  Esconderse donde se pueda.",
+            "Si te atrapan, vuelves al \xfaltimo punto." };
+        ModeFlat();
+        Quad(60.0f, 92.0f, 520.0f, 300.0f, (u32)(cd * 200 / 255), 0);
+        Quad(60.0f, 92.0f, 520.0f, 2.0f, 0xC8B89000u | (u32)(cd * 200 / 255), 0);
+        Quad(60.0f, 390.0f, 520.0f, 2.0f, 0xC8B89000u | (u32)(cd * 200 / 255), 0);
+        Line("Cap\xedtulo 0 \x97 Hace 11 horas", 320.0f, 104.0f, 1.15f, cd);
+        for (i = 0; i < 7; i++) Line(L[i], 320.0f, 152.0f + 30.0f * i + (i >= 3 ? 10.0f : 0.0f), 0.78f, cd);
+        Line("\x01 Continuar", 320.0f, 356.0f, 0.85f, cd);
     }
     if (hd == 1) Line("\x01 Esconderse", 320.0f, 400.0f, 1.0f, 230);
     if (hd == 2) Line("\x01 Salir", 320.0f, 400.0f, 1.0f, 230);

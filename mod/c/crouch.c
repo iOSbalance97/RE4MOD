@@ -388,8 +388,9 @@ void ScaredApply(f32 f, f32 k)
     u8* pl = pPL; u8* p; f32* l; f32 m[3][3], e[3], fr, y;
     int i, a, b;
     if (!pl || k <= 0.0f) return;
-    while (f >= (f32)SC_N) f -= (f32)SC_N;
-    a = (int)f; b = a + 1 < SC_N ? a + 1 : 0; fr = f - (f32)a;
+    if (f < 0.0f) f = 0.0f;
+    if (f > (f32)(SC_N - 1)) f = (f32)(SC_N - 1);
+    a = (int)f; b = a + 1 < SC_N ? a + 1 : a; fr = f - (f32)a;
     for (i = 0; i < 25; i++) {
         int no = i + 1;
         Q qa, qb;

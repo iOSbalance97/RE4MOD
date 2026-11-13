@@ -682,3 +682,8 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   Círculo → CrouchPress con Ashley; sin derribos sigilosos con Ashley). Escondites: tabla HIDE en ch0.c
   (establo −5578, 12832). Intro: anim/tools/mkscared.py (Mixamo 'Scared' del usuario, 2,2–7,0 s, 10 fps,
   partes 1-25) → c/ch0_scared.h, crouch.c ScaredApply; cámara IntroCam (de los pies, de frente, subiendo).
+- **C0-04** (prueba C0-03: la intro "ha quedado genial"): Scared 2,2–5,9 s (sin el gesto de hombros del
+  final) y salida de 30 frames sobre su última pose; cartel del nivel tras la intro (hud.c, ✕); guardia
+  del camino de espaldas y quieto (road_wait) hasta que Ashley coge el desvío (z < 5000), patrulla hacia
+  el este (−21956, 9224). Atlas de letras 24 px con tabla índice (ch0_gidx) para ahorrar dol.
+  mkscared.py usa mkcrouch_min.py = mkcrouch.py hasta "# name, file, loop" (se genera al vuelo).
