@@ -767,3 +767,8 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   id 17 → Et11_init → SetBox) toma su TPL del efecto et11.eff (EFM TPL 9), no de un .tpl. Cuerpo del
   contenedor r310 = bin 9 (1920 B, textura 8 del TPL de la sala: 512x128 CMPR, 32 KB). Idea: cuerpo del
   contenedor en el sitio de et1100.bin + su textura en lugar de la del barril.
+- **C0-18**: contenedores (cuerpo r310 bin 9 + textura 8 con mips, final de em12.drs; sustituyen a et1100.bin y a la
+  imagen del EFM 9 de et11.eff; id 30 → 17; CONT con orientación junto a pared; ContPush; escondida = be_flag &~2).
+  Antorchas: torch de em11 (0x26A/0x26B) en em17.drs + parche de Em17WeaponSet (REL .text 0x440A8..0x440F0, mot[69]/
+  [70] = ARC 0x26E/0x26F; ceros de mot[67/68/73-76] quitados: el trabajo se limpia al crear). Captura propia a 1,6 m
+  (el agarre del juego cuelga en 0x8012DA30). Rodeo de esquinas (det/sk en Guard). R_UP por 4 puntos (UPW).

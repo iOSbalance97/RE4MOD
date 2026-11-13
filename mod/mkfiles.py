@@ -83,3 +83,82 @@ _nd = open('files/em/em12.drs', 'rb').read(); _nd = pad32(_nd); _km = len(_nd)
 open('files/em/em12.drs', 'wb').write(_nd + _blob)
 open('c/ch0_key.h', 'w').write('/* mkfiles.py: the key model at the end of em12.drs */\n#define KM_OFS 0x%X\n#define KM_LEN 0x%X\n#define KM_TPL 0x%X\n' % (_km, len(_blob), len(pad32(_bin))))
 print('key model at', hex(_km), len(_blob))
+
+# C0-18: the torch. r111's Ganado module (em17) has no torch model (Em17WeaponSet leaves mot[69]/[70] = 0, so the
+# list flag 0x04000000 gives nothing). The torch of em11 (archive entries 0x26A BIN / 0x26B TPL, ARC words
+# 0x26E/0x26F) is put in em17's two empty slots (inserted before the REL like em12's extra entries) and
+# Em17WeaponSet (REL .text 0x43F9C) is changed to fill mot[69]/[70] like em11 does: the game itself then makes the
+# torch (em10MakeWeapon 6), puts it in the right hand and lights it (setEffAlways 0x10/0x49, in em17's own EFF).
+# The two zero stores of mot[67]/[68] and the four of mot[73..76] go: the work is cleared on create (memClear).
+def _ppc_lwz(d, a, o): return 0x80000000 | d << 21 | a << 16 | (o & 0xFFFF)
+def _ppc_stw(s, a, o): return 0x90000000 | s << 21 | a << 16 | (o & 0xFFFF)
+def _ppc_add(d, a, b): return 0x7C000214 | d << 21 | a << 16 | b << 11
+def _arc_parts(d):
+    psize, pofs = struct.unpack('>I', d[0x24:0x28])[0], struct.unpack('>I', d[0x2c:0x30])[0]
+    p1size, p1ofs = struct.unpack('>I', d[0x44:0x48])[0], struct.unpack('>I', d[0x4c:0x50])[0]
+    assert pofs == 0x400 and p1ofs == pofs + psize and p1ofs + p1size <= len(d)
+    a = d[pofs:pofs + psize]; n, rel = struct.unpack('>II', a[:8])
+    offs = list(struct.unpack('>%dI' % n, a[0x10:0x10 + 4 * n])); tags = [a[0x10 + 4 * n + 4 * j:0x14 + 4 * n + 4 * j] for j in range(n)]
+    return psize, pofs, p1ofs, a, n, rel, offs, tags
+_d11 = open(SRC + 'em11.drs', 'rb').read(); _, _, _, _a11, _, _, _o11, _t11 = _arc_parts(_d11)
+def _ent(a, offs, j): o = offs[j]; return a[o:min([x for x in offs if x > o] + [len(a)])]
+assert _t11[0x26A] == b'BIN\0' and _t11[0x26B] == b'TPL\0'
+_tb, _tt = pad32(_ent(_a11, _o11, 0x26A)), pad32(_ent(_a11, _o11, 0x26B))
+_d17 = open(SRC + 'em17.drs', 'rb').read(); psize, pofs, p1ofs, arc, n, rel, offs, tags = _arc_parts(_d17)
+assert tags[0x26A] == b'\0' * 4 and tags[0x26B] == b'\0' * 4
+ins = _tb + _tt; delta = len(ins); assert delta % 32 == 0
+noffs = [o + delta if o >= rel else o for o in offs]
+noffs[0x26A], noffs[0x26B] = rel, rel + len(_tb)
+ntags = list(tags); ntags[0x26A] = b'BIN\0'; ntags[0x26B] = b'TPL\0'
+head = struct.pack('>4I', n, rel + delta, 0, 0) + struct.pack('>%dI' % n, *noffs) + b''.join(ntags)
+relb = bytearray(arc[rel:])
+T = 0xB4                                              # .text in the REL file (section 1 offset 0xB5 & ~1)
+assert struct.unpack('>I', relb[0x4:0x8])[0] == 0 and struct.unpack('>I', relb[0x4C + 8:0x4C + 12])[0] == 0xB5
+def _w(o): return struct.unpack('>I', relb[T + o:T + o + 4])[0]
+def _put(o, v): relb[T + o:T + o + 4] = struct.pack('>I', v)
+OLD = {0x440a8: _ppc_lwz(0, 11, 2484), 0x440ac: _ppc_stw(10, 9, 316), 0x440b0: _ppc_add(0, 0, 11), 0x440b4: _ppc_stw(10, 9, 320),
+       0x440b8: _ppc_stw(0, 9, 312), 0x440bc: _ppc_stw(10, 9, 324), 0x440c0: _ppc_stw(10, 9, 328),
+       0x440dc: _ppc_stw(10, 9, 352), 0x440e4: _ppc_stw(10, 9, 340), 0x440ec: _ppc_stw(10, 9, 344), 0x440f0: _ppc_stw(10, 9, 348)}
+for o, v in OLD.items(): assert _w(o) == v, hex(o)
+NEW = {0x440a8: _ppc_lwz(0, 11, 0x26D * 4), 0x440ac: _ppc_add(0, 0, 11), 0x440b0: _ppc_stw(0, 9, 312),
+       0x440b4: _ppc_lwz(12, 11, 0x26E * 4), 0x440b8: _ppc_add(12, 12, 11), 0x440bc: _ppc_stw(12, 9, 324),
+       0x440c0: _ppc_lwz(12, 11, 0x26F * 4), 0x440dc: _ppc_add(12, 12, 11), 0x440e4: _ppc_stw(12, 9, 328),
+       0x440ec: 0x60000000, 0x440f0: 0x60000000}
+for o in range(0x440c4, 0x440dc, 4): assert ((_w(o) >> 21) & 31) != 12 and ((_w(o) >> 16) & 31) != 12   # r12 untouched between
+for o, v in NEW.items(): _put(o, v)
+narc = head + arc[len(head):rel] + ins + bytes(relb)
+assert len(narc) == psize + delta
+nd = bytearray(_d17[:pofs] + narc + _d17[p1ofs:])
+nd[0x24:0x28] = struct.pack('>I', psize + delta); nd[0x4c:0x50] = struct.pack('>I', p1ofs + delta)
+for j in range(n):
+    if j in (0x26A, 0x26B): continue
+    assert narc[noffs[j]:noffs[j] + 32] == arc[offs[j]:offs[j] + 32], j
+assert nd[p1ofs + delta:p1ofs + delta + 64] == _d17[p1ofs:p1ofs + 64]
+open('files/em/em17.drs', 'wb').write(nd)
+print('em17.drs: torch in, grows', delta)
+
+# C0-18: the island's container (r310, disc 2) for the hiding places: its body (SMD bin 9, its one material
+# pointed at texture 0, texture count 1) and its texture (TPL image 8, 512x128 CMPR with 5 mip levels) with the
+# image header, after the key at the end of em12.drs. ch0.c puts the body in place of r111's barrel (et1100.bin)
+# and points the barrel's texture (et11.eff, EFM 9) at ours.
+_r3 = '/tmp/r310.bin'
+if not os.path.exists(_r3): os.system('/tmp/yz2 /home/claude/disc/ext2/files/St3/r310.das 0x400 /tmp/r310.bin >/dev/null')
+_r = open(_r3, 'rb').read(); _s0 = _arc.get(_r, 'SMD'); _s = _r[_s0:_arc.get(_r, 'SMX')]
+def _u(b, o): return struct.unpack('>I', b[o:o + 4])[0]
+_bt = _u(_s, 4); _bins = [_bt + _u(_s, _bt + 4 * i) for i in range(_u(_s, _bt) // 4)]
+_body = bytearray(_s[_bins[9]:_bins[10]]); assert len(_body) == 3424 and _body[0x28] == 5
+_pp = _u(_body, 0x1C); assert _body[_pp + 0x0C] == 8 and _u(_body, 0x24) == 0x36
+_body[_pp + 0x0C] = 0; _body[0x24:0x28] = struct.pack('>I', 1)
+_tt0 = _u(_s, 8); _tp = _tt0 + _u(_s, _tt0); assert _s[_tp:_tp + 4] == b'\x00\x20\xaf\x30'
+_th = _tp + _u(_s, _tp + 0xC + 8 * 8); _hdr = bytearray(_s[_th:_th + 0x24])
+assert struct.unpack('>HHI', _hdr[:8]) == (128, 512, 14) and _hdr[0x22] == 5
+_img = _s[_tp + _u(_hdr, 8):_tp + _u(_hdr, 8) + 43712]
+_hdr[8:12] = b'\0' * 4; _hdr[0x23] = 0
+_cb = pad32(bytes(_hdr)) + pad32(bytes(_body)) + _img
+assert len(pad32(bytes(_hdr))) == 0x40 and (0x40 + len(pad32(bytes(_body)))) % 32 == 0
+_nd = pad32(open('files/em/em12.drs', 'rb').read()); _co = len(_nd)
+open('files/em/em12.drs', 'wb').write(_nd + _cb)
+open('c/ch0_cont.h', 'w').write('/* mkfiles.py: the container at the end of em12.drs: texture header, body bin, texture */\n'
+    '#define CT_OFS 0x%X\n#define CT_LEN 0x%X\n#define CT_BIN 0x40\n#define CT_BIN_LEN 0x%X\n#define CT_TEX 0x%X\n' %
+    (_co, len(_cb), len(_body), 0x40 + len(pad32(bytes(_body)))))
+print('container at', hex(_co), len(_cb))

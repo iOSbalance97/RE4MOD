@@ -56,6 +56,7 @@
 #include "game.h"
 #include "ch0_msg.h"
 #include "ch0_key.h"
+#include "ch0_cont.h"
 
 #define STAGE G8(0x4FA8)
 #define ROOM  G8(0x4FA9)
@@ -88,11 +89,13 @@ int ch0_stick;
 extern int ch0_crouch_force;                 /* crouch.c: kept crouched (hidden) */
 enum { G_HOLD, G_WALK, G_CHASE };
 enum { R_NONE, R_GROUP, R_RUN, R_SIEGE, R_LADDER, R_PAT, R_RING, R_DOOR = 9, R_UP = 10 };
-/* C0-14: the house's stairs (SAT ramp y 0 -> 3200): foot, top */
-static const f32 UPW[2][2] = { { 3600.0f, -10300.0f }, { 3600.0f, -15100.0f } };
+/* C0-18: the way up (the straight line from the door to the stairs went into the wall by the door): inside the
+ * door, the middle of the room, the foot of the stairs (SAT ramp z -9905 y 0 -> z -15500 y 3200), the top */
+static const f32 UPW[4][3] = { { 7309.0f, 0.0f, -6724.0f }, { 5644.0f, 0.0f, -9100.0f }, { 3700.0f, 0.0f, -10000.0f },
+    { 3700.0f, 3200.0f, -15350.0f } };
 #define HOUSE_X 3000.0f                              /* the key house, roughly its middle */
 #define HOUSE_Z (-11000.0f)
-typedef struct { u8* e; u8 st, role, leg, vis, pat, pad[3]; f32 base, meter, ax, az, bx, bz, tx, tz; int tm, lost; } Guard;
+typedef struct { u8* e; u8 st, role, leg, vis, pat, side, pad[2]; f32 base, meter, ax, az, bx, bz, tx, tz; int tm, lost; f32 sx, sz, qx, qz; s16 sk, det; } Guard;
 static int scene_gate, after_key;                    /* C0-07: the south gate scene (frames); split after a restart */
 static int cyc;                                      /* C0-06: road / watch cycle */
 static int cyc2;                                     /* C0-10b: north-east / square cycle */
@@ -426,6 +429,8 @@ static void Guards(void)
                 Walk(g, g->ax, g->az);
                 continue;
             }
+            if (!hidden && !scene && !scene_x && !scene_n && !caught && pPL[0xFC] == 0 && d < 1600.0f
+                && *(f32*)(e + 0x98) - PY() < 1200.0f && PY() - *(f32*)(e + 0x98) < 1200.0f) grab = 1;   /* C0-18: caught before the game's own grab (it crashes, PC 0x8012DA30) */
             if (d > 15000.0f || (hidden && !g->lost)) g->lost++;
             else if (!hidden) g->lost = 0;
             if (g->lost > 120) {                     /* back home / to its patrol */
@@ -437,6 +442,26 @@ static void Guards(void)
         }
         Native(e);
         hx = (ex - g->ax) * (ex - g->ax) + (ez - g->az) * (ez - g->az);
+        if (g->role != R_UP && g->det > 0) {          /* C0-18: stuck on a corner: round it, then on to its target */
+            g->det--;
+            *(s32*)(e + 0x3E4) = 300;
+            if (e[0xFD] != 0x14) { e[0xFD] = 0x14; e[0xFE] = 0; e[0xFF] = 0; }
+            *(f32*)(e + 0x92C) = g->qx; *(f32*)(e + 0x934) = g->qz;
+            Steer(e, g->qx, g->qz);
+            if ((ex - g->qx) * (ex - g->qx) + (ez - g->qz) * (ez - g->qz) < 400.0f * 400.0f) g->det = 0;
+            if (!g->det) Walk(g, g->tx, g->tz);
+            goto meter;
+        }
+        if (g->role != R_UP && g->st == G_WALK && !scene && !scene_gate) {
+            if (++g->sk >= 75) {                     /* hardly moved in 2.5 s while walking: a detour to one side */
+                f32 mx = ex - g->sx, mz = ez - g->sz, ux = g->tx - ex, uz = g->tz - ez, l = Sq(ux * ux + uz * uz), sd;
+                if (mx * mx + mz * mz < 250.0f * 250.0f && l > 600.0f) {
+                    ux /= l; uz /= l; g->side ^= 1; sd = g->side ? 2200.0f : -2200.0f;
+                    g->qx = ex + uz * sd - ux * 500.0f; g->qz = ez - ux * sd - uz * 500.0f; g->det = 150;
+                }
+                g->sk = 0; g->sx = ex; g->sz = ez;
+            }
+        } else { g->sk = 0; g->sx = ex; g->sz = ez; }
         if (g->role == R_SIEGE && !inh && !scene) { Chase(g); continue; }   /* she came out: after her */
         if (k == 0 && !road_wait && g->role == R_NONE) {   /* the road guard: east half the cycle, west the other */
             int east = (cyc % CYC) < CYC / 2;
@@ -470,14 +495,22 @@ static void Guards(void)
             if ((ex - LADDER[0]) * (ex - LADDER[0]) + (ez - LADDER[1]) * (ez - LADDER[1]) < 900.0f * 900.0f || ++g->tm > 900) Chase(g);
             continue;
         } else if (g->role == R_UP) {                /* C0-14: up the house's stairs, then after her */
-            f32 tx = UPW[g->leg][0], tz = UPW[g->leg][1];
-            if (g->st != G_WALK || g->tx != tx || g->tz != tz) Walk(g, tx, tz);
+            f32 tx, tz;
+            if (g->leg < 4) { tx = UPW[g->leg][0]; tz = UPW[g->leg][2]; }
+            else { tx = PX(); tz = PZ(); }                       /* C0-18: upstairs, straight to her */
+            if (g->st != G_WALK || ((g->tx != tx || g->tz != tz) && g->leg < 4)) Walk(g, tx, tz);
+            g->tx = tx; g->tz = tz;
             *(s32*)(e + 0x3E4) = 300;
             if (e[0xFD] != 0x14) { e[0xFD] = 0x14; e[0xFE] = 0; e[0xFF] = 0; }
             *(f32*)(e + 0x92C) = tx; *(f32*)(e + 0x934) = tz;
             Steer(e, tx, tz);
-            if ((ex - tx) * (ex - tx) + (ez - tz) * (ez - tz) < 600.0f * 600.0f) { if (g->leg < 1) g->leg++; else Chase(g); }
-            else if (g->tm > 600) Chase(g);
+            if (++g->det > 300 && g->leg < 4) {      /* C0-18: stuck on the way (she is upstairs, out of sight): on */
+                *(f32*)(e + 0x94) = *(f32*)(e + 0x110) = tx; *(f32*)(e + 0x98) = *(f32*)(e + 0x114) = UPW[g->leg][1];
+                *(f32*)(e + 0x9C) = *(f32*)(e + 0x118) = tz;
+                ex = tx; ez = tz;
+            }
+            if (g->leg < 4 && (ex - tx) * (ex - tx) + (ez - tz) * (ez - tz) < 500.0f * 500.0f) { g->leg++; g->det = 0; }
+            else if (g->leg == 4 && (d < 2500.0f || g->det > 600 || PY() < 2000.0f)) { g->det = 0; Chase(g); }
             continue;
         } else if (g->role == R_PAT) {               /* C0-10b: patrols, in step; C0-12: loops */
             const Pat* p = &PATS[g->pat - 1];
@@ -547,6 +580,7 @@ static void Guards(void)
             }
         }
         /* the alert meter */
+    meter:
         if (!hidden && ph == 1 && !scene && !scene_n && !card && g->role != R_SIEGE && g->role != R_RUN) {
             f32 dy = PY() - *(f32*)(e + 0x98), rate = 0.0f, r = rv;
             if (dy < 0.0f) dy = -dy;
@@ -587,22 +621,22 @@ int Ch0Mark(int k, f32* x, f32* y, f32* z)
     if (g->meter < 0.03f) return 0;
     return (int)(g->meter * 99.0f) + 1;
 }
-static const f32 HIDE[][3] = {                       /* hiding places: x, z, radius */
-    /* C0-12: where the user stood in his captures (the containers go there; barrels until then) */
-    { -24287.0f, 399.0f, 1500.0f },                  /* the alley to the square's entrance */
-    { -22855.0f, -5531.0f, 1500.0f },                /* the north crossing's corner */
-    { -5140.0f, 14167.0f, 1500.0f },                 /* in the stable */
-    { 13000.0f, 10500.0f, 1500.0f },                 /* C0-13: in the south alley (user) */
-    { 28580.0f, -2130.0f, 1500.0f },                 /* between the tower and the door */
+/* C0-18: the island's containers (r310) in place of the barrels, each along the nearest wall (tools: the walls of
+ * the SAT); the first one at the mouth of the alley to the square (the alley itself is 2.2 m wide: a container
+ * in it would close it). x, y, z, facing (rad; the container's long side along it) */
+static const f32 CONT[5][4] = {
+    { -26704.0f, 0.0f, -1601.0f, -2.056f },          /* the alley to the square, its mouth */
+    { -23036.0f, 0.0f, -5744.0f, -0.868f },          /* the north crossing's corner */
+    { -4377.0f, 0.0f, 14026.0f, -2.959f },           /* in the stable */
+    { 12925.0f, 853.0f, 9912.0f, 1.698f },           /* in the south alley */
+    { 28456.0f, 1136.0f, -1881.0f, -2.034f },        /* between the tower and the door */
 };
-/* the room's barrels (ETS id 17 x4, id 30 x1) moved to the new hiding places */
-static const f32 BARREL[5][3] = { { -24287.0f, 0.0f, 399.0f }, { -22855.0f, 0.0f, -5531.0f },
-    { -5140.0f, 0.0f, 14167.0f }, { 13000.0f, 854.0f, 10500.0f }, { 28580.0f, 1138.0f, -2130.0f } };
-#define NHIDE (int)(sizeof(HIDE) / sizeof(HIDE[0]))
+#define HIDE_R 1500.0f
+#define NHIDE 5
 static int HideSpot(void)                            /* the hiding place Ashley is at, or -1 */
 {
     int i;
-    for (i = 0; i < NHIDE; i++) if (D2(HIDE[i][0], HIDE[i][1]) < HIDE[i][2] * HIDE[i][2] && PY() < 1500.0f) return i;
+    for (i = 0; i < NHIDE; i++) if (D2(CONT[i][0], CONT[i][2]) < HIDE_R * HIDE_R && PY() < CONT[i][1] + 1500.0f) return i;
     return -1;
 }
 static void HideFrame(u16 trg)
@@ -623,6 +657,7 @@ static void HideFrame(u16 trg)
     }
     ch0_padlock = 2;                                 /* still, crouched, the camera free (C0-12); Cross: out */
     if (trg & PAD_A) { hidden = 0; ch0_crouch_force = 0; ch0_padlock = 0; }
+    if (hidden) *(u32*)pPL &= ~2u; else *(u32*)pPL |= 2u;   /* C0-18: inside the container: not drawn */
 }
 int Ch0Card(void) { if (!on || !card) return 0; return card == 1 ? (card_t < 12 ? card_t * 255 / 12 : 255) : 255 - card_t * 255 / 12; }
 int Ch0Hide(void)
@@ -683,7 +718,7 @@ static u8* HouseGanado(f32 x, f32 z, f32 ang)        /* a torch Ganado (EmSetEve
     u8* e;
     memclr_asm(hrec, 32);
     hrec[0] = 1; hrec[1] = 0x17; hrec[2] = 0;
-    *(u32*)(hrec + 4) = 0x00020000u;
+    *(u32*)(hrec + 4) = 0x04000000u;                 /* C0-18: a torch too (was dynamite) */
     *(u16*)(hrec + 8) = 1000;
     *(s16*)(hrec + 0x0C) = (s16)(x / 10.0f); *(s16*)(hrec + 0x10) = (s16)(z / 10.0f);
     *(s16*)(hrec + 0x14) = (s16)(ang * 16384.0f / 3.14159265f);
@@ -765,17 +800,21 @@ static void Block(void)                              /* behind the boxes: Ashley
 /* C0-09: the boxes. Making new ones (EtcModelSet in the middle of play, C0-08) showed nothing; now the room's
  * own eight boxes (ETS id 1 / 2, r111 entries 14-21) are moved into the passages just before the room sets its
  * etc models (hook at EtcModelListSet's entry, PAL 0x80106B68), the way the game itself places them. */
+static void Container(u8* etm);
 static const f32 BOXY[4] = { 0.0f, 0.0f, 286.0f, 0.0f };  /* the ground of each passage (the room's floors) */
 void Ch0Ets(u8* list)
 {
     int i, b = 0, j = 0, c;
     u16 n;
     if (!on || !pG || STAGE != 1 || ROOM != 0x11 || !list) return;
+    Container(list - 0x9CF60);
     n = *(u16*)list;
     for (i = 0, c = 0; i < n && c < 5; i++) {
         u8* d = list + 0x10 + i * 0x28;
         if (*(u16*)d != 17 && *(u16*)d != 30) continue;
-        *(f32*)(d + 0x1C) = BARREL[c][0]; *(f32*)(d + 0x20) = BARREL[c][1]; *(f32*)(d + 0x24) = BARREL[c][2];
+        *(u16*)d = 17;                               /* C0-18: id 30 (et1e00) too: every one is our container */
+        *(f32*)(d + 0x10) = 0.0f; *(f32*)(d + 0x14) = CONT[c][3]; *(f32*)(d + 0x18) = 0.0f;
+        *(f32*)(d + 0x1C) = CONT[c][0]; *(f32*)(d + 0x20) = CONT[c][1]; *(f32*)(d + 0x24) = CONT[c][2];
         c++;
     }
     for (i = 0; i < n && b < 4; i++) {
@@ -804,25 +843,65 @@ int  DvdFileExistCheck(void* dvd, const char* name, u32* len);
 void* mem_alloc(u32 size, const char* file, int line, int flag, int heap);
 #define DVD_READ_PRIO ((int (*)(void*, void*, s32, s32, s32))0x80075BE8)
 static u32 km_fi[0x10] __attribute__((aligned(8)));
-static void KeyModel(void)
+static u8* DrsRead(u32 ofs, u32 len)                 /* C0-18: a piece of em12.drs into the room's heap */
 {
-    u32 len = 0, i;
+    u32 flen = 0, i;
     int entry;
-    u8 *fe, *buf, *sys = ITM_SYS;
-    if ((u32)sys < 0x80000000u || (u32)sys >= 0x81800000u || *(u32*)(sys + KEY_ID * 8)) return;
-    entry = DvdFileExistCheck(DVD_OBJ, "em/em12.drs", &len);
-    if (entry < 0 || len < KM_OFS + KM_LEN || !FST_PTR) return;
+    u8 *fe, *buf;
+    entry = DvdFileExistCheck(DVD_OBJ, "em/em12.drs", &flen);
+    if (entry < 0 || flen < ofs + len || !FST_PTR) return 0;
     fe = FST_PTR + entry * 12;
-    buf = mem_alloc(KM_LEN + 0x40, 0, 0, 0, 13);
-    if (!buf) return;
+    buf = mem_alloc(len + 0x40, 0, 0, 0, 13);
+    if (!buf) return 0;
     buf = (u8*)(((u32)buf + 0x1F) & ~0x1Fu);
     for (i = 0; i < 0x10; i++) km_fi[i] = 0;
-    km_fi[0x30 / 4] = *(u32*)(fe + 4) + KM_OFS;
-    km_fi[0x34 / 4] = KM_LEN;
-    for (i = 0; i < KM_LEN + 0x20; i += 0x20) __asm__ volatile("dcbi 0,%0" :: "r"(buf + i));
-    if (DVD_READ_PRIO(km_fi, buf, KM_LEN, 0, 2) < (s32)KM_LEN) return;
+    km_fi[0x30 / 4] = *(u32*)(fe + 4) + ofs;
+    km_fi[0x34 / 4] = len;
+    for (i = 0; i < len + 0x20; i += 0x20) __asm__ volatile("dcbi 0,%0" :: "r"(buf + i));
+    if (DVD_READ_PRIO(km_fi, buf, len, 0, 2) < (s32)len) return 0;
+    return buf;
+}
+static void KeyModel(void)
+{
+    u8 *buf, *sys = ITM_SYS;
+    if ((u32)sys < 0x80000000u || (u32)sys >= 0x81800000u || *(u32*)(sys + KEY_ID * 8)) return;
+    buf = DrsRead(KM_OFS, KM_LEN);
+    if (!buf) return;
     *(u8**)(sys + KEY_ID * 8) = buf;
     *(u8**)(sys + KEY_ID * 8 + 4) = buf + KM_TPL;
+}
+/* C0-18: the container. Read with the room's items (SceAtInit, before the etc models); at EtcModelListSet's entry
+ * its body goes over r111's barrel model (ETM entry 52 "et1100.bin", 3680 bytes; ours 3424) while that is still
+ * the untouched file (word 0 = 0x40: not yet relocated) and the barrel's texture (et11.eff, EFM 9, image 0) gets
+ * our image header, the data already a pointer (unpacked 1: calcTplAddr leaves it). */
+static u8* ct_buf;
+static void Container(u8* etm)
+{
+    u8 *bin = etm + 0x886E0, *tpl = etm + 0x89580 + 0x7640, *h;
+    u32 v, i;
+    if (!ct_buf || *(u32*)(etm + 0x886C0) != 0x65743131u || *(u32*)(etm + 0x886C4) != 0x30302E62u) return;   /* "et1100.b" */
+    if (*(u32*)(tpl) != 0x0020AF30u) return;
+    if (*(u32*)bin == 0x40u) {
+        for (i = 0; i < CT_BIN_LEN; i += 4) *(u32*)(bin + i) = *(u32*)(ct_buf + CT_BIN + i);
+        for (i = 0; i < CT_BIN_LEN + 0x20; i += 0x20) __asm__ volatile("dcbf 0,%0" :: "r"(bin + i));   /* the GPU reads it */
+        __asm__ volatile("sync");
+    }
+    v = *(u32*)(tpl + 0xC); h = v >= 0x80000000u ? (u8*)v : tpl + v;      /* descriptor 0 */
+    v = *(u32*)h; h = v >= 0x80000000u ? (u8*)v : tpl + v;                /* its image header */
+    for (i = 0; i < 0x24; i += 4) *(u32*)(h + i) = *(u32*)(ct_buf + i);
+    *(u8**)(h + 8) = ct_buf + CT_TEX; h[0x23] = 1;
+}
+static void ContPush(void)                           /* she can't walk into one (its own bump is a 0.35 m post) */
+{
+    int i;
+    for (i = 0; i < NHIDE; i++) {
+        f32 c = Cs(CONT[i][3]), sn = Sn(CONT[i][3]), dx = PX() - CONT[i][0], dz = PZ() - CONT[i][2];
+        f32 lx = dx * c - dz * sn, lz = dx * sn + dz * c, px = 850.0f - (lx < 0 ? -lx : lx), pz = 1130.0f - (lz < 0 ? -lz : lz);
+        if (px <= 0.0f || pz <= 0.0f || PY() > CONT[i][1] + 1200.0f) continue;
+        if (px < pz) lx = lx < 0 ? -850.0f : 850.0f; else lz = lz < 0 ? -1130.0f : 1130.0f;
+        *(f32*)(pPL + 0x94) = CONT[i][0] + lx * c + lz * sn;
+        *(f32*)(pPL + 0x9C) = CONT[i][2] - lx * sn + lz * c;
+    }
 }
 void Ch0Ita(u8* aev, u8* ita)
 {
@@ -832,6 +911,7 @@ void Ch0Ita(u8* aev, u8* ita)
     if (ita[0] != 'I' || ita[1] != 'T' || ita[2] != 'A') return;
     n = *(u16*)(ita + 6);
     for (i = 0; i < n; i++) ita[0x10 + i * 0x9C + 0x34] = 0;
+    if (ROOM == 0x11) ct_buf = DrsRead(CT_OFS, CT_LEN);
     if (ROOM != 0x11 || key) return;
     KeyModel();
     for (i = 0; i < n; i++) {
@@ -926,6 +1006,7 @@ static void RoofWindow(void)
 static void Restart(void)                            /* caught: the room again from the checkpoint */
 {
     hidden = 0; ch0_crouch_force = 0;
+    if (pPL) *(u32*)pPL |= 2u;
     if (!cp) { road_wait = 1; cyc = 0; stage = 0; ch0_got = 0; watch_on = 0; }
     scene_n = 0; scene_x = 0; grab = 0; keep_open = 0; x_done = 0;
     scene_gate = 0;
@@ -1129,6 +1210,11 @@ void Ch0Frame(void)
         if (caught) {                                /* knocked down: fade, text, again */
             cap_t++;
             ch0_padlock = 1;
+            {   /* C0-18: everyone stops where they are (no grab, no blow) */
+                int j;
+                for (j = 0; j < NG; j++) if (Alive(gd[j].e) && gd[j].e[0xFC] == 1 && gd[j].st != G_HOLD) Hold(&gd[j]);
+                if (Alive(hman) && hman[0xFC] == 1 && hman[0xFD] != 1) { *(u32*)(hman + 0x3C8) &= ~1u; Native(hman); hman[0xFD] = 1; hman[0xFE] = 0; }
+            }
             if (cap_t == 200) Restart();      /* C0-15: grabbed, carried off two steps, then the screen */
             return;
         }
@@ -1144,6 +1230,11 @@ void Ch0Frame(void)
             return;
         }
         Block();
+        ContPush();
+        if (Alive(hman) && hman[0xFC] == 1 && !hidden && !scene && !scene_x) {   /* C0-18: the house one too */
+            f32 hx = *(f32*)(hman + 0x94) - PX(), hz = *(f32*)(hman + 0x9C) - PZ(), hy = *(f32*)(hman + 0x98) - PY();
+            if (hx * hx + hz * hz < 1600.0f * 1600.0f && hy < 1200.0f && hy > -1200.0f && pPL[0xFC] == 0) grab = 1;
+        }
         if (after_key && --after_key == 0) AfterKey();
         if (!scene && NorthScene()) return;
         if (stage == 0 && !scene && D2(STABLE_X, STABLE_Z) < 2500.0f * 2500.0f) {   /* passing the stable */
@@ -1153,7 +1244,8 @@ void Ch0Frame(void)
         }
         if (keep_open && Alive(hdoor) && keep_open++ < 600) *(s32*)(hdoor + 0x7E0) = 0x96;   /* C0-14: it stays open */
         if ((pPL[0xFC] == 1 || grab) && !scene && !scene_x) {
-            caught = 1; cap_t = 0; hidden = 0; ch0_crouch_force = 0; grab = 0; Hud(0);   /* C0-15: the game's own grab plays */
+            caught = 1; cap_t = grab ? 50 : 0; hidden = 0; ch0_crouch_force = 0; grab = 0; Hud(0);   /* C0-15: the game's own grab plays */
+            *(u32*)pPL |= 2u;                       /* C0-18: seen again (hidden in a container) */
             return;
         }
         if (OutScene()) return;
@@ -1208,7 +1300,7 @@ void Ch0Frame(void)
                 hdoor = d; keep_open = 1;
             }
             if (scene == S_OPEN + 10) {              /* C0-17: the first (nearest) goes up, the others stay below */
-                if (ins[0]) { gd[ins[0] - 1].role = R_UP; gd[ins[0] - 1].leg = 0; }
+                if (ins[0]) { gd[ins[0] - 1].role = R_UP; gd[ins[0] - 1].leg = 0; gd[ins[0] - 1].det = 0; }
                 else if (Alive(hman)) WalkE(hman, DOOR_IN_X, DOOR_IN_Z - 1500.0f);
             }
             if (scene == S_OPEN + 35 && ins[1]) Walk(&gd[ins[1] - 1], gd[ins[1] - 1].ax, gd[ins[1] - 1].az);
