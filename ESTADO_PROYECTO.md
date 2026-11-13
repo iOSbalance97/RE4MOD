@@ -762,3 +762,8 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   cadena p->pList->pList no existe en su modelo → InverseKinematics escribe en NULL+0x1C0. Gancho en su entrada
   (0x80192084, original stwu r1,-0x240) → Ch0Ik marca 0x80 (saltar) en esas partes. Captura: fundido 80-115,
   texto 110-130, reinicio 200.
+- **C0-17**: revisión. Contenedores (en curso): ETM de r111 = archivo (n, entradas {u32 tamaño, u32 largo del
+  nombre, 0x18, nombre 0x20, datos}); ETM en memoria = lista ETS - 0x9CF60 (r111). El barril (et1100.bin, 3744 B,
+  id 17 → Et11_init → SetBox) toma su TPL del efecto et11.eff (EFM TPL 9), no de un .tpl. Cuerpo del
+  contenedor r310 = bin 9 (1920 B, textura 8 del TPL de la sala: 512x128 CMPR, 32 KB). Idea: cuerpo del
+  contenedor en el sitio de et1100.bin + su textura en lugar de la del barril.
