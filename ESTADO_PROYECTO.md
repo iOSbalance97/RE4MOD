@@ -748,3 +748,7 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   Steer() orienta a los que caminan; tras la llave R_RING (5 puntos delante/este); B con Cruz; ch0_padlock 2 =
   escondida con C-stick libre; ch0_btn botones forzados en escenas. Controles de tanque: para mover a Ashley
   en una escena se fija su ángulo (pPL+0xA4) y stick arriba.
+- **C0-13**: antorcha imposible tal cual: Em10WeaponSet (em10_set.cpp) deja mot[69]/[70] a 0 en el pueblo
+  (traería el modelo del módulo de zelotes + efecto de fuego). La escena de la llave bloqueaba el mando con la
+  pantalla del objeto abierta (Stop_flg 0x10000000 / Status 0x501C): ahora espera. AfterKey: todos a R_RING
+  (8 puntos), meter ≥ 0.5; el que entra queda R_DOOR buscando dentro.

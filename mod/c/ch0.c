@@ -98,7 +98,7 @@ int ch0_got;                                         /* item.c: the key has been
 static int stage;                                    /* C0-07: 0 start, 1 the gate scene done (grouped), 2 the key */
 static Guard gd[12];
 static int hidden, hide_no, card, card_t, road_wait;
-static int scene_n, watch_on, rw;                   /* C0-12: the north crossing scene */
+static int scene_n, watch_on, rw, kwait;                   /* C0-12: the north crossing scene */
 
 #define BX 19713.0f                                  /* door B */
 #define BZ 2003.0f
@@ -543,6 +543,7 @@ static void Guards(void)
             if (rate > 0.0f) g->meter += rate; else { g->meter -= 0.006f; if (g->meter < 0.0f) g->meter = 0.0f; }
             if (g->meter >= 1.0f) alarm = k;
         } else { g->meter -= 0.006f; if (g->meter < 0.0f) g->meter = 0.0f; }
+        if (g->role == R_RING && g->meter < 0.5f) g->meter = 0.5f;   /* C0-13: on the alert after the key */
     }
     if (alarm >= 0) {                                /* found: it and the ones near it */
         u8* a = gd[alarm].e;
@@ -572,12 +573,12 @@ static const f32 HIDE[][3] = {                       /* hiding places: x, z, rad
     { -24287.0f, 399.0f, 1500.0f },                  /* the alley to the square's entrance */
     { -22855.0f, -5531.0f, 1500.0f },                /* the north crossing's corner */
     { -5140.0f, 14167.0f, 1500.0f },                 /* in the stable */
-    { 12000.0f, 4500.0f, 1500.0f },                  /* where the square pair's one stuck in the wall stood */
+    { 13000.0f, 10500.0f, 1500.0f },                 /* C0-13: in the south alley (user) */
     { 28580.0f, -2130.0f, 1500.0f },                 /* between the tower and the door */
 };
 /* the room's barrels (ETS id 17 x4, id 30 x1) moved to the new hiding places */
 static const f32 BARREL[5][3] = { { -24287.0f, 0.0f, 399.0f }, { -22855.0f, 0.0f, -5531.0f },
-    { -5140.0f, 0.0f, 14167.0f }, { 12000.0f, 0.0f, 4500.0f }, { 28580.0f, 1138.0f, -2130.0f } };
+    { -5140.0f, 0.0f, 14167.0f }, { 13000.0f, 854.0f, 10500.0f }, { 28580.0f, 1138.0f, -2130.0f } };
 #define NHIDE (int)(sizeof(HIDE) / sizeof(HIDE[0]))
 static int HideSpot(void)                            /* the hiding place Ashley is at, or -1 */
 {
@@ -608,7 +609,7 @@ int Ch0Card(void) { if (!on || !card) return 0; return card == 1 ? (card_t < 12 
 int Ch0Hide(void)
 {
     if (!on || !ready || ph != 1 || scene || scene_n || scene_gate || caught || card) return 0;
-    if (key && D2(BX, BZ) < 1800.0f * 1800.0f) return 3;     /* C0-12: door B: Cross to open */
+    if (key && D2(BX, BZ) < 2500.0f * 2500.0f) return 3;     /* C0-12: door B: Cross to open */
     return hidden ? 2 : (HideSpot() >= 0 ? 1 : 0);
 }
 
@@ -715,17 +716,17 @@ static void Runners(int at_gate)                     /* the two from the south g
 /* C0-12 (user): after the key the one who came in goes after her; the others ring the house's front and east
  * side to press her, watching it (no chase on sight of the house alone); north and west stay free: the window
  * to the roof and the other ladder are the way out. The patrols go on. */
-static const f32 RING[5][2] = { { 7169.0f, -4800.0f }, { 8700.0f, -5000.0f }, { 6300.0f, -4300.0f },
-                                { 9800.0f, -8500.0f }, { 9800.0f, -12500.0f } };
-static void AfterKey(void)
+static const f32 RING[8][2] = { { 7169.0f, -4800.0f }, { 8700.0f, -5000.0f }, { 6300.0f, -4300.0f },
+                                { 9800.0f, -8500.0f }, { 9800.0f, -12500.0f }, { 5000.0f, -3800.0f },
+                                { 10500.0f, -6500.0f }, { 3500.0f, -4000.0f } };
+static void AfterKey(void)                           /* C0-13: every Ganado on the map comes, on the alert */
 {
     int k, n = 0;
     for (k = 0; k < NG; k++) {
         Guard* g = &gd[k];
-        if (!Alive(g->e) || k == door_in - 1 || g->role == R_PAT || k == 0) continue;
-        if (g->role != R_GROUP && g->role != R_SIEGE && g->st != G_CHASE && g->role != R_DOOR) continue;
-        g->role = R_RING; g->ax = RING[n % 5][0]; g->az = RING[n % 5][1]; g->bx = g->bz = 0.0f; n++;
-        g->meter = 0.3f;
+        if (!Alive(g->e) || k == door_in - 1) continue;
+        g->role = R_RING; g->pat = 0; g->ax = RING[n % 8][0]; g->az = RING[n % 8][1]; g->bx = g->bz = 0.0f; n++;
+        g->meter = 0.6f;
         Walk(g, g->ax, g->az);
     }
 }
@@ -897,13 +898,17 @@ static void Restart(void)                            /* caught: the room again f
  * behind the north houses looking about; she runs back down the alley (the camera behind her) and crouches at
  * its corner; the camera turns to him searching; he turns and starts his patrol (a T: west along the back of
  * the houses, south to the square). So the way is the one down to the square. */
-static const f32 NRW[3][2] = { { -24500.0f, -4600.0f }, { -26000.0f, -2250.0f }, { -25250.0f, -1500.0f } };   /* walls kept 0.45 m off */
-#define N_SPAWN_X (-15500.0f)
-#define N_SPAWN_Z (-8800.0f)
-#define N_STOP_X  (-19000.0f)
-#define N_STOP_Z  (-8800.0f)
+static const f32 NRW[2][2] = { { -26000.0f, -2250.0f }, { -25250.0f, -1500.0f } };   /* walls kept 0.45 m off */
+#define N_TRIG_X  (-26987.0f)                        /* C0-13: the crossing before the alley (user's capture) */
+#define N_TRIG_Z  (-3615.0f)
+#define N_SPAWN_X (-18500.0f)
+#define N_SPAWN_Z (-9200.0f)
+#define N_STOP_X  (-22000.0f)
+#define N_STOP_Z  (-8500.0f)
+#define N_CAM_X   (-26000.0f)                        /* sees the alley top, his way and her corner */
+#define N_CAM_Z   (-4500.0f)
 static f32 ncam[6];
-static int nt;                                       /* the scene's own clock once she is down */
+static int nt, nph;                                  /* the scene's own clock and step */
 int ch0_btn;                                         /* pad.c: buttons held for her in a scene */
 static void WatchSpawn(f32 x, f32 z, f32 ang)
 {
@@ -920,42 +925,51 @@ static void CamTo(f32 fx, f32 fy, f32 fz, f32 tx, f32 ty, f32 tz, f32 k)   /* ea
     ncam[3] += (tx - ncam[3]) * k; ncam[4] += (ty - ncam[4]) * k; ncam[5] += (tz - ncam[5]) * k;
     Cam(ncam[0], ncam[1], ncam[2], ncam[3], ncam[4], ncam[5], 50.0f);
 }
+/* C0-13 (user): the scene starts at the crossing before the alley (so it is always seen): he comes out from
+ * behind the houses (the camera over her shoulder), stops and looks round (a pause to see him); she runs to the
+ * alley's corner and crouches (the camera behind her); then the camera goes up to a point that sees the alley
+ * top and follows him while he turns and goes off on his round. */
 static int NorthScene(void)                          /* 1 while it runs */
 {
     Guard* w = &gd[G_WATCH];
     u8* e = Alive(w->e) ? w->e : 0;
     f32 gx = e ? *(f32*)(e + 0x94) : N_STOP_X, gz = e ? *(f32*)(e + 0x9C) : N_STOP_Z;
     if (!scene_n) {
-        if (stage || watch_on || PZ() > -6300.0f || PX() < -26500.0f || PX() > -19000.0f || pPL[0xFC] != 0) return 0;
-        scene_n = 1; rw = 0; watch_on = 1; Hud(0);
+        if (stage || watch_on || D2(N_TRIG_X, N_TRIG_Z) > 1800.0f * 1800.0f || pPL[0xFC] != 0) return 0;
+        scene_n = 1; rw = 0; nt = 0; nph = 0; watch_on = 1; Hud(0);
         WatchSpawn(N_SPAWN_X, N_SPAWN_Z, -1.571f);
+        *(f32*)(pPL + 0xA4) = Atan2f(N_STOP_X - PX(), N_STOP_Z - PZ());   /* she looks up the alley */
         ncam[0] = PX() + 300.0f; ncam[1] = PY() + 1700.0f; ncam[2] = PZ() + 1600.0f;
-        ncam[3] = N_SPAWN_X; ncam[4] = 1200.0f; ncam[5] = N_SPAWN_Z;
+        ncam[3] = N_STOP_X; ncam[4] = 1200.0f; ncam[5] = N_STOP_Z;
         return 1;
     }
-    scene_n++;
-    ch0_padlock = 1; ch0_stick = 0;
+    scene_n++; nt++;
+    ch0_padlock = 1; ch0_stick = 0; ch0_btn = 0;
     STOPF |= SPF_CAM;
-    if (scene_n == 8 && e) { w->ax = N_STOP_X; w->az = N_STOP_Z; Walk(w, N_STOP_X, N_STOP_Z); }   /* slowly out from behind the house */
-    if (scene_n < 70) CamTo(PX() + 300.0f, PY() + 1700.0f, PZ() + 1600.0f, gx, 1200.0f, gz, 0.08f);
-    else if (rw < 3) {                               /* she runs back down the alley, the camera behind her */
+    if (nph == 0) {                                  /* he comes out, slowly; over her shoulder */
+        if (nt == 8 && e) { w->ax = N_STOP_X; w->az = N_STOP_Z; Walk(w, N_STOP_X, N_STOP_Z); }
+        CamTo(PX() + 300.0f, PY() + 1700.0f, PZ() + 1600.0f, gx, 1200.0f, gz, 0.06f);
+        if (nt > 20 && (!e || w->st == G_HOLD || nt > 200)) { nph = 1; nt = 0; }
+    } else if (nph == 1) {                           /* the pause: he looks round */
+        if (e && e[0xFE] == 1) Turn(e, -1.571f + 1.2f * Sn((f32)nt * 0.06f), 0.06f);
+        CamTo(PX() + 600.0f, PY() + 1500.0f, PZ() + 1200.0f, gx, 1300.0f, gz, 0.05f);
+        if (nt >= 80) { nph = 2; nt = 0; }
+    } else if (nph == 2) {                           /* she runs to the corner, the camera behind her */
         f32 dx = NRW[rw][0] - PX(), dz = NRW[rw][1] - PZ(), d = Sq(dx * dx + dz * dz);
-        ch0_btn = 0;
-        if (d < 450.0f || scene_n > 260) { rw++; if (rw >= 3) { nt = 0; ch0_crouch_force = 1; *(f32*)(pPL + 0xA4) = Atan2f(gx - PX(), gz - PZ()); } }
-        else {
+        if (d < 450.0f || nt > 150) {
+            if (++rw >= 2 || nt > 150) { nph = 3; nt = 0; ch0_crouch_force = 1; *(f32*)(pPL + 0xA4) = Atan2f(gx - PX(), gz - PZ()); }
+        } else {
             dx /= d; dz /= d;
             *(f32*)(pPL + 0xA4) = Atan2f(dx, dz);    /* tank controls: face the way, stick up, run held */
             ch0_stick = 1; ch0_sx = 0; ch0_sy = 127; ch0_btn = PAD_B;
-            CamTo(PX() - dx * 2600.0f, PY() + 1700.0f, PZ() - dz * 2600.0f, PX() + dx * 3000.0f, PY() + 900.0f, PZ() + dz * 3000.0f, 0.15f);
+            CamTo(PX() - dx * 2600.0f, PY() + 1700.0f, PZ() - dz * 2600.0f, PX() + dx * 3000.0f, PY() + 900.0f, PZ() + dz * 3000.0f, 0.12f);
         }
-    } else {                                         /* crouched at the corner: to him, searching */
-        nt++; ch0_btn = 0;
-        CamTo(PX() + 500.0f, PY() + 1000.0f, PZ() + 900.0f, gx, 1300.0f, gz, 0.04f);
-        if (nt == 100 && e) { Patrol(G_WATCH, 1); w->leg = 0; }   /* he turns and goes on his round */
+    } else {                                         /* she is down: up to the alley's view, on him */
+        CamTo(N_CAM_X, 2600.0f, N_CAM_Z, gx, 1200.0f, gz, nt < 40 ? 0.05f : 0.08f);
+        if (nt == 30 && e) { Patrol(G_WATCH, 1); w->leg = 0; }   /* he turns and goes on his round */
         if (nt >= 150) {
             scene_n = 0; STOPF &= ~SPF_CAM; ch0_padlock = 0; ch0_stick = 0; ch0_btn = 0; ch0_crouch_force = 0; Hud(1);
             if (e && w->role != R_PAT) Patrol(G_WATCH, 1);
-            return 1;
         }
     }
     return 1;
@@ -1062,6 +1076,7 @@ void Ch0Frame(void)
             u8* d = HouseDoor();
             f32 sh = 0.0f;
             int b = scene < 30 ? -1 : (scene - 30) % 22, k, in = 0;
+            if ((STOPF & 0x10000000u) || (*(u32*)(pG + 0x501C) & 0x10000000u)) { ch0_padlock = 0; return; }   /* C0-13: a game screen is up: wait, never lock it */
             scene++;
             ch0_padlock = 1;
             STOPF |= SPF_CAM;
@@ -1102,22 +1117,26 @@ void Ch0Frame(void)
             Cam(5644.0f + sh, 1500.0f + sh * 0.5f, -9300.0f, DOOR_IN_X, 900.0f, DOOR_IN_Z, 50.0f);
             if (scene >= S_LEN) {
                 scene = 0; STOPF &= ~SPF_CAM; ch0_padlock = 0; Hud(1); stage = 2;
-                if (door_in && Alive(gd[door_in - 1].e)) Chase(&gd[door_in - 1]);
+                if (door_in && Alive(gd[door_in - 1].e)) gd[door_in - 1].meter = 0.6f;   /* C0-13: he searches downstairs */
                 AfterKey();
             }
             return;
         }
         HideFrame(trg);
         if (hidden) return;
-        if (!key && (ch0_got || KeyItem())) {                     /* C0-10: picked up the game's way (its own screen) */
-            key = 1; cp = 1; scene = 1; door_in = 0; Hud(0);
+        if (!key && (ch0_got || KeyItem())) {      /* C0-10: picked up the game's way (its own screen) */
+            /* C0-13: only once its screen is closed (the scene's pad lock kept it open) */
+            if (pPL[0xFC] == 0 && !(STOPF & 0x10000000u) && !(*(u32*)(pG + 0x501C) & 0x10000000u)) kwait++;
+            else kwait = 0;
+            if (kwait < 15) return;
+            key = 1; cp = 1; scene = 1; door_in = 0; kwait = 0; Hud(0);
             return;
         }
-        if (D2(BX, BZ) < 1800.0f * 1800.0f) {
-            if (!key) { if (!b_seen) { b_seen = 1; Say(MSG_LOCKED, 150); } }
-            else if (pPL[0xFC] == 0 && (trg & PAD_A)) { Leave(); return; }   /* C0-12: by hand */
+        if (D2(BX, BZ) < 2500.0f * 2500.0f) {
+            if (!key) { if (!b_seen || ((trg & PAD_A) && talk_t <= 0)) { b_seen = 1; Say(MSG_LOCKED, 150); } }
+            else if (D2(BX, BZ) < 2500.0f * 2500.0f && pPL[0xFC] == 0 && (trg & PAD_A)) { Leave(); return; }   /* C0-12: by hand */
         } else {
-            if (b_seen && !key && talk_t > 1 && D2(BX, BZ) > 2600.0f * 2600.0f) { talk_t = 1; SayTick(); }   /* C0-10b: gone when she walks off */
+            if (b_seen && !key && talk_t > 1 && D2(BX, BZ) > 3000.0f * 3000.0f) { talk_t = 1; SayTick(); }   /* C0-10b: gone when she walks off */
             if (D2(BX, BZ) > 4000.0f * 4000.0f) b_seen = 0;
         }
         return;
