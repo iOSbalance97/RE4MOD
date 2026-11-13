@@ -134,8 +134,8 @@ static const s16 GU[][5] = {
     { -15761, 0,  -2050,    834,  3 },   /* 1 the watch over the crossing to the stable, in step with the road */
     {  11688, 0,  -1077,  -8192, 12 },   /* 2, 3 the square pair, by door B first */
     {  11940, 0,   3763,  -8192,  0 },
-    {  13121, 0, -17642,  -6931,  3 },   /* 4, 5 north-east (C0-08 map) */
-    {  15561, 0, -19534,  -6931,  1 },
+    {  13121, 846, -17642,  -6931,  3 },   /* 4, 5 north-east (C0-08 map); C0-09: on their real ground */
+    {  15561, 978, -19534,  -6931,  1 },
 };
 #define NGU (int)(sizeof(GU) / sizeof(GU[0]))
 #define G_RUN0 NGU                       /* the two who run in by the south gate (EmSetEvent) */
@@ -152,7 +152,7 @@ static const f32 GATHER[4][2] = { { -10000.0f, 3500.0f }, { -10000.0f, 5000.0f }
 static const f32 RUNWAY[][2] = { { -15500.0f, 29000.0f }, { -14500.0f, 26000.0f }, { -13641.0f, 21193.0f },
                                  { -12529.0f, 15216.0f }, { -13000.0f, 10000.0f } };
 #define NRUN (int)(sizeof(RUNWAY) / sizeof(RUNWAY[0]))
-static const f32 RUN0[2][2] = { { -16248.0f, 31000.0f }, { -14383.0f, 30634.0f } };   /* inside the south gate */
+static const f32 RUN0[2][3] = { { -16248.0f, 2684.0f, 31000.0f }, { -14383.0f, 2571.0f, 30634.0f } };   /* inside the south gate (C0-09: its ground is 2.6 m up) */
 #define STABLE_X (-5772.0f)
 #define STABLE_Z 12963.0f
 /* C0-08: the user's black marks, closed with boxes (the room's own et01 box, EtcModelSet PAL 0x8010ACF0)
@@ -162,8 +162,6 @@ static const f32 BLK[3][5] = {                       /* centre x, z, direction (
     {  -6245.0f, -5123.0f, 2.4435f, 1800.0f, 3 },    /* west of the house */
     {  12960.0f, -12682.0f, 2.7925f, 2000.0f, 3 },   /* north-east of the house */
 };
-#define ETC_SET ((int (*)(void*))0x8010ACF0)
-static u8 boxes[8][0x28] __attribute__((aligned(4)));
 static const f32 SIEGE[3][2] = { { 7169.0f, -4800.0f }, { 8700.0f, -5000.0f }, { 6300.0f, -4300.0f } };   /* house C's front */
 static const f32 LADDER[2] = { -13518.0f, -10294.0f };   /* the room's ladder (ETS, id 6) */                                                   /* foot of the ladder up */
 
@@ -285,14 +283,14 @@ static void Group(int k)                             /* to its place in the gath
     if (g->e && g->st != G_CHASE && k < G_RUN0) { g->leg = 3; Walk(g, VIA_X, VIA_Z); }   /* round the bonfire, north */
 }
 static u8 rrec[32] __attribute__((aligned(4)));
-static u8* Spawn(f32 x, f32 z, f32 ang, int type)    /* a torch Ganado (EmSetEvent) */
+static u8* Spawn(f32 x, f32 y, f32 z, f32 ang, int type)    /* a torch Ganado (EmSetEvent) */
 {
     u8* e;
     memclr_asm(rrec, 32);
     rrec[0] = 1; rrec[1] = 0x17; rrec[2] = (u8)type;
     *(u32*)(rrec + 4) = 0x00020000u;
     *(u16*)(rrec + 8) = 1000;
-    *(s16*)(rrec + 0x0C) = (s16)(x / 10.0f); *(s16*)(rrec + 0x10) = (s16)(z / 10.0f);
+    *(s16*)(rrec + 0x0C) = (s16)(x / 10.0f); *(s16*)(rrec + 0x0E) = (s16)(y / 10.0f); *(s16*)(rrec + 0x10) = (s16)(z / 10.0f);
     *(s16*)(rrec + 0x14) = (s16)(ang * 16384.0f / 3.14159265f);
     *(u16*)(rrec + 0x18) = 0x111; *(s16*)(rrec + 0x1A) = 10;
     e = EM_SET_EVENT(rrec);
@@ -574,8 +572,8 @@ static void Runners(int at_gate)                     /* the two from the south g
     for (j = 0; j < 2; j++) {
         Guard* g = &gd[G_RUN0 + j];
         memclr_asm(g, sizeof(*g));
-        g->e = at_gate ? Spawn(RUN0[j][0], RUN0[j][1], 3.0f, j ? 1 : 3)
-                       : Spawn(GATHER[2 + j][0], GATHER[2 + j][1], 0.0f, j ? 1 : 3);
+        g->e = at_gate ? Spawn(RUN0[j][0], RUN0[j][1], RUN0[j][2], 3.0f, j ? 1 : 3)
+                       : Spawn(GATHER[2 + j][0], 0.0f, GATHER[2 + j][1], 0.0f, j ? 1 : 3);
         if (!g->e) continue;
         g->ax = GATHER[2 + j][0]; g->az = GATHER[2 + j][1];
         if (at_gate) { g->role = R_RUN; g->leg = 0; g->st = G_WALK; }
@@ -604,21 +602,27 @@ static void Block(void)                              /* behind the boxes: Ashley
         *(f32*)(pPL + 0x9C) = BLK[i][1] + dz / d * r;
     }
 }
-static void Boxes(void)                              /* the boxes (room etc slots 48-55) */
+/* C0-09: the boxes. Making new ones (EtcModelSet in the middle of play, C0-08) showed nothing; now the room's
+ * own eight boxes (ETS id 1 / 2, r111 entries 14-21) are moved into the passages just before the room sets its
+ * etc models (hook at EtcModelListSet's entry, PAL 0x80106B68), the way the game itself places them. */
+static const f32 BOXY[3] = { 0.0f, 0.0f, 286.0f };  /* the ground of each passage (the room's floors) */
+void Ch0Ets(u8* list)
 {
-    int i, j, n = 0;
-    for (i = 0; i < 3; i++) {
-        int c = (int)BLK[i][4];
-        f32 sx = Sn(BLK[i][2]), sz = Cs(BLK[i][2]);
-        for (j = 0; j < c && n < 8; j++, n++) {
-            u8* d = boxes[n];
-            f32 o = ((f32)j - (f32)(c - 1) * 0.5f) * (BLK[i][3] / (f32)c);
-            memclr_asm(d, 0x28);
-            *(u16*)d = 1; *(u16*)(d + 2) = (u16)(48 + n);
-            *(f32*)(d + 0x14) = BLK[i][2] + 0.3f * (f32)j;
-            *(f32*)(d + 0x1C) = BLK[i][0] + sx * o; *(f32*)(d + 0x20) = 0.0f; *(f32*)(d + 0x24) = BLK[i][1] + sz * o;
-            ETC_SET(d);
-        }
+    int i, b = 0, j = 0, c;
+    u16 n;
+    if (!on || !pG || STAGE != 1 || ROOM != 0x11 || !list) return;
+    n = *(u16*)list;
+    for (i = 0; i < n && b < 3; i++) {
+        u8* d = list + 0x10 + i * 0x28;
+        f32 o;
+        if (*(u16*)d != 1 && *(u16*)d != 2) continue;
+        c = (int)BLK[b][4];
+        o = ((f32)j - (f32)(c - 1) * 0.5f) * (BLK[b][3] / (f32)c);
+        *(f32*)(d + 0x10) = 0.0f; *(f32*)(d + 0x14) = BLK[b][2] + 0.3f * (f32)j; *(f32*)(d + 0x18) = 0.0f;
+        *(f32*)(d + 0x1C) = BLK[b][0] + Sn(BLK[b][2]) * o;
+        *(f32*)(d + 0x20) = BOXY[b];
+        *(f32*)(d + 0x24) = BLK[b][1] + Cs(BLK[b][2]) * o;
+        if (++j >= c) { j = 0; b++; }
     }
 }
 static void Restart(void)                            /* caught: the room again from the checkpoint */
@@ -643,7 +647,6 @@ void Ch0Frame(void)
         if (Ashley()) {
             ready = 1; t = 0;
             if (ph == 0) Hud(0); else { ch0_padlock = 0; Hud(1); }
-            Boxes();
             if (ph == 1 && stage >= 1) Runners(0);
             if (ph == 1 && cp == 1 && !Alive(hman)) hman = HouseGanado(DOOR_IN_X, DOOR_IN_Z - 900.0f, 3.02f);
             if (ph == 1 && key) after_key = 30;
@@ -694,7 +697,7 @@ void Ch0Frame(void)
             STOPF |= SPF_CAM;
             {
                 f32 k = Sm((f32)scene_gate / 150.0f);
-                Cam(-13300.0f - 600.0f * k, 1700.0f, 18800.0f + 1500.0f * k, -15200.0f + 1800.0f * k, 900.0f, 27500.0f - 5000.0f * k, 48.0f);
+                Cam(-13300.0f - 600.0f * k, 2900.0f + 300.0f * k, 18800.0f + 1500.0f * k, -15200.0f + 1800.0f * k, 3300.0f - 1200.0f * k, 27500.0f - 5000.0f * k, 48.0f);   /* C0-09: the alley climbs to 2.6 m */
             }
             if (scene_gate >= 160) { scene_gate = 0; stage = 1; STOPF &= ~SPF_CAM; ch0_padlock = 0; Hud(1); }
             return;
@@ -715,9 +718,25 @@ void Ch0Frame(void)
                 f32 sh = 0.0f;
                 int b = scene < 30 ? -1 : (scene - 30) % 22, k, in = 0;
                 if (scene >= 30 && scene < 96 && b < 7) sh = (f32)(7 - b) * 9.0f * ((b & 1) ? 1.0f : -1.0f);
-                if (scene == 100) {
-                    for (k = 0; k < NG && !in; k++) if (gd[k].role == R_SIEGE && Alive(gd[k].e)) { Chase(&gd[k]); in = 1; }
-                    if (!in && !Alive(hman)) hman = HouseGanado(DOOR_OUT_X, DOOR_OUT_Z, 3.02f);
+                if (scene == 100) {                  /* C0-09: one always comes in (C0-08: nobody did) */
+                    for (k = 0; k < NG && !in; k++) if (gd[k].role == R_SIEGE && Alive(gd[k].e)) in = k + 1;
+                    if (!in) {                       /* none at the door: the nearest one is put there */
+                        f32 best = 1e12f, dx, dz;
+                        for (k = 0; k < NG; k++) {
+                            u8* e = gd[k].e;
+                            if (!Alive(e) || e[0xFC] != 1 || k == 0) continue;
+                            dx = *(f32*)(e + 0x94) - DOOR_OUT_X; dz = *(f32*)(e + 0x9C) - DOOR_OUT_Z;
+                            if (dx * dx + dz * dz < best) { best = dx * dx + dz * dz; in = k + 1; }
+                        }
+                    }
+                    if (in) {
+                        u8* e = gd[in - 1].e;
+                        *(f32*)(e + 0x94) = *(f32*)(e + 0x110) = DOOR_OUT_X;
+                        *(f32*)(e + 0x98) = *(f32*)(e + 0x114) = 0.0f;
+                        *(f32*)(e + 0x9C) = *(f32*)(e + 0x118) = DOOR_OUT_Z;
+                        *(f32*)(e + 0xA4) = 3.02f;
+                        Chase(&gd[in - 1]);
+                    } else if (!Alive(hman)) hman = HouseGanado(DOOR_OUT_X, DOOR_OUT_Z, 3.02f);
                 }
                 Cam(5644.0f + sh, 1500.0f + sh * 0.5f, -9300.0f, DOOR_IN_X, 900.0f, DOOR_IN_Z, 50.0f);
             }
@@ -735,14 +754,16 @@ void Ch0Frame(void)
         }
         if (D2(BX, BZ) < 1800.0f * 1800.0f) {
             if (!key) { if (!b_seen) { b_seen = 1; Msg(1); } }
-            else { ph = 2; endt = 0; ch0_padlock = 1; Hud(0); Msg(3); }
+            else if (pPL[0xFC] == 0) { int k; ph = 2; endt = 0; ch0_padlock = 1; Hud(0); Msg(3);
+                for (k = 0; k < NG; k++) if (Alive(gd[k].e) && gd[k].e[0xFC] == 1) Hold(&gd[k]);   /* C0-09: everyone stops */
+                if (Alive(hman)) { *(u32*)(hman + 0x3C8) &= ~1u; Native(hman); hman[0xFD] = 1; hman[0xFE] = 0; } }
         } else if (D2(BX, BZ) > 4000.0f * 4000.0f) b_seen = 0;
         return;
     }
     if (ph == 2) {
         endt++;
         ch0_padlock = 1;
-        if (endt == 170) {
+        if (endt >= 170 && pPL[0xFC] == 0) {     /* C0-09: never while she is being hit (the C0-08 crash) */
             done = 1; on = 0; ch0_padlock = 0; msg = 0; hidden = 0; ch0_crouch_force = 0;
             PL_SELECT(0);
             EMLIST_NO = -1;                          /* r100 reads Leon's list again */

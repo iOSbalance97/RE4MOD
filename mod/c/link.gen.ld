@@ -18,6 +18,7 @@ ret_cam            = 0x800BDB04;
 ret_hud            = 0x8011D480;
 ret_rjump          = 0x80152E2C;
 ret_emlist         = 0x800CB210;
+ret_ets            = 0x80106B6C;
 itemInfo           = 0x80019C90;
 ItemMgr_get        = 0x8001A934;
 PutInCase          = 0x8014A928;

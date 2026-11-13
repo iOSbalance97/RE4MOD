@@ -262,3 +262,18 @@ hook_emlist:
     addi  r1,r1,16
     stwu  r1,-80(r1)          # original instruction
     b     ret_emlist
+
+# C0-09: EtcModelListSet (0x80106B68) entry: the chapter moves the room's boxes before they are set.
+    .globl hook_ets
+hook_ets:
+    stwu  r1,-16(r1)
+    mflr  r0
+    stw   r0,20(r1)
+    stw   r3,8(r1)
+    bl    Ch0Ets
+    lwz   r0,20(r1)
+    mtlr  r0
+    lwz   r3,8(r1)
+    addi  r1,r1,16
+    stwu  r1,-24(r1)          # original instruction
+    b     ret_ets

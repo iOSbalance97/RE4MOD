@@ -715,3 +715,10 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   en la cuerda más estrecha de cada paso (BLK) + tope invisible. ETS de r111: puertas id 3 (casa C en
   6540, −6422), escaleras id 6 (−13518, −10294 y −4939, −17683), ventanas id 0, cajas id 1/2.
   Guardias: 0 camino, 1 vigía (−15761, −2050), 2/3 pareja de B, 4/5 noreste; reunión GATHER más al oeste.
+- **C0-09** (vídeo/prueba C0-08: cajas no aparecen, corredores bajo el suelo, Círculo muerto en la pausa, en la
+  llave solo golpes, cuelgue PC 0x8012DA30 al morir llegando a la puerta final): el SAT tiene un plano a y=0
+  bajo todo el pueblo: la altura real es el suelo más alto por debajo de ~3 m (el sur sube a 2,6 m, B 1 m,
+  noreste 0,85-1 m). Cajas: hook en EtcModelListSet (0x80106B68) → Ch0Ets mueve las 8 cajas de r111 (ETS id
+  1/2) a BLK. pad.c: crouch de Ashley solo sin SPF_PL (Stop_flg 0x10000000) ni STA_SUSPEND
+  (Status_flg[1] pG+0x501C 0x10000000). Escena de la llave: siempre entra uno (asedio o el más cercano,
+  teletransportado a la puerta). Final: solo con Ashley en r_no_0 0; todos en Hold; salto cuando r_no_0 0.

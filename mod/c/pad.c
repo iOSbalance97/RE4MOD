@@ -70,7 +70,7 @@ void PadRemap(void)
         }
         out |= in & (PAD_L | PAD_R | PAD_Z);
         if (in & PAD_B) out |= PAD_A;
-        if (G8(0x4FC4) == 1 && pPL && pPL[0xFC] == 0) {         /* C0-03: Ashley: Circle crouches, L3 runs */
+        if (G8(0x4FC4) == 1 && pPL && pPL[0xFC] == 0 && !(*(u32*)(pG + 0x170) & 0x10000000u) && !(*(u32*)(pG + 0x501C) & 0x10000000u)) {   /* C0-03: Ashley: Circle crouches; C0-09: not in menus (SPF_PL, STA_SUSPEND) */
             if ((in & ~prev_raw) & PAD_A) CrouchPress();
             in &= ~PAD_A;
         }
