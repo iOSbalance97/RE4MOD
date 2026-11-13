@@ -640,6 +640,10 @@ Reglas de trabajo del usuario:
        a los 85 frames. Glifos de font/common_p.fnt (32 por fila, código 0x80 + índice). "¿Qué ha sido eso?"
        tras el primer golpe (t 52; León se mueve en t 100, antes 48) y "¿De dónde viene?" en la ventana
        (parada 75 frames, antes 24).
+   - **B112** (usuario: todo bien salvo que las frases duraban medio segundo): frase en el slot 12 (nadie
+     más lo usa; B111 el 3) y, mientras dura su tiempo (85 frames), si el slot deja de estar vivo o cambia
+     su atributo se vuelve a poner (se pinta de golpe, sin parpadeo visible). Causa exacta de que se cerrara
+     sin confirmar (no se ve en el código del motor de mensajes; algo de la escena cierra el slot).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

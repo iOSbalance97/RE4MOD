@@ -138,25 +138,31 @@ void HerreroYellAt(f32 x, f32 y, f32 z, u8* e, int se);
  * A-Y 0xA7.., a-z 0xC1.., e acute 0xF0, o acute 0xF2, inverted ? 0x122, ? 0x9B; 00 page, 01 end */
 static const u16 SUB_QUE[] = { 0x0, 0x122, 0xB7, 0xD5, 0xF0, 0x80, 0xC8, 0xC1, 0x80, 0xD3, 0xC9, 0xC4, 0xCF, 0x80, 0xC5, 0xD3, 0xCF, 0x9B, 0x1 };      /* "Que ha sido eso" */
 static const u16 SUB_DONDE[] = { 0x0, 0x122, 0xAA, 0xC5, 0x80, 0xC4, 0xF2, 0xCE, 0xC4, 0xC5, 0x80, 0xD6, 0xC9, 0xC5, 0xCE, 0xC5, 0x9B, 0x1 };    /* "De donde viene" */
-#define SUB_WK 3
+#define SUB_WK 12                        /* B112: a slot nothing else in the game or the mod uses (3: B111) */
+#define SUB_SLOT (cMes + 4 + 236 * SUB_WK)
 static int sub_left;
 static u32 sub_attr;
-static void Sub(const u16* txt, int frames)
+static const u16* sub_txt;
+static void SubSet(void)
 {
-    u8* m0 = cMes + 4; u8* m = cMes + 4 + 236 * SUB_WK;
+    u8* m0 = cMes + 4; u8* m = SUB_SLOT;
     int fh = *(s8*)(m0 + 0x19), lg = *(s8*)(m0 + 0x77);
     *(s8*)(m + 0x18) = *(s8*)(m0 + 0x18); *(s8*)(m + 0x19) = *(s8*)(m0 + 0x19);   /* the game's size, as slot 0 */
     *(u16*)(m + 0x76) = *(u16*)(m0 + 0x76);
     sub_attr = 0x52 | 0x01000000;
     MesSet(cMes, 0, 0x64, 0x147 - fh - lg, sub_attr, SUB_WK, 0, 4);
-    *(const u16**)(m + 0x98) = txt;
-    sub_left = frames;
+    *(const u16**)(m + 0x98) = sub_txt;
 }
+static void Sub(const u16* txt, int frames) { sub_txt = txt; sub_left = frames; SubSet(); }
+/* B112: B111's line lasted half a second (something in the scene ends the slot): while its time runs
+ * it is put back the frame it is gone (alive bit, our attribute; shown at once: no flicker to see) */
 static void SubTick(void)
 {
+    u8* m = SUB_SLOT;
     if (sub_left <= 0) return;
     ((void (*)(void*, int))0x800C0518)((void*)0x8027E4A8, 0);   /* the end code turns the life meter back on */
-    if (--sub_left == 0 && *(u32*)(cMes + 4 + 236 * SUB_WK + 0x80) == sub_attr) MesDelete(cMes, SUB_WK);
+    if (--sub_left == 0) { if (*(u32*)(m + 0x80) == sub_attr) MesDelete(cMes, SUB_WK); return; }
+    if (!(*(u32*)(m + 4) & 1) || *(u32*)(m + 0x80) != sub_attr) SubSet();
 }
 static void Hud(int on)
 {
