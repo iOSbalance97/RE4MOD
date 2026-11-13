@@ -103,6 +103,14 @@ static void QfpsPlMat(u8* pl)
     int i;
     for (i = 0; i < 12; i++) ((f32*)(0x80217104 + 0x174))[i] = ((f32*)(pl + 0x0C))[i];
 }
+/* B109: THE reason the camera did not face the Ganado after the panel (B102-B108): the mod's own move hook
+ * (m15.s, in pl_R0_Move) keeps the camera still in the world when the GAME turns Leon: every frame it takes
+ * the yaw added since its last frame (modvars +4 = last yaw, +8 = valid) off m_direction_ratio. Under the
+ * panel Leon's routine is stopped, so its last yaw was the one from before the panel: our turn to the
+ * Ganado was read on the first free frame as "turned by the game" and the camera was turned back by it
+ * (whatever m_direction_ratio / m_pl_mat / init flag had been set) -- he looked at the Ganado, the camera
+ * stayed looking where it was. Now the hook's memory is dropped whenever we turn him: it starts afresh */
+static void YawForget(void) { *(u32*)(modvars + 8) = 0; }
 static f32 cang, crad;                   /* B102: the camera round Leon: angle, distance */
 /* Leon's climb in the videos (feet): off the ladder on the loft, half way, at its foot on the ground */
 #define LA_X (-12610.0f)
@@ -319,6 +327,17 @@ static f32 InMargin(f32 x, f32 z)
     k = BZ1 - z; if (k < m) m = k;
     return m;
 }
+/* B109: a camera place behind a wall is brought in along the line to Leon (B108's Cam() clamp moved it
+ * sideways, x and z on their own: near the east wall the orbit camera ended past him, looking at the floor) */
+static void SafePos(f32 lx, f32 lz, f32* x, f32* z)
+{
+    int k;
+    for (k = 0; k < 14 && InMargin(*x, *z) < 120.0f; k++) {
+        f32 nx = lx + (*x - lx) * 0.88f, nz = lz + (*z - lz) * 0.88f;
+        if ((nx - lx) * (nx - lx) + (nz - lz) * (nz - lz) < 650.0f * 650.0f) break;
+        *x = nx; *z = nz;
+    }
+}
 static void Cam(f32 cx, f32 cy, f32 cz, f32 tx, f32 ty, f32 tz, f32 fovy)
 {
     if (cx < BX0 + 60.0f) cx = BX0 + 60.0f;
@@ -440,9 +459,15 @@ static void Shot0(u8* pl, int tt)
                 }
         }
         if (rot != 0.0f) {
-            f32 c = Cos(rot), n = Sin(rot);
+            f32 c = Cos(rot), n = Sin(rot), la = *(f32*)(pl + 0xA4);
             px = lx + ox * c + oz * n; pz = lz - ox * n + oz * c;
+            /* B109: THE reason Leon was not in the shot (stealth kill at the west wall, B108 video): the
+             * place went round him but the camera still looked at the far point ahead of where the shot
+             * first was -- from his side it looked past him at the wall and the window. Gone round, it
+             * looks at him (a little ahead of him, chest high) */
+            qx = lx + Sin(la) * 500.0f; qy = ly + 1250.0f; qz = lz + Cos(la) * 500.0f;
         }
+        SafePos(lx, lz, &px, &pz);
     }
     Cam(px + sh, py + sh, pz, qx, qy, qz, vs ? 44.0f : 38.0f);
     cang = atan2f_(px - lx, pz - lz); crad = Sq((px - lx) * (px - lx) + (pz - lz) * (pz - lz));
@@ -495,14 +520,10 @@ void BarnFrame(void)
             st = 1; t = 0; seen = 1; WindowsLock(1); STOPF |= SPF_EM | SPF_PL; MusicQuiet(); barn_padlock = 1;
             QFPS_DIR = 0.0f; QFPS_DEP = 0.0f;
             {
-                /* B108: also a step (0.8 m) toward the Ganado, under the panel: on the very first frame up the
-                 * ladder's own camera cut (its area at the ladder top) is still the camera, and it stayed so
-                 * while Leon stood there -- after the panel the camera looked at him from the side. Out of
-                 * that area the shoulder camera takes over behind him */
+                /* B109: no step (B108's 0.8 m: a wrong guess, a ladder camera area); turned to the Ganado */
                 f32 a = atan2f_(ux - lx, uz - lz);
-                lx += Sin(a) * 800.0f; lz += Cos(a) * 800.0f;
-                *(f32*)(pl + 0x94) = lx; *(f32*)(pl + 0x9C) = lz;
                 *(f32*)(pl + 0xA4) = a; SetMat(pl, lx, lz, a);
+                YawForget();
                 QfpsPlMat(pl);
             }
         } else t = 0;
@@ -521,6 +542,7 @@ void BarnFrame(void)
             QFPS_DIR = 0.0f; QFPS_DEP = 0.0f;
             QfpsPlMat(pl);
             *(u8*)(0x80217104 + 0x1B2) = 1;            /* B104: m_init_flag: the shoulder camera snaps behind him */
+            YawForget();
             STOPF &= ~(SPF_KEY | SPF_EM | SPF_PL | SPF_CAM); st = 2; t = 0; skill = 0; barn_padlock = 0;
         }
         return;
@@ -673,6 +695,13 @@ void BarnFrame(void)
                 crad += (1800.0f - crad) * k;
                 cey += (ly + 700.0f - cey) * k;
                 cex = lx + Sin(cang) * crad; cez = lz + Cos(cang) * crad;
+                {   /* B109: kept inside the walls along the line to him (and the orbit takes that distance) */
+                    f32 sx = cex, sz = cez;
+                    SafePos(lx, lz, &sx, &sz);
+                    if (sx != cex || sz != cez) { crad = Sq((sx - lx) * (sx - lx) + (sz - lz) * (sz - lz)); cex = sx; cez = sz; }
+                }
+                if (InMargin(cex, cez) < 120.0f)       /* still at a wall that close: round him to the barn's middle side */
+                    cang += Wrap(atan2f_(0.5f * (BX0 + BX1) - lx, 0.5f * (BZ0 + BZ1) - lz) - cang) * 0.08f;
                 ctx += (lx + fa * 400.0f - ctx) * k * 2.0f; cty += (ly + 300.0f - cty) * k * 2.0f; ctz += (lz + fb * 400.0f - ctz) * k * 2.0f;
                 Cam(cex, cey, cez, ctx, cty, ctz, 46.0f);
             }
@@ -714,7 +743,7 @@ void BarnFrame(void)
             barn_padlock = 0;
             /* B107 (user): the game camera right behind him (as after the panel: its copy of his matrix,
              * the C-stick angles at 0, and the snap flag) */
-            QfpsPlMat(pl); QFPS_DIR = 0.0f; QFPS_DEP = 0.0f; *(u8*)(0x80217104 + 0x1B2) = 1;
+            QfpsPlMat(pl); QFPS_DIR = 0.0f; QFPS_DEP = 0.0f; *(u8*)(0x80217104 + 0x1B2) = 1; YawForget();
             Hud(1);
             {
                 u8* wp = *(u8**)(pl + 0x788);

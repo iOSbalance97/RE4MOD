@@ -369,7 +369,8 @@ def upswing(f):
         hz = np.array([bdir[0], 0, bdir[2]]); ymin = (SW_FLOOR - grip[1]) / BEAM
         bdir = nrm(nrm(hz) * math.sqrt(max(1 - ymin * ymin, 0.0)) + np.array([0, ymin, 0]))
     arm(p, P, -1, wr, nrm(lerp(np.array([0.3, 0, -1.0]), np.array([0.6, -1.0, 0.1]), min(q, 1.0))), beam_hand(bdir, fore))
-    turn(p, 11, ry(0.25 * sw))                                               # the claw arm swings back to balance
+    # B109: the claw arm stays as in his idle (B104 swung it back 'to balance': in the game its elbow stuck
+    # out behind him -- the odd elbow the user saw)
     P = fk(p)
     low = min(P[20][1] - BP[20][1], P[24][1] - BP[24][1], P[21][1] - BP[21][1], P[25][1] - BP[25][1])
     p.root[1] -= low
@@ -404,11 +405,15 @@ if __name__ == '__main__':
     # first blow blend into the smash's first ones.
     # B108 (user): a pause between the blows: the blow from below (to frame 26, the anvil up in front), back
     # down to his dragging stance (14 frames), a stop (12), and the whole two-handed smash from its start
-    UPC = 24; DN = 14; HOLD = 12; BL2 = 6
+    # B109: the smash's own start (frames 0-29) is a wind-up with his back to Leon and a half turn back in 4
+    # frames (26-30): after the stop B108 blended into it in 6 frames -- a whole-body whip, the arm flailing.
+    # Now from the stop he lifts the anvil again (14 frames) straight to the smash's top (frame SJ, facing
+    # Leon, anvil overhead) and brings it down from there
+    UPC = 24; DN = 14; HOLD = 12; RAISE = 14; SJ = 30
     I0 = IP[0]
     CP = UP[:UPC + 1] + [blendpose(UP[UPC], I0, sm((k + 1) / (DN + 1))) for k in range(DN)] + [I0] * HOLD
-    CP += [blendpose(I0, SP[k], sm((k + 1) / (BL2 + 1))) for k in range(BL2)] + SP[BL2:]
-    CO = UPC + 1 + DN + HOLD                             # smash frame f is now at CO + f
+    CP += [blendpose(I0, SP[SJ], sm((k + 1) / RAISE)) for k in range(RAISE)] + SP[SJ + 1:]
+    CO = UPC + 1 + DN + HOLD + RAISE - (SJ + 1)          # smash frame f (> SJ) is now at CO + f
     SP = CP
     wm = build(WP); sm_ = build(SP); im = build(IP); fm = build(FP); rm = build(RP); um = build(UP)
     print('walk', check(wm, WP), len(wm), '| smash', check(sm_, SP), len(sm_), '| idle', len(im), '| flex', len(fm))

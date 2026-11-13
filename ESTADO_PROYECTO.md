@@ -597,6 +597,26 @@ Reglas de trabajo del usuario:
        quedaba mientras León siguiera ahí.
      · Combo con pausa (usuario): golpe de abajo (hasta su frame 24), vuelta a la postura de arrastre (14),
        parado (12) y el mazazo entero desde su inicio (6 de mezcla). HR_SMASH 131 frames, golpes 15-21 / 82-91.
+   - **B109** (vídeo B108; usuario: "localiza el porqué antes de actuar"):
+     · Cámara tras el cartel — CAUSA: el hook de movimiento del mod (m15.s en pl_R0_Move) mantiene la
+       cámara quieta en el mundo cuando el JUEGO gira a León: cada frame resta a m_direction_ratio el giro
+       hecho desde su último frame (modvars +4 último yaw, +8 válido). Bajo el cartel la rutina de León
+       está parada: su último yaw era el de antes del cartel, y nuestro giro hacia el Ganado se leía en el
+       primer frame libre como "giro del juego" → la cámara se quedaba mirando donde miraba (90° de lado),
+       hiciéramos lo que hiciéramos con m_pl_mat / ángulos / init flag. En el vídeo: León a −23° (hacia el
+       Ganado), cámara fija de lado 2,3 s hasta que el usuario toca el stick. Arreglo: YawForget() (válido
+       = 0) cada vez que giramos a León (cartel, cierre, fin de escena). Quitado el paso de 0,8 m de B108.
+     · Escena con sigilo junto a la pared oeste (−14172): el primer plano giraba alrededor de León para
+       no salir del granero pero seguía mirando al punto lejano del plano original → desde su lado miraba
+       la pared y la ventana, León fuera de cuadro. Ahora, girado, mira a León (0,5 m por delante, pecho).
+       Al rodearle de camino a la escalera junto a la pared este, el límite de Cam() (x y z por separado)
+       movía la cámara más allá de León → plano del suelo. Ahora SafePos acerca la cámara por la línea
+       hacia León (mín. 0,65 m) y la órbita gira hacia el centro si aun así toca pared.
+     · Combo del Herrero: el codo raro era el brazo de la garra echado hacia atrás (turn 11 ry(0,25) en
+       el golpe de abajo, quitado) y, tras la pausa, el arranque del mazazo (frames 0-29 de espaldas y
+       media vuelta en 26-30) mezclado en 6 frames: latigazo de todo el cuerpo. Ahora tras la pausa
+       levanta la viga 14 frames hasta lo alto del mazazo (su frame 30, de cara) y baja desde ahí.
+       HR_SMASH 115 frames, golpes 15-21 / 65-74.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.
