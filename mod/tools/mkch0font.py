@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 F = '/usr/share/fonts/truetype/crosextra/Caladea-Regular.ttf'
 TEXTS = ['Hace 11 horas', '“Tengo que salir de aquí.”', 'Está cerrada.',
          'Tiene que haber una llave en algún sitio.', '\x01 Coger la llave', 'Has cogido la llave.',
-         'Ashley ha sido capturada', 'Fin de la Parte 1 (prueba)', 'La puerta se abre.']
+         'Ashley ha sido capturada', 'Fin de la Parte 1 (prueba)', 'La puerta se abre.', '\x01 Esconderse', '\x01 Salir', '!']
 CH = sorted(set(''.join(TEXTS)) - {' '})
 S = 3; SIZE = 24; GH = 32; W = 512
 f = ImageFont.truetype(F, SIZE * S)

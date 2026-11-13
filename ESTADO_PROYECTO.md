@@ -673,3 +673,12 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   (bit 1 a los 6 frames) y cámara SPF_CAM en la planta baja mirando a la puerta; B con llave = fin de la
   Parte 1; captura = rutina del jugador 1 (derribo) → ROOM_JUMP(0x111) al último punto (inicio / cama).
   Textos: atlas de letras I4 512x64 (tools/mkch0font.py → c/ch0_font.c) dibujado por hud.c Text().
+- **C0-03** (vídeo C0-02: completado; un cuelgue en otra prueba al activar la escena): sin SndCall 1/0x1E
+  (banco de León, no cargado con Ashley) y un solo ganado de la escena. Sigilo propio en ch0.c (Guards):
+  medidor por guardia; vigilando = Keeper + Be_flg 0x100 + Guard_r 0 (sin detección del juego) y nosotros
+  giramos ang.y; patrulla = R1 0x14 GuardWalk a Go_pos (+0x92C) con Timer (+0x3E4) alto; detectada =
+  liberación de barn.c (Guard_r 20000, flag bit 1, Wait). Marcas sobre la cabeza en hud.c (proyección como
+  StealthPromptDraw). Ashley agachada: crouch.c con Ash()/Play() (partes 1-25, raíz ×1094/1140; pad.c:
+  Círculo → CrouchPress con Ashley; sin derribos sigilosos con Ashley). Escondites: tabla HIDE en ch0.c
+  (establo −5578, 12832). Intro: anim/tools/mkscared.py (Mixamo 'Scared' del usuario, 2,2–7,0 s, 10 fps,
+  partes 1-25) → c/ch0_scared.h, crouch.c ScaredApply; cámara IntroCam (de los pies, de frente, subiendo).

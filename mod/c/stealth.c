@@ -45,7 +45,7 @@ static int hr_pin; static f32 hr_pin_x, hr_pin_z;
 #include "herrero_mot.h"
 void StealthFrame(void)
 {
-    StealthKillFrame();
+    if (G8(0x4FC4) != 1) StealthKillFrame();        /* C0-03: no takedowns for Ashley */
     HerreroFrame();
     u8* pl = pPL;
     u8* m;

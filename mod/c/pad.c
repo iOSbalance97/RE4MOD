@@ -70,6 +70,10 @@ void PadRemap(void)
         }
         out |= in & (PAD_L | PAD_R | PAD_Z);
         if (in & PAD_B) out |= PAD_A;
+        if (G8(0x4FC4) == 1 && pPL && pPL[0xFC] == 0) {         /* C0-03: Ashley: Circle crouches, L3 runs */
+            if ((in & ~prev_raw) & PAD_A) CrouchPress();
+            in &= ~PAD_A;
+        }
         if (in & PAD_A) out |= PAD_B;
         if (in & PAD_X) out |= PAD_Y;
         if (in & PAD_Y) out |= PAD_X;

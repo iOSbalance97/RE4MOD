@@ -36,6 +36,11 @@ static int knife_hide;                  /* after the takedown: knife in the shea
 #define STEP_MIN 1.0f                  /* units / frame that count as moving */
 
 int crouch_stand;                      /* pad.c (unused now) */
+/* C0-03: Ashley (chapter 0) crouches with the same clips: same parts 0-25 as Leon (pl01), only those;
+ * her root is a little lower (1094 vs 1140). Gameplay = her normal state (no move hook for her). */
+static int Ash(void) { return G8(0x4FC4) == 1; }
+static int Play(void) { return Ash() ? (pPL && pPL[0xFC] == 0) : modvars[VB_GAMEPLAY] != 0; }
+int ch0_crouch_force;                  /* ch0.c: hidden = kept crouched */
 static int want, shot = -1, cur = CR_IDLE, prev = -1, have_last, still, full;
 static f32 w, wu, shot_f, sxf, phase, prev_f, xf = 1.0f, last_x, last_z, drop;
 
@@ -198,10 +203,12 @@ static void Apply(u8* pl)
     f32* l;
     u8* p;
     int i;
-    drop = (1140.0f - y) * w;
+    if (Ash()) y *= 1094.0f / 1140.0f;
+    drop = ((Ash() ? 1094.0f : 1140.0f) - y) * w;
     for (i = 0; i < CR_NPARTS; i++) {
         int no = cr_parts[i];
         f32 k = (no >= 17 && no <= 25) ? w : w * wu;               /* aim / knife: legs only */
+        if (no > 25 && Ash()) continue;               /* aim / knife: legs only */
         if (k <= 0.0f) continue;
         p = (u8*)getPartsPtr(pl, no);
         if (!p) return;
@@ -237,7 +244,7 @@ static int Armed(u8* pl) { return pl[0xFC] == 0 && (pl[0xFD] == 6 || pl[0xFD] ==
 void CrouchPress(void)
 {
     u8* pl = pPL;
-    if (!pl || !modvars[VB_GAMEPLAY] || SwapLock() || !(Free(pl) || Armed(pl))) return;
+    if (!pl || !Play() || SwapLock() || !(Free(pl) || Armed(pl))) return;
     want = !want;
     if (Free(pl) && still > 2) {                   /* transitions only from standing still */
         shot = want ? CR_DOWN : CR_UP;
@@ -276,7 +283,8 @@ void CrouchFrame(void)
             cur = CR_IDLE; phase = 0.0f; prev = CR_TAKE; prev_f = (f32)(TK_N - 1); xf = 0.0f;
         }
     }
-    if (!pl || !modvars[VB_GAMEPLAY]) { want = 0; w = wu = 0.0f; shot = -1; have_last = 0; drop = 0.0f; return; }
+    if (pl && Ash() && ch0_crouch_force && !want) { want = 1; w = 1.0f; wu = 1.0f; shot = -1; cur = CR_IDLE; phase = 0.0f; prev = -1; xf = 1.0f; }
+    if (!pl || !Play()) { want = 0; w = wu = 0.0f; shot = -1; have_last = 0; drop = 0.0f; return; }
     full = Free(pl);
     if (knife_hide) {                                       /* the game's put-away: not shown */
         if (pl[0xFC] == 0 && pl[0xFD] == 0xB) full = 1; else knife_hide = 0;
@@ -369,4 +377,39 @@ void CrouchFrame(void)
     }
     if (w <= 0.0f) { drop = 0.0f; prev = -1; return; }
     Apply(pl);
+}
+
+/* C0-03: the chapter 0 intro's scared clip on Ashley (anim/tools/mkscared.py, the user's Mixamo
+ * 'Scared'): frame f (clip frames, looped), weight k over the game's pose; parts 1-25 + the root height. */
+#include "ch0_scared.h"
+void ScaredApply(f32 f, f32 k)
+{
+    static const Q ident = { 1.0f, 0.0f, 0.0f, 0.0f };
+    u8* pl = pPL; u8* p; f32* l; f32 m[3][3], e[3], fr, y;
+    int i, a, b;
+    if (!pl || k <= 0.0f) return;
+    while (f >= (f32)SC_N) f -= (f32)SC_N;
+    a = (int)f; b = a + 1 < SC_N ? a + 1 : 0; fr = f - (f32)a;
+    for (i = 0; i < 25; i++) {
+        int no = i + 1;
+        Q qa, qb;
+        p = (u8*)getPartsPtr(pl, no);
+        if (!p) return;
+        l = (f32*)(p + 0x3C);
+        e[0] = sc_rot[a][i * 3] * 1e-4f; e[1] = sc_rot[a][i * 3 + 1] * 1e-4f; e[2] = sc_rot[a][i * 3 + 2] * 1e-4f;
+        EulerMtx(e, m); qa = MtxQ(m);
+        e[0] = sc_rot[b][i * 3] * 1e-4f; e[1] = sc_rot[b][i * 3 + 1] * 1e-4f; e[2] = sc_rot[b][i * 3 + 2] * 1e-4f;
+        EulerMtx(e, m); qb = MtxQ(m);
+        QMtx(QLerp(LQ(l), QLerp(qa, qb, fr), k), m);
+        if (no == 1) SetL(l, m, l[3] * (1.0f - k), l[7] + (10.0f - l[7]) * k, l[11] * (1.0f - k));
+        else if (no == 17) SetL(l, m, l[3] * (1.0f - k), l[7] * (1.0f - k), l[11] * (1.0f - k));
+        else SetL(l, m, l[3], l[7], l[11]);
+    }
+    p = (u8*)getPartsPtr(pl, 0);
+    if (!p) return;
+    l = (f32*)(p + 0x3C);
+    y = (sc_y[a] * (1.0f - fr) + sc_y[b] * fr) * (1094.0f / 1140.0f);
+    QMtx(QLerp(LQ(l), ident, k), m);
+    SetL(l, m, l[3] * (1.0f - k), l[7] + (y - l[7]) * k, l[11] * (1.0f - k));
+    partsWorldCalc(pl);
 }

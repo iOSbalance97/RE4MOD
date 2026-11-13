@@ -539,6 +539,7 @@ int StealthDiag(int i);
 void BarnFrame(void);
 void Ch0Frame(void);
 int Ch0Black(void); int Ch0Text(int k); int Ch0Coords(int i);
+int Ch0Mark(int k, f32* x, f32* y, f32* z); int Ch0Hide(void);
 void ModFrame(void)
 {
     mod_frame++;
@@ -549,8 +550,8 @@ void ModFrame(void)
         RecoilFrame();
         SwapFrame();
         LegsFrame();
-        CrouchFrame();
     }
+    CrouchFrame();                                            /* C0-03: Ashley crouches too */
     IconFrame();
     draw_now = 0;
     if (StealthDiag(-1) > 0 && modvars[VB_GAMEPLAY]) draw_now = 1;   /* stealth numbers (test) */
@@ -696,9 +697,25 @@ static void Line(const char* s, f32 cx, f32 y, f32 k, int a)    /* white text wi
 static void Ch0Draw(void)
 {
     Mtx44 p; Mtx m; int i, a[8], any = 0;
-    int bk = Ch0Black(), cx = Ch0Coords(0);
+    int bk = Ch0Black(), cx = Ch0Coords(0), hd = Ch0Hide(), nm = 0;
+    f32 mx[16], my[16]; int ml[16];
     for (i = 0; i < 8; i++) { a[i] = Ch0Text(i); any |= a[i]; }
-    if (!bk && !any && cx == -999999) return;
+    for (i = 0; i < 16; i++) {                               /* C0-03: the guards' markers, projected */
+        f32 x, y, z;
+        int lv = Ch0Mark(i, &x, &y, &z);
+        if (lv) {
+            f32* v = (f32*)(pG + 0x74 + 0x30);
+            f32* pp = (f32*)(pG + 0x74 + 0x64);
+            f32 vx = v[0] * x + v[1] * y + v[2] * z + v[3];
+            f32 vy = v[4] * x + v[5] * y + v[6] * z + v[7];
+            f32 vz = v[8] * x + v[9] * y + v[10] * z + v[11];
+            f32 qx = pp[0] * vx + pp[1] * vy + pp[2] * vz + pp[3];
+            f32 qy = pp[4] * vx + pp[5] * vy + pp[6] * vz + pp[7];
+            f32 qw = pp[12] * vx + pp[13] * vy + pp[14] * vz + pp[15];
+            if (qw > 1.0f) { mx[nm] = 320.0f * (1.0f + qx / qw); my[nm] = 240.0f * (1.0f - qy / qw); ml[nm] = lv; nm++; }
+        }
+    }
+    if (!bk && !any && cx == -999999 && !hd && !nm) return;
     GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
     C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
     PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
@@ -710,6 +727,17 @@ static void Ch0Draw(void)
         Quad(96.0f, 70.0f, 3 * 96.0f, 26.0f, 0x000000A0, 0);
         for (i = 0; i < 3; i++) Num(98.0f + 96.0f * i, 74.0f, Ch0Coords(i), i == 1 ? 0x60FF60FF : 0xFFFFFFFF);
     }
+    for (i = 0; i < nm; i++) {                               /* white -> yellow -> red; found: red with a '!' */
+        int lv = ml[i];
+        u32 col = lv >= 100 ? 0xFF2A2000u : lv > 60 ? 0xFF9A2000u : lv > 30 ? 0xFFE04000u : 0xFFFFFF00u;
+        u32 al = lv >= 100 ? 235u : (u32)(90 + lv * 145 / 99);
+        ModeFlat();
+        Disc(mx[i], my[i], 7.5f, al * 2 / 3);
+        Disc(mx[i], my[i], 6.0f, col | al);
+        if (lv >= 100) Line("!", mx[i], my[i] - 26.0f, 0.9f, 255);
+    }
+    if (hd == 1) Line("\x01 Esconderse", 320.0f, 400.0f, 1.0f, 230);
+    if (hd == 2) Line("\x01 Salir", 320.0f, 400.0f, 1.0f, 230);
     if (a[0]) Line("Hace 11 horas", 320.0f, 240.0f - 30.0f, 1.9f, a[0]);
     if (a[1]) Line("\x93Tengo que salir de aqu\xed.\x94", 320.0f, 366.0f, 1.0f, a[1]);
     if (a[2]) { Line("Est\xe1 cerrada.", 320.0f, 342.0f, 1.0f, a[2]); Line("Tiene que haber una llave en alg\xfan sitio.", 320.0f, 370.0f, 1.0f, a[2]); }
