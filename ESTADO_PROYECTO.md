@@ -698,3 +698,13 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   2 vigía gira a −0,184 (cruce) o 2,957 al ritmo del ciclo; 3/4 junto a B y, con Ashley pasado el
   establo (x > −2000, z > 15000) o con la llave, andan a SQ_BACK (líneas rectas sin muros); rondas BV por
   guardia (dirección libre de muros, work/place.py). Dibujo sobre el mapa: tools/ch0/guardias_c006.png.
+- **C0-07** (usuario): GU sin los dos del sur (7 guardias de lista) + 2 corredores (gd[7], gd[8], EmSetEvent)
+  que en la escena del establo (Ashley a < 2,5 m de −5772, 12963; scene_gate 160 frames, cámara en el
+  callejón) corren (R1 0x11 Dash con Go_pos) desde la puerta sur por RUNWAY y se unen al grupo (GATHER, oeste
+  de la hoguera; 3/4 van por (−4000, −2000) para no cruzar la hoguera). Grupo: mira a todos lados; detección
+  20 m andando / 24 m corriendo / agachada nada salvo < 1,5 m. Callejón cerrado: círculo BLOCK (pared
+  invisible, falta objeto). InHouse(): perseguidores pasan a asedio (SIEGE, fachada de la casa) hasta la
+  llave; escena de la llave con golpes (cámara temblando) y entra un asediador o, si no hay, el de C0-02;
+  después AfterKey(): alternos persiguen / van al pie de la escalera (−13500, −9000) y luego persiguen.
+  stage 0/1/2 sobrevive al reinicio (cp 1 repone corredores en el grupo y reparte tras 30 frames).
+  Dol: 5 KB libres.
