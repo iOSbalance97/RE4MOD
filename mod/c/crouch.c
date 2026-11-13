@@ -414,3 +414,4 @@ void ScaredApply(f32 f, f32 k)
     SetL(l, m, l[3] * (1.0f - k), l[7] + (y - l[7]) * k, l[11] * (1.0f - k));
     partsWorldCalc(pl);
 }
+void CrouchOff(void) { want = 0; w = wu = 0.0f; shot = -1; }   /* C0-14: ch0.c scenes stand her up */

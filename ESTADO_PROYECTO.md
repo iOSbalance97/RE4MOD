@@ -752,3 +752,9 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   (traería el modelo del módulo de zelotes + efecto de fuego). La escena de la llave bloqueaba el mando con la
   pantalla del objeto abierta (Stop_flg 0x10000000 / Status 0x501C): ahora espera. AfterKey: todos a R_RING
   (8 puntos), meter ≥ 0.5; el que entra queda R_DOOR buscando dentro.
+- **C0-14**: cuelgue PC 0x801925A8 (InverseKinematics PAL 0x80192084: parte con padre nulo) al agarrar el juego a
+  Ashley jugable → captura nuestra a 1,7 m y Hold a todos. Puerta: Open_timer (cEmDoor +0x7E0) a 0x96 mientras
+  entran. Escalera interior de la casa: rampa SAT (3600, -10300) y 3200 → (3600, -15100). Motion.Seq_speed en
+  cModel +0x298. Ventana del tejado = ETS 8 (WINDOW00, -938, 4200, -13150); la de la escalera ETS 0 (384, 4200,
+  -6406) con HASIGO01 (354, -4727). "Rota" = bit0 de EtcModelFlg[no] en los datos guardados de la sala
+  (GetEtcFlgPtr, NTSC 0x80132EE8; dirección PAL aún sin encontrar).
