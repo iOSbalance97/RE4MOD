@@ -101,6 +101,7 @@ static int stage;                                    /* C0-07: 0 start, 1 the ga
 static Guard gd[12];
 static int hidden, hide_no, card, card_t, road_wait;
 static int scene_n, watch_on, rw, kwait;
+static int win_done;
 static int scene_x, x_done, grab;                    /* C0-14: out of the house scene; a chaser at arm's length */
 static u8 ins[3];                                    /* C0-14: the three who come in (gd index + 1) */
 static u8* hdoor;
@@ -153,7 +154,7 @@ void Ch0Jump(u32* a)
     PL_SELECT(1);
     a[0] = 0x111; a[1] = (u32)&apos; a[2] = (u32)&arot;
     hidden = 0; ch0_crouch_force = 0; card = 0; road_wait = 1; cyc = 0; stage = 0; scene_gate = 0;
-    on = 1; ph = 0; t = 0; ready = 0; endt = 0; key = 0; b_seen = 0; cp = 0; caught = 0; scene = 0; door_in = 0; talk_t = 0; ch0_got = 0; cyc2 = 0; scene_n = 0; watch_on = 0; scene_x = 0; x_done = 0; grab = 0; keep_open = 0;
+    on = 1; ph = 0; t = 0; ready = 0; endt = 0; key = 0; b_seen = 0; cp = 0; caught = 0; scene = 0; door_in = 0; talk_t = 0; ch0_got = 0; cyc2 = 0; scene_n = 0; watch_on = 0; scene_x = 0; x_done = 0; grab = 0; keep_open = 0; win_done = 0;
 }
 
 /* the guards (user's map, snapped to the ground, 0.9 m clear of walls): pos (mm), facing (s16, pi/0x4000), type
@@ -898,6 +899,29 @@ static void WalkE(u8* e, f32 x, f32 z)               /* GuardWalk for a work out
     *(f32*)(e + 0x92C) = x; *(f32*)(e + 0x930) = *(f32*)(e + 0x98); *(f32*)(e + 0x934) = z;
     *(s32*)(e + 0x3E4) = 300;
 }
+/* C0-16 (user): the upstairs window onto the roof (ETS 8, WINDOW00, -938 4200 -13150) has no glass: so
+ * Ashley climbs through it instead of Leon's break-through. A heavy hit is put in its damage slot (dmg at
+ * +0x324: flag 1, weapon 0x10 = size group 2 -> hp 0 -> SetBreakAll) once, while the intro plays far away;
+ * the game keeps it broken (its etc flag). */
+
+static void RoofWindow(void)
+{
+    u32 n = *(u32*)((u8*)EMMGR + 4), i, sz = *(u32*)((u8*)EMMGR + 8);
+    u8* base = *(u8**)EMMGR;
+    if (win_done) return;
+    if ((u32)base < 0x80000000u || (u32)base >= 0x81800000u || n > 1024 || sz < 0xC00 || sz > 0x40000) return;
+    for (i = 0; i < n; i++) {
+        u8* e = base + i * sz;
+        f32 dx, dy, dz;
+        if (!(*(u32*)e & 1)) continue;
+        dx = *(f32*)(e + 0x94) + 938.0f; dy = *(f32*)(e + 0x98) - 4200.0f; dz = *(f32*)(e + 0x9C) + 13150.0f;
+        if (dx * dx + dz * dz > 400.0f * 400.0f || dy * dy > 600.0f * 600.0f) continue;
+        e[0x324] = 1; e[0x325] = 0; e[0x326] = 0x10;
+        *(f32*)(e + 0x328) = -2000.0f; *(f32*)(e + 0x32C) = 4200.0f; *(f32*)(e + 0x330) = -13150.0f;
+        win_done = 1;
+        return;
+    }
+}
 static void Restart(void)                            /* caught: the room again from the checkpoint */
 {
     hidden = 0; ch0_crouch_force = 0;
@@ -1076,6 +1100,7 @@ void Ch0Frame(void)
         if (hman_t == 6) *(u32*)(hman + 0x3C8) |= 1u;
     }
     if (ph == 0) {
+        if (t > 10 && ROOM == 0x11) RoofWindow();
         ch0_padlock = 1; ch0_stick = 0;
         if (t >= T_WALK && t < T_STOP) { ch0_stick = 1; ch0_sx = 0; ch0_sy = 56; }     /* four steps */
         IntroCam();
