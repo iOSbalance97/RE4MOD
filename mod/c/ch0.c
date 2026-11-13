@@ -46,8 +46,15 @@
  *   the south pair as before; the gathering further west; boxes in the three black-marked passages.
  * C0-06 (user): the road guard walks along the road (his beat ran into a wall), in step with the watch
  *   over the crossing so that there is a moment to slip to the stable; only two in the square, by door B
- *   first and then back toward the start (not past her) once she is round the south side. */
+ *   first and then back toward the start (not past her) once she is round the south side.
+ * C0-10 (user): the game's own texts in the game's own message window (door B's "Está cerrada y no se abre..."
+ *   and "Has usado la Llave de la insignia." from r101; Ashley's line in the game's letters); the key is the
+ *   game's own item (0x3B, the Insignia Key r101 asks for) lying on the bed, picked up the game's way; every
+ *   item of the rooms (Leon's ammo, money, herbs...) is gone; the house scene opens the door (cEmDoor::setOpen)
+ *   and the Ganado walks in; door B with the key leads on to the road to the church (r112, the farm at night)
+ *   and its far end (the way down to the cemetery, r118) ends Part 1. */
 #include "game.h"
+#include "ch0_msg.h"
 
 #define STAGE G8(0x4FA8)
 #define ROOM  G8(0x4FA9)
@@ -66,7 +73,7 @@
 extern u16 barn_pad;                                 /* pad.c: this frame's remapped buttons */
 
 static int on, done, ph, t, ready, endt, scene;
-static int key, b_seen, msg, msg_t, caught, cap_t, cp;      /* cp: checkpoint 0 start, 1 the bed */
+static int key, b_seen, caught, cap_t, cp;      /* cp: checkpoint 0 start, 1 the bed */
 static Vec lpos, lrot; static int larg;              /* the intro's own jump (Leon, r100) */
 static Vec apos = { -52144.0f, 91.0f, 22524.0f }, arot = { 0.0f, 2.122f, 0.0f };
 static Vec kpos = { 2100.0f, 3199.0f, -9500.0f }, krot = { 0.0f, 0.0f, 0.0f };
@@ -96,6 +103,16 @@ static int hidden, hide_no, card, card_t, road_wait;
 #define DOOR_OUT_Z (-5545.0f)
 #define DOOR_IN_X 7309.0f
 #define DOOR_IN_Z (-6724.0f)
+#define HDOOR_X 6540.0f                              /* house C's door model (ETS 2, et03: the hinge) */
+#define HDOOR_Z (-6422.0f)
+#define KEY_ID 0x3B                                  /* the Insignia Key (r101's iron door to the farm) */
+static const f32 KEYP[3] = { 2400.0f, 3925.0f, -8450.0f };   /* on the bed (its top, EAT: y 3900-3950) */
+static Vec fpos = { -19691.0f, 0.0f, -19088.0f }, frot = { 0.0f, 0.988f, 0.0f };
+#define EX (-4050.0f)                                /* r112's way down to the cemetery (r118): the end */
+#define EZ 51612.0f
+static int talk_t;                                   /* the message on screen: frames left */
+static int door_in;                                  /* C0-10: gd index + 1 of the one who comes in */
+static u32 talk_attr;
 
 static void Hud(int sw)
 {
@@ -124,7 +141,7 @@ void Ch0Jump(u32* a)
     PL_SELECT(1);
     a[0] = 0x111; a[1] = (u32)&apos; a[2] = (u32)&arot;
     hidden = 0; ch0_crouch_force = 0; card = 0; road_wait = 1; cyc = 0; stage = 0; scene_gate = 0;
-    on = 1; ph = 0; t = 0; ready = 0; endt = 0; key = 0; b_seen = 0; cp = 0; caught = 0; scene = 0; msg = 0;
+    on = 1; ph = 0; t = 0; ready = 0; endt = 0; key = 0; b_seen = 0; cp = 0; caught = 0; scene = 0; door_in = 0; talk_t = 0;
 }
 
 /* the guards (user's map, snapped to the ground, 0.9 m clear of walls): pos (mm), facing (s16, pi/0x4000), type
@@ -169,7 +186,17 @@ static const f32 LADDER[2] = { -13518.0f, -10294.0f };   /* the room's ladder (E
 void Ch0EmList(void)
 {
     int i, k = 0;
-    if (!on || !pG || STAGE != 1 || ROOM != 0x11) return;
+    if (!on || !pG || STAGE != 1) return;
+    if (ROOM == 0x12) {                              /* C0-10: the road to the church, empty for now */
+        for (i = 0; i < 256; i++) {
+            u8* e = EMLIST(i);
+            if (*(u16*)(e + 0x18) == 0x112) { e[0] = 0; e[1] = 0; }
+        }
+        ngidx = 0; hman = 0;
+        memclr_asm(gd, sizeof(gd));
+        return;
+    }
+    if (ROOM != 0x11) return;
     for (i = 0; i < 256; i++) {
         u8* e = EMLIST(i);
         if (*(u16*)(e + 0x18) == 0x111 && e[1] == 0x17) { e[0] = 0; e[1] = 0; }
@@ -194,7 +221,7 @@ void Ch0EmList(void)
     memclr_asm(gd, sizeof(gd));
 }
 
-static int Ashley(void) { return pPL && PLTYPE == 1 && STAGE == 1 && ROOM == 0x11; }
+static int Ashley(void) { return pPL && PLTYPE == 1 && STAGE == 1 && (ROOM == 0x11 || ROOM == 0x12); }
 static int Alive(u8* e) { return e && (u32)e >= 0x80000000u && (u32)e < 0x81800000u && (*(u32*)e & 0x201) == 1; }
 
 static u8* EmFind(int no)                            /* the live work made from list entry `no` */
@@ -564,7 +591,6 @@ static void IntroCam(void)                           /* from her feet, in front,
     STOPF |= SPF_CAM;
     Cam(PX() + fx * dist + fz * sx, PY() + ch, PZ() + fz * dist - fx * sx, PX(), PY() + th, PZ(), 42.0f + 8.0f * u);
 }
-static void Msg(int m) { msg = m; msg_t = 0; }       /* texts: 1 locked, 2 key, 3 opens */
 
 static void Runners(int at_gate)                     /* the two from the south gate */
 {
@@ -625,26 +651,117 @@ void Ch0Ets(u8* list)
         if (++j >= c) { j = 0; b++; }
     }
 }
+/* C0-10: the rooms' items (ITA records, 0x9C bytes) just before the game reads them (hook at SceAtInit's entry,
+ * PAL 0x8014E434): all off (Leon's ammo, money, herbs, the shotgun...), and in r111 one of them becomes the key
+ * on the bed. No taken flag (item_flg / auto_item_flg 0): nothing of Leon's game is touched. */
+void Ch0Ita(u8* aev, u8* ita)
+{
+    int i, n;
+    (void)aev;
+    if (!on || !pG || STAGE != 1 || !ita || (ROOM != 0x11 && ROOM != 0x12)) return;
+    if (ita[0] != 'I' || ita[1] != 'T' || ita[2] != 'A') return;
+    n = *(u16*)(ita + 6);
+    for (i = 0; i < n; i++) ita[0x10 + i * 0x9C + 0x34] = 0;
+    if (ROOM != 0x11 || key) return;
+    for (i = 0; i < n; i++) {
+        u8* w = ita + 0x10 + i * 0x9C;
+        if (*(u16*)(w + 0x78) != 0x57) continue;    /* r111's treasure up on a roof: now the key */
+        *(f32*)(w + 0x5C) = KEYP[0]; *(f32*)(w + 0x60) = KEYP[1]; *(f32*)(w + 0x64) = KEYP[2];
+        *(u32*)(w + 0x68) = 0;
+        *(f32*)(w + 0x6C) = *(f32*)(w + 0x70) = *(f32*)(w + 0x74) = 0.0f;
+        *(u16*)(w + 0x78) = KEY_ID; *(u16*)(w + 0x7A) = 0; *(u16*)(w + 0x7C) = 1; *(u16*)(w + 0x7E) = 0;
+        w[0x80] = 1; w[0x81] = 0; w[0x82] = 0; w[0x83] = 0; w[0x84] = 0; w[0x85] = 0;
+        *(s16*)(w + 0x86) = -1;
+        *(f32*)(w + 0x88) = 800.0f;
+        *(f32*)(w + 0x8C) = *(f32*)(w + 0x90) = *(f32*)(w + 0x94) = 0.0f;
+        w[0x46] = 0; w[0x47] = 0; w[0x52] = 0;
+        w[0x34] = 3;
+        break;
+    }
+}
+typedef struct { u16 id, num; u8 flags, type; u16 lv, bullet; s8 x, y, orient; u8 board; } Item;
+static Item* KeyItem(void)                           /* the key in Ashley's case, or 0 */
+{
+    Item* it = *(Item**)((u8*)ItemMgr + 0x14);
+    int i, n = *(s32*)((u8*)ItemMgr + 0x1C);
+    u8 ch = *((u8*)ItemMgr + 0x13);
+    if ((u32)it < 0x80000000u || (u32)it >= 0x81800000u || n > 256) return 0;
+    for (i = 0; i < n; i++, it++) if ((it->flags & 1) && it->type == ch && it->id == KEY_ID && it->num) return it;
+    return 0;
+}
+/* the game's own message window, without stopping the game: 0x1002 the game's text look (SceMesSet),
+ * 0x10 the game goes on, 0x80000 each line centred, 0x01000000 it stays (we take it away), 0x02000000 no
+ * waiting for a button */
+#define TALK_WK 2
+static void Say(const u16* txt, int frames)
+{
+    u8* m = cMes + 4 + 236 * TALK_WK;
+    talk_attr = 0x1002 | 0x10 | 0x80000 | 0x01000000 | 0x02000000;
+    MesSet(cMes, 0x15, 0x64, 282, talk_attr, TALK_WK, 0, 4);
+    *(const u16**)(m + 0x98) = txt;
+    talk_t = frames;
+}
+static void SayTick(void)
+{
+    if (talk_t <= 0) return;
+    if (--talk_t > 0) return;
+    if (*(u32*)(cMes + 4 + 236 * TALK_WK + 0x80) == talk_attr) MesDelete(cMes, TALK_WK);
+}
+static u8* HouseDoor(void)                           /* house C's door (cEmDoor, id 0x41) */
+{
+    u32 n = *(u32*)((u8*)EMMGR + 4), i, sz = *(u32*)((u8*)EMMGR + 8);
+    u8* base = *(u8**)EMMGR;
+    if ((u32)base < 0x80000000u || (u32)base >= 0x81800000u || n > 1024 || sz < 0xC00 || sz > 0x40000) return 0;
+    for (i = 0; i < n; i++) {
+        u8* e = base + i * sz;
+        f32 dx, dz;
+        if (!(*(u32*)e & 1) || e[0x100] != 0x41) continue;
+        dx = *(f32*)(e + 0x94) - HDOOR_X; dz = *(f32*)(e + 0x9C) - HDOOR_Z;
+        if (dx * dx + dz * dz < 800.0f * 800.0f) return e;
+    }
+    return 0;
+}
+#define DOOR_OPEN ((void (*)(u8*, Vec*, int, int, int))0x800DE5A0)   /* cEmDoor::setOpen (PAL) */
+static void WalkE(u8* e, f32 x, f32 z)               /* GuardWalk for a work outside gd[] */
+{
+    e[0xFD] = 0x14; e[0xFE] = 0; e[0xFF] = 0;
+    *(f32*)(e + 0x92C) = x; *(f32*)(e + 0x930) = *(f32*)(e + 0x98); *(f32*)(e + 0x934) = z;
+    *(s32*)(e + 0x3E4) = 300;
+}
 static void Restart(void)                            /* caught: the room again from the checkpoint */
 {
     hidden = 0; ch0_crouch_force = 0;
     if (!cp) { road_wait = 1; cyc = 0; stage = 0; }
     scene_gate = 0;
     PL_LIFE = PL_LIFE_MAX;
-    ready = 0; scene = 0; caught = 0; ch0_padlock = 1; msg = 0;
+    ready = 0; scene = 0; caught = 0; ch0_padlock = 1;
     ROOM_JUMP(0x111, cp ? &kpos : &apos, cp ? &krot : &arot, 0);
 }
 
-#define S_LEN      185                               /* the house scene */
+#define S_LEN      215                               /* the house scene */
+#define S_OPEN     104                               /* C0-10: the door opens */
+enum { R_DOOR = 9 };                                 /* the one who comes in (no special branch in Guards) */
+
+static void Leave(void)                              /* C0-10: door B with the key: on to the road to the church */
+{
+    int k;
+    Item* it = KeyItem();
+    if (it) { it->num = 0; it->flags &= ~1; }       /* used, as the game does with a key */
+    for (k = 0; k < NG; k++) if (Alive(gd[k].e) && gd[k].e[0xFC] == 1) Hold(&gd[k]);
+    if (Alive(hman)) { *(u32*)(hman + 0x3C8) &= ~1u; Native(hman); hman[0xFD] = 1; hman[0xFE] = 0; }
+    Say(MSG_USED, 100);
+    ph = 4; endt = 0; ch0_padlock = 1; Hud(0);
+}
 
 void Ch0Frame(void)
 {
     u16 pad, trg;
     if (!on || !pG) { ch0_padlock = 0; ch0_stick = 0; return; }
     pad = barn_pad; trg = pad & ~pad_old; pad_old = pad;
+    SayTick();
     if (!ready) {                                    /* still loading: keep it black and still */
         ch0_padlock = 1; ch0_stick = 0;
-        if (Ashley()) {
+        if (Ashley() && (ph != 3 || ROOM == 0x12)) {
             ready = 1; t = 0;
             if (ph == 0) Hud(0); else { ch0_padlock = 0; Hud(1); }
             if (ph == 1 && stage >= 1) Runners(0);
@@ -655,9 +772,18 @@ void Ch0Frame(void)
     }
     if (!Ashley()) return;                           /* menus, death screen... */
     t++;
-    if (msg) msg_t++;
-    if (msg && msg != 3 && msg_t > 150) msg = 0;
     Areas();
+    if (ph == 3) {                                   /* C0-10: r112, the road to the church */
+        if (ROOM != 0x12) return;
+        if (D2(EX, EZ) < 2500.0f * 2500.0f && pPL[0xFC] == 0) { ph = 2; endt = 0; ch0_padlock = 1; Hud(0); }
+        return;
+    }
+    if (ph == 4) {                                   /* door B: the message, black, r112 */
+        endt++;
+        ch0_padlock = 1;
+        if (endt >= 75 && pPL[0xFC] == 0) { ph = 3; ready = 0; ROOM_JUMP(0x112, &fpos, &frot, 0); }
+        return;
+    }
     if (ph == 1 && !caught && !scene && !card) ch0_padlock = 0;
     Guards();
     if (Alive(hman)) {                               /* born without bit 1 (else it stays hidden, barn.c B94) */
@@ -674,6 +800,7 @@ void Ch0Frame(void)
             if (f > 36.99f) f = 36.99f;
             ScaredApply(f, k);
         }
+        if (t == T_SAY) Say(MSG_ASHLEY, T_FREE - 15 - T_SAY);   /* C0-10: in the game's own letters */
         if (t >= T_FREE) { ph = 1; ch0_stick = 0; STOPF &= ~SPF_CAM; card = 1; card_t = 0; }
         return;
     }
@@ -709,54 +836,68 @@ void Ch0Frame(void)
             Runners(1); Group(2); Group(3);
             return;
         }
-        if (pPL[0xFC] == 1 && !scene) { caught = 1; cap_t = 0; msg = 0; hidden = 0; ch0_crouch_force = 0; Hud(0); return; }
+        if (pPL[0xFC] == 1 && !scene) { caught = 1; cap_t = 0; hidden = 0; ch0_crouch_force = 0; Hud(0); return; }
         if (scene) {                                 /* the Ganado comes in downstairs */
+            u8* d = HouseDoor();
+            f32 sh = 0.0f;
+            int b = scene < 30 ? -1 : (scene - 30) % 22, k, in = 0;
             scene++;
             ch0_padlock = 1;
             STOPF |= SPF_CAM;
-            {   /* C0-07: banging on the door from outside (the camera shakes with each blow), then one comes in */
-                f32 sh = 0.0f;
-                int b = scene < 30 ? -1 : (scene - 30) % 22, k, in = 0;
-                if (scene >= 30 && scene < 96 && b < 7) sh = (f32)(7 - b) * 9.0f * ((b & 1) ? 1.0f : -1.0f);
-                if (scene == 100) {                  /* C0-09: one always comes in (C0-08: nobody did) */
-                    for (k = 0; k < NG && !in; k++) if (gd[k].role == R_SIEGE && Alive(gd[k].e)) in = k + 1;
-                    if (!in) {                       /* none at the door: the nearest one is put there */
-                        f32 best = 1e12f, dx, dz;
-                        for (k = 0; k < NG; k++) {
-                            u8* e = gd[k].e;
-                            if (!Alive(e) || e[0xFC] != 1 || k == 0) continue;
-                            dx = *(f32*)(e + 0x94) - DOOR_OUT_X; dz = *(f32*)(e + 0x9C) - DOOR_OUT_Z;
-                            if (dx * dx + dz * dz < best) { best = dx * dx + dz * dz; in = k + 1; }
-                        }
+            /* C0-07: banging on the door from outside (the camera shakes with each blow); C0-10: the door
+               rattles with them, then it is opened (the game's own door, no sound) and one walks in */
+            if (scene >= 30 && scene < 96 && b < 7) sh = (f32)(7 - b) * 9.0f * ((b & 1) ? 1.0f : -1.0f);
+            if (d && scene < S_OPEN) *(f32*)(d + 0xA4) = *(f32*)(d + 0x778) + sh * 0.0012f;
+            if (scene == S_OPEN - 8) {               /* one at the door: the one laying siege, or the nearest */
+                for (k = 0; k < NG && !in; k++) if (gd[k].role == R_SIEGE && Alive(gd[k].e) && gd[k].e[0xFC] == 1) in = k + 1;
+                if (!in) {
+                    f32 best = 1e12f, dx, dz;
+                    for (k = 1; k < NG; k++) {
+                        u8* e = gd[k].e;
+                        if (!Alive(e) || e[0xFC] != 1) continue;
+                        dx = *(f32*)(e + 0x94) - DOOR_OUT_X; dz = *(f32*)(e + 0x9C) - DOOR_OUT_Z;
+                        if (dx * dx + dz * dz < best) { best = dx * dx + dz * dz; in = k + 1; }
                     }
-                    if (in) {
-                        u8* e = gd[in - 1].e;
-                        *(f32*)(e + 0x94) = *(f32*)(e + 0x110) = DOOR_OUT_X;
-                        *(f32*)(e + 0x98) = *(f32*)(e + 0x114) = 0.0f;
-                        *(f32*)(e + 0x9C) = *(f32*)(e + 0x118) = DOOR_OUT_Z;
-                        *(f32*)(e + 0xA4) = 3.02f;
-                        Chase(&gd[in - 1]);
-                    } else if (!Alive(hman)) hman = HouseGanado(DOOR_OUT_X, DOOR_OUT_Z, 3.02f);
                 }
-                Cam(5644.0f + sh, 1500.0f + sh * 0.5f, -9300.0f, DOOR_IN_X, 900.0f, DOOR_IN_Z, 50.0f);
+                door_in = in;
+                if (in) {
+                    Guard* g = &gd[in - 1];
+                    u8* e = g->e;
+                    *(f32*)(e + 0x94) = *(f32*)(e + 0x110) = DOOR_OUT_X;
+                    *(f32*)(e + 0x98) = *(f32*)(e + 0x114) = 0.0f;
+                    *(f32*)(e + 0x9C) = *(f32*)(e + 0x118) = DOOR_OUT_Z;
+                    *(f32*)(e + 0xA4) = 3.02f;
+                    g->role = R_DOOR; g->ax = DOOR_IN_X; g->az = DOOR_IN_Z - 1500.0f;
+                    Hold(g);
+                } else if (!Alive(hman)) hman = HouseGanado(DOOR_OUT_X, DOOR_OUT_Z, 3.02f);
             }
-            if (scene >= S_LEN) { scene = 0; STOPF &= ~SPF_CAM; ch0_padlock = 0; Hud(1); stage = 2; AfterKey(); }
+            if (scene == S_OPEN && d) {
+                Vec p;
+                p.x = DOOR_OUT_X; p.y = 0.0f; p.z = DOOR_OUT_Z;
+                *(f32*)(d + 0xA4) = *(f32*)(d + 0x778);
+                DOOR_OPEN(d, &p, 0, 1, 0);
+            }
+            if (scene == S_OPEN + 10) {
+                if (door_in) Walk(&gd[door_in - 1], DOOR_IN_X, DOOR_IN_Z - 1500.0f);
+                else if (Alive(hman)) WalkE(hman, DOOR_IN_X, DOOR_IN_Z - 1500.0f);
+            }
+            Cam(5644.0f + sh, 1500.0f + sh * 0.5f, -9300.0f, DOOR_IN_X, 900.0f, DOOR_IN_Z, 50.0f);
+            if (scene >= S_LEN) {
+                scene = 0; STOPF &= ~SPF_CAM; ch0_padlock = 0; Hud(1); stage = 2;
+                if (door_in && Alive(gd[door_in - 1].e)) Chase(&gd[door_in - 1]);
+                AfterKey();
+            }
             return;
         }
         HideFrame(trg);
         if (hidden) return;
-        if (!key) {
-            f32 dy = PY() - KY;
-            if (D2(KX, KZ) < 1300.0f * 1300.0f && dy > -500.0f && dy < 500.0f && (trg & PAD_A)) {
-                key = 1; cp = 1; Msg(2); scene = 1; Hud(0);
-                return;
-            }
+        if (!key && KeyItem()) {                     /* C0-10: picked up the game's way (its own screen) */
+            key = 1; cp = 1; scene = 1; door_in = 0; Hud(0);
+            return;
         }
         if (D2(BX, BZ) < 1800.0f * 1800.0f) {
-            if (!key) { if (!b_seen) { b_seen = 1; Msg(1); } }
-            else if (pPL[0xFC] == 0) { int k; ph = 2; endt = 0; ch0_padlock = 1; Hud(0); Msg(3);
-                for (k = 0; k < NG; k++) if (Alive(gd[k].e) && gd[k].e[0xFC] == 1) Hold(&gd[k]);   /* C0-09: everyone stops */
-                if (Alive(hman)) { *(u32*)(hman + 0x3C8) &= ~1u; Native(hman); hman[0xFD] = 1; hman[0xFE] = 0; } }
+            if (!key) { if (!b_seen) { b_seen = 1; Say(MSG_LOCKED, 210); } }
+            else if (pPL[0xFC] == 0) { Leave(); return; }
         } else if (D2(BX, BZ) > 4000.0f * 4000.0f) b_seen = 0;
         return;
     }
@@ -764,7 +905,8 @@ void Ch0Frame(void)
         endt++;
         ch0_padlock = 1;
         if (endt >= 170 && pPL[0xFC] == 0) {     /* C0-09: never while she is being hit (the C0-08 crash) */
-            done = 1; on = 0; ch0_padlock = 0; msg = 0; hidden = 0; ch0_crouch_force = 0;
+            done = 1; on = 0; ch0_padlock = 0; hidden = 0; ch0_crouch_force = 0;
+            if (talk_t > 0) { talk_t = 1; SayTick(); }
             PL_SELECT(0);
             EMLIST_NO = -1;                          /* r100 reads Leon's list again */
             ROOM_JUMP(0x100, &lpos, &lrot, larg);
@@ -781,6 +923,8 @@ int Ch0Black(void)
     if (ph == 0) return 255 - Ramp(T_FADE_IN, T_LIT, t);
     if (ph == 1 && caught) return Ramp(40, 90, cap_t);
     if (ph == 2) return Ramp(60, 100, endt);
+    if (ph == 4) return Ramp(25, 70, endt);                  /* C0-10: door B -> r112 */
+    if (ph == 3) return 255 - Ramp(0, 40, t);
     return 0;
 }
 /* line k: 0 "Hace 11 horas", 1 Ashley's line, 2 locked (two lines), 3 key prompt, 4 key taken,
@@ -790,24 +934,14 @@ int Ch0Text(int k)
     if (!on || !ready) return 0;
     if (ph == 0) {
         if (k == 0) { if (t < T_TXT_FULL) return Ramp(T_TXT_IN, T_TXT_FULL, t); return 255 - Ramp(T_TXT_OUT, T_TXT_GONE, t); }
-        if (k == 1) { if (t < T_SAY + 15) return Ramp(T_SAY, T_SAY + 15, t); return 255 - Ramp(T_FREE - 15, T_FREE, t); }
         return 0;
     }
-    if (k == 3) {
-        f32 dy;
-        if (key || scene || caught || ph != 1 || !Ashley()) return 0;
-        dy = PY() - KY;
-        return D2(KX, KZ) < 1300.0f * 1300.0f && dy > -500.0f && dy < 500.0f ? 255 : 0;
-    }
-    if (k == 2 && msg == 1) return msg_t < 120 ? Ramp(0, 10, msg_t) : 255 - Ramp(120, 150, msg_t);
-    if (k == 4 && msg == 2) return msg_t < 120 ? Ramp(0, 10, msg_t) : 255 - Ramp(120, 150, msg_t);
-    if (k == 5 && msg == 3) return 255 - Ramp(50, 70, msg_t);
     if (k == 6 && caught) return Ramp(70, 90, cap_t);
     if (k == 7 && ph == 2) return Ramp(100, 120, endt);
     return 0;
 }
 int Ch0Coords(int i)                                  /* test: Ashley x, y, z; -999999 = off */
 {
-    if (!on || !ready || ph != 1 || caught || scene || card || !Ashley()) return -999999;
+    if (!on || !ready || (ph != 1 && ph != 3) || caught || scene || card || !Ashley()) return -999999;
     return (int)*(f32*)(pPL + 0x94 + 4 * i);
 }

@@ -722,3 +722,13 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   1/2) a BLK. pad.c: crouch de Ashley solo sin SPF_PL (Stop_flg 0x10000000) ni STA_SUSPEND
   (Status_flg[1] pG+0x501C 0x10000000). Escena de la llave: siempre entra uno (asedio o el más cercano,
   teletransportado a la puerta). Final: solo con Ashley en r_no_0 0; todos en Hold; salto cuando r_no_0 0.
+- **C0-10** (prueba C0-09: pausa, cuelgue y establo bien; en la llave solo golpes): textos con la ventana de
+  mensajes del juego (MesSet con nuestro puntero de códigos, como item.c; attr 0x1002|0x10|0x80000|0x01000000|
+  0x02000000) y frases originales sacadas del MDT de r101 (tools/ch0/mdt.py, mkmsg.py → c/ch0_msg.h; códigos:
+  0x80 espacio, A-Z 0xA7.., a-z 0xC1.., . 0x95, , 0x94, ! 0x9A, ¡ 0x121, á 0xEF, í 0xF1, ó 0xF2, ú 0xF3, ñ 0x10B,
+  03 línea, 08 espera, 04 página, 11 nombre de objeto). Hook en SceAtInit (PAL 0x8014E434, r3 AEV, r4 ITA) →
+  Ch0Ita: todas las fichas ITA de r111/r112 apagadas (be_flg 0) y la del tesoro 0x57 de r111 pasa a ser la
+  llave 0x3B (sin bandera de cogido) sobre la cama (2400, 3925, -8450; EAT de la cama y 3900-3950). Llave
+  detectada en la maleta (ItemMgr +0x14/+0x1C/+0x13). Escena: puerta cEmDoor id 0x41 junto a (6540,-6422),
+  cEmDoor::setOpen PAL 0x800DE5A0 (sin sonido), tiembla con los golpes (ang = base_dir +0x778 + golpe), el
+  ganado entra con GuardWalk. B con llave → r112 (-19691, 0, -19088, 0.988); final en (-4050, 51612).

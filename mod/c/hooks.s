@@ -277,3 +277,20 @@ hook_ets:
     addi  r1,r1,16
     stwu  r1,-24(r1)          # original instruction
     b     ret_ets
+
+# C0-10: SceAtInit's entry (PAL 0x8014E434): r3 AEV, r4 ITA -> Ch0Ita (Leon's items out, the key in)
+    .globl hook_ita
+hook_ita:
+    stwu  r1,-16(r1)
+    mflr  r0
+    stw   r0,20(r1)
+    stw   r3,8(r1)
+    stw   r4,12(r1)
+    bl    Ch0Ita
+    lwz   r0,20(r1)
+    mtlr  r0
+    lwz   r3,8(r1)
+    lwz   r4,12(r1)
+    addi  r1,r1,16
+    stwu  r1,-24(r1)          # original instruction
+    b     ret_ita

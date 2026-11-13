@@ -18,3 +18,4 @@ ret_hud            = 0x8011D480;
 ret_rjump          = 0x80152E2C;
 ret_emlist         = 0x800CB210;
 ret_ets            = 0x80106B6C;
+ret_ita            = 0x8014E438;

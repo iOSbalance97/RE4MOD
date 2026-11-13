@@ -763,11 +763,6 @@ static void Ch0Draw(void)
     if (hd == 1) Line("\x01 Esconderse", 320.0f, 400.0f, 1.0f, 230);
     if (hd == 2) Line("\x01 Salir", 320.0f, 400.0f, 1.0f, 230);
     if (a[0]) Line("Hace 11 horas", 320.0f, 240.0f - 30.0f, 1.9f, a[0]);
-    if (a[1]) Line("\x93Tengo que salir de aqu\xed.\x94", 320.0f, 366.0f, 1.0f, a[1]);
-    if (a[2]) { Line("Est\xe1 cerrada.", 320.0f, 342.0f, 1.0f, a[2]); Line("Tiene que haber una llave en alg\xfan sitio.", 320.0f, 370.0f, 1.0f, a[2]); }
-    if (a[3]) Line("\x01 Coger la llave", 320.0f, 370.0f, 1.0f, a[3]);
-    if (a[4]) Line("Has cogido la llave.", 320.0f, 370.0f, 1.0f, a[4]);
-    if (a[5]) Line("La puerta se abre.", 320.0f, 370.0f, 1.0f, a[5]);
     if (a[6]) Line("Ashley ha sido capturada", 320.0f, 224.0f, 1.3f, a[6]);
     if (a[7]) Line("Fin de la Parte 1 (prueba)", 320.0f, 224.0f, 1.3f, a[7]);
     GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
