@@ -617,6 +617,19 @@ Reglas de trabajo del usuario:
        media vuelta en 26-30) mezclado en 6 frames: latigazo de todo el cuerpo. Ahora tras la pausa
        levanta la viga 14 frames hasta lo alto del mazazo (su frame 30, de cara) y baja desde ahí.
        HR_SMASH 115 frames, golpes 15-21 / 65-74.
+   - **B110** (usuario: la cámara tras el cartel ya va; la escena estaba mejor antes de los límites de
+     paredes → todo lo de la cámara de la escena como en B106; combo nuevo con articulaciones revisadas):
+     · Escena: sin límites de paredes, sin giro del primer plano, sin SafePos (Shot0, Cam y la órbita = B106).
+       Se mantienen: YawForget (cartel), música de jefe/golpe en la ventana, cámara tras León al acabar.
+     · Combo del Herrero NUEVO, procedural (mkanim.py combo_seq / rigpose, 107 frames): análisis de
+       articulaciones (jchk.py: codo, muñeca, velocidad por frame) del combo B109: la muñeca saltaba
+       98-128° en un frame y llegaba a 165°, el antebrazo daba 180° (IK con la viga forzada en el mundo) y
+       la garra del mazazo de Mixamo con el codo bloqueado y la muñeca a 170°. Ahora el brazo derecho se
+       mueve como una pieza desde la postura de arrastre (flexión del hombro, codo, muñeca): codo 16-94°,
+       muñeca 15-65°, máx. 28°/frame; la garra con su propio IK (codo hacia fuera, sin vuelcos), máx. 60°/frame
+       en el frame más rápido del mazazo. Golpe de abajo (yunque barre el suelo y sube por delante, golpe
+       17-24), baja el yunque delante y la garra coge la viga, pausa, la levanta con las dos sobre la cabeza,
+       mazazo al suelo delante (68-74), vuelve a arrastrarla.
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.

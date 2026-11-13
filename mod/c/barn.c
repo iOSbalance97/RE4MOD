@@ -319,7 +319,7 @@ static void WalkTo(u8* pl, int i)
 #define BX1 (-10300.0f)
 #define BZ0 (-7850.0f)
 #define BZ1 (-1500.0f)
-static f32 InMargin(f32 x, f32 z)
+static __attribute__((unused)) f32 InMargin(f32 x, f32 z)
 {
     f32 m = x - BX0, k;
     k = BX1 - x; if (k < m) m = k;
@@ -327,23 +327,8 @@ static f32 InMargin(f32 x, f32 z)
     k = BZ1 - z; if (k < m) m = k;
     return m;
 }
-/* B109: a camera place behind a wall is brought in along the line to Leon (B108's Cam() clamp moved it
- * sideways, x and z on their own: near the east wall the orbit camera ended past him, looking at the floor) */
-static void SafePos(f32 lx, f32 lz, f32* x, f32* z)
-{
-    int k;
-    for (k = 0; k < 14 && InMargin(*x, *z) < 120.0f; k++) {
-        f32 nx = lx + (*x - lx) * 0.88f, nz = lz + (*z - lz) * 0.88f;
-        if ((nx - lx) * (nx - lx) + (nz - lz) * (nz - lz) < 650.0f * 650.0f) break;
-        *x = nx; *z = nz;
-    }
-}
 static void Cam(f32 cx, f32 cy, f32 cz, f32 tx, f32 ty, f32 tz, f32 fovy)
 {
-    if (cx < BX0 + 60.0f) cx = BX0 + 60.0f;
-    if (cx > BX1 - 60.0f) cx = BX1 - 60.0f;
-    if (cz < BZ0 + 60.0f) cz = BZ0 + 60.0f;
-    if (cz > BZ1 - 60.0f) cz = BZ1 - 60.0f;
     CAMP[0] = cx; CAMP[1] = cy; CAMP[2] = cz; CAMP[3] = tx; CAMP[4] = ty; CAMP[5] = tz; CAMP[6] = 0.0f; CAMP[7] = fovy;
     CAMP[8] = 0.0f; CAMP[9] = 1.0f; CAMP[10] = 0.0f;               /* Up */
     /* B100: THE reason El Herrero (and in B99 Leon) vanished since B88: with SPF_CAMERA, CameraMove builds
@@ -443,31 +428,6 @@ static void Shot0(u8* pl, int tt)
         f32 ga = Sin(a0), gb = Cos(a0);
         px = lx + ga * 1350.0f + gb * 420.0f; py = ly + 1700.0f; pz = lz + gb * 1350.0f - ga * 420.0f;
         qx = lx + ga * 60.0f; qy = ly + 1560.0f; qz = lz + gb * 60.0f;
-    }
-    {   /* B108 (user: only keep it inside the walls): if that place is behind a wall, the camera goes
-         * round Leon at the same distance (steps of 15 degrees, either way, chosen on the first frame and
-         * kept) to the first place inside the barn */
-        static f32 rot;
-        f32 ox = px - lx, oz = pz - lz;
-        if (tt == 0) {
-            int k;
-            rot = 0.0f;
-            if (InMargin(px, pz) < 150.0f)
-                for (k = 1; k <= 12; k++) {
-                    f32 r = 0.2618f * (f32)((k + 1) / 2) * ((k & 1) ? 1.0f : -1.0f), c = Cos(r), n = Sin(r);
-                    if (InMargin(lx + ox * c + oz * n, lz - ox * n + oz * c) >= 150.0f) { rot = r; break; }
-                }
-        }
-        if (rot != 0.0f) {
-            f32 c = Cos(rot), n = Sin(rot), la = *(f32*)(pl + 0xA4);
-            px = lx + ox * c + oz * n; pz = lz - ox * n + oz * c;
-            /* B109: THE reason Leon was not in the shot (stealth kill at the west wall, B108 video): the
-             * place went round him but the camera still looked at the far point ahead of where the shot
-             * first was -- from his side it looked past him at the wall and the window. Gone round, it
-             * looks at him (a little ahead of him, chest high) */
-            qx = lx + Sin(la) * 500.0f; qy = ly + 1250.0f; qz = lz + Cos(la) * 500.0f;
-        }
-        SafePos(lx, lz, &px, &pz);
     }
     Cam(px + sh, py + sh, pz, qx, qy, qz, vs ? 44.0f : 38.0f);
     cang = atan2f_(px - lx, pz - lz); crad = Sq((px - lx) * (px - lx) + (pz - lz) * (pz - lz));
@@ -695,13 +655,6 @@ void BarnFrame(void)
                 crad += (1800.0f - crad) * k;
                 cey += (ly + 700.0f - cey) * k;
                 cex = lx + Sin(cang) * crad; cez = lz + Cos(cang) * crad;
-                {   /* B109: kept inside the walls along the line to him (and the orbit takes that distance) */
-                    f32 sx = cex, sz = cez;
-                    SafePos(lx, lz, &sx, &sz);
-                    if (sx != cex || sz != cez) { crad = Sq((sx - lx) * (sx - lx) + (sz - lz) * (sz - lz)); cex = sx; cez = sz; }
-                }
-                if (InMargin(cex, cez) < 120.0f)       /* still at a wall that close: round him to the barn's middle side */
-                    cang += Wrap(atan2f_(0.5f * (BX0 + BX1) - lx, 0.5f * (BZ0 + BZ1) - lz) - cang) * 0.08f;
                 ctx += (lx + fa * 400.0f - ctx) * k * 2.0f; cty += (ly + 300.0f - cty) * k * 2.0f; ctz += (lz + fb * 400.0f - ctz) * k * 2.0f;
                 Cam(cex, cey, cez, ctx, cty, ctz, 46.0f);
             }

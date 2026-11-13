@@ -337,7 +337,7 @@ def roar(f):
     drag_right(p, 20 * shake)
     return p
 UP_N = 40
-UP_HIT = (15, 21)                                   # the anvil comes up through Leon (frames)
+UP_HIT = (17, 24)                                   # the anvil comes up through Leon (frames)
 def upswing(f):
     """B104 (user): the first blow of his combo: one arm, from below. The beam, held as it drags (the
     grip the user saw as 'reversed'), is swept from behind along the floor and up in front to above his
@@ -383,6 +383,102 @@ def blendpose(a, b, w):
         r = Rr.from_matrix(np.stack([a.W[k], b.W[k]])); p.W[k] = Slerp([0, 1], r)([w]).as_matrix()[0]
     p.root = lerp(a.root, b.root, w); p.travel = lerp(a.travel, b.travel, w)
     return p
+
+# ------------------------------------------------- B110: the combo, one rigid-arm timeline (see rigpose)
+from scipy.spatial.transform import Rotation as Rr
+def aa(axis, a): return Rr.from_rotvec(np.asarray(axis)*a).as_matrix()
+def keyv(f, keys):
+    """piecewise smoothstep through (frame, value) keys"""
+    if f<=keys[0][0]: return keys[0][1]
+    for (f0,v0),(f1,v1) in zip(keys,keys[1:]):
+        if f<=f1: return v0+(v1-v0)*sm((f-f0)/(f1-f0))
+    return keys[-1][1]
+
+CLAW_HS=-1.0
+CLAW_TB=300.0
+def rigpose(f, TH, EB, CK, YW, PT, DR, claw=None, idle_t=None, AD=None, gset=None, info=None):
+    """B110: the right arm moved as one piece from his dragging stance (shoulder flexion TH, elbow bend EB
+    x the stance's, wrist cock CK): no IK, so no elbow flips or wrist twists; the anvil kept above the floor
+    by the wrist; claw: weight (0-1) of the claw on the beam"""
+    p, Wm = mixpose('mutant breathing idle', ((f if idle_t is None else idle_t) % 120) / 30.0)
+    yaw=keyv(f,YW); pit=keyv(f,PT)
+    turn(p, 1, ry(yaw*0.6) @ rx(pit))
+    turn(p, 2, ry(yaw*0.4))
+    p.root[1]-=keyv(f,DR)
+    drag_right(p)
+    W0={k:p.W[k].copy() for k in (6,7,8,9,10)}
+    Le0=W0[7].T@W0[8]; rv=Rr.from_matrix(Le0).as_rotvec(); a0=np.linalg.norm(rv); ax=rv/a0
+    Lh0=W0[9].T@W0[10]
+    Rb=p.W[2]; th=keyv(f,TH)
+    ad=keyv(f,AD) if AD else 0.0
+    F=Rb@ry(ad)@rx(-th)@Rb.T
+    p.W[7]=F@W0[7]; p.W[6]=p.W[7]
+    p.W[8]=p.W[7]@aa(ax, a0*keyv(f,EB)); p.W[9]=p.W[8]
+    def hand(g): return p.W[9]@aa(ax, -g)@Lh0
+    def anvil():
+        P=fk(p); grip=P[10]+p.W[10]@np.array([-GRIP_OFF,0,0]); return grip+p.W[10]@np.array([0,0,-1.0])*BEAM, grip
+    g=keyv(f,CK) if gset is None else gset; p.W[10]=hand(g)
+    if gset is None and anvil()[0][1]<SW_FLOOR:
+        best=None
+        for k in range(1,50):
+            for sg in (1,-1):
+                p.W[10]=hand(g+sg*0.02*k)
+                if anvil()[0][1]>=SW_FLOOR: best=g+sg*0.02*k; break
+            if best is not None: break
+        g=best if best is not None else g; p.W[10]=hand(g)
+    if info is not None: info['g']=g
+    P=fk(p)
+    low=min(P[20][1]-BP[20][1],P[24][1]-BP[24][1],P[21][1]-BP[21][1],P[25][1]-BP[25][1]); p.root[1]-=low
+    if claw is not None:
+        w=keyv(f,claw)
+        if w>0.01:
+            P=fk(p); an,grip=anvil(); sh=nrm(an-grip)
+            tb=CLAW_TB                                        # a fixed place on the beam (a nearest point jumped with the swing)
+            tgt=grip+sh*tb-np.array([0,0,0])
+            cur=P[16]; reach=(L_UA+L_FA)*0.86
+            d=tgt-P[13]
+            if np.linalg.norm(d)>reach: tgt=P[13]+nrm(d)*reach
+            wl=cur+(tgt-cur)*w
+            pole=nrm(np.array([1.0,-0.35,-0.25]))                # elbow out to his left (the beam never goes there: no plane spin)
+            Lh=p.W[15].T@p.W[16]
+            # B110: the claw arm by its own two bones, twisted by the plane of the arm (arm() aimed the bind z
+            # at the pole: when the pole lay along the upper arm it flipped 180 degrees in a frame)
+            sh_=P[13]; el,wr=two_bone(sh_, wl, L_UA, L_FA, pole)
+            hn=np.cross(el-sh_, wr-el)
+            if np.linalg.norm(hn)<1e-3: hn=np.array([0,1.0,0])
+            hn=nrm(hn)*CLAW_HS
+            p.W[13]=aim([1.0,0,0],[0,1.0,0],el-sh_,hn); p.W[12]=p.W[13]
+            p.W[14]=aim([1.0,0,0],[0,1.0,0],wr-el,hn); p.W[15]=p.W[14]
+            p.W[16]=p.W[15]@Lh                                   # the claw keeps its own set on the forearm
+    return p
+
+# B110: the whole combo, one timeline
+CB_TH=[(0,0),(9,-0.42),(13,-0.2),(20,2.1),(24,2.45),(28,2.45),(40,1.5),(48,1.5),(62,3.3),(65,3.3),(72,1.62),(84,1.62),(92,1.1),(102,0.0),(106,0)]
+CB_EB=[(0,1.0),(9,0.85),(16,0.35),(23,0.30),(28,0.35),(40,0.6),(48,0.6),(62,0.9),(65,0.9),(72,0.5),(84,0.5),(102,1.0),(106,1.0)]
+CB_CK=[(0,0),(9,0.1),(14,-0.1),(20,-0.6),(26,-0.65),(40,-0.2),(48,-0.2),(62,-0.6),(65,-0.6),(72,-0.7),(84,-0.7),(90,-0.1),(102,0),(106,0)]
+CB_YW=[(0,0),(9,-0.38),(14,-0.1),(20,0.32),(26,0.28),(40,0.05),(48,0.0),(62,-0.22),(65,-0.25),(72,0.12),(84,0.1),(102,0),(106,0)]
+CB_PT=[(0,0),(9,0.05),(18,-0.10),(24,-0.06),(40,0.08),(48,0.08),(62,-0.18),(65,-0.2),(72,0.45),(84,0.4),(102,0),(106,0)]
+CB_DR=[(0,0),(9,70),(16,40),(22,20),(40,40),(48,40),(62,-20),(65,-30),(72,170),(84,150),(102,0),(106,0)]
+CB_CL=[(0,0),(32,0),(40,1),(86,1),(94,0),(106,0)]
+CB_N=106
+CB_HIT1=(17,24); CB_HIT2=(68,74)
+CB_AD=[(0,0),(32,0),(40,0.6),(48,0.6),(62,0.35),(65,0.35),(72,0.65),(84,0.65),(94,0),(106,0)]
+def combo_seq():
+    gs=[]
+    for f in range(CB_N+1):
+        inf={}; rigpose(f, CB_TH, CB_EB, CB_CK, CB_YW, CB_PT, CB_DR, None, AD=CB_AD, info=inf); gs.append(inf['g'])
+    gs=np.array(gs); k=np.exp(-0.5*(np.arange(-6,7)/2.5)**2); k/=k.sum()
+    gp=np.pad(gs,6,mode='edge'); g2=np.convolve(gp,k,mode='valid')
+    for it in range(6):                                  # where the smoothing put the anvil in the floor, back toward the need
+        bad=False
+        for f in range(CB_N+1):
+            inf={}; p=rigpose(f, CB_TH, CB_EB, CB_CK, CB_YW, CB_PT, CB_DR, None, AD=CB_AD, gset=g2[f]); P=fk(p)
+            grip=P[10]+p.W[10]@np.array([-GRIP_OFF,0,0]); an=grip+p.W[10]@np.array([0,0,-1.0])*BEAM
+            if an[1]<SW_FLOOR-25: g2[f]+=(gs[f]-g2[f])*0.6; bad=True
+        if not bad: break
+        gp=np.pad(g2,3,mode='edge'); k2=np.exp(-0.5*(np.arange(-3,4)/1.2)**2); k2/=k2.sum(); g2=np.convolve(gp,k2,mode='valid')
+    return [rigpose(f, CB_TH, CB_EB, CB_CK, CB_YW, CB_PT, CB_DR, CB_CL, AD=CB_AD, gset=g2[f]) for f in range(CB_N+1)], gs, g2
+
 COMBO_BL = 6                                         # frames the blow from below blends into the smash
 COMBO_SKIP = 26                                      # B107: the smash joined at its frame 26 (anvil already up over the
                                                      # right shoulder): its own wind-up turned his back to Leon (weird)
@@ -405,23 +501,21 @@ if __name__ == '__main__':
     # first blow blend into the smash's first ones.
     # B108 (user): a pause between the blows: the blow from below (to frame 26, the anvil up in front), back
     # down to his dragging stance (14 frames), a stop (12), and the whole two-handed smash from its start
-    # B109: the smash's own start (frames 0-29) is a wind-up with his back to Leon and a half turn back in 4
-    # frames (26-30): after the stop B108 blended into it in 6 frames -- a whole-body whip, the arm flailing.
-    # Now from the stop he lifts the anvil again (14 frames) straight to the smash's top (frame SJ, facing
-    # Leon, anvil overhead) and brings it down from there
-    UPC = 24; DN = 14; HOLD = 12; RAISE = 14; SJ = 30
-    I0 = IP[0]
-    CP = UP[:UPC + 1] + [blendpose(UP[UPC], I0, sm((k + 1) / (DN + 1))) for k in range(DN)] + [I0] * HOLD
-    CP += [blendpose(I0, SP[SJ], sm((k + 1) / RAISE)) for k in range(RAISE)] + SP[SJ + 1:]
-    CO = UPC + 1 + DN + HOLD + RAISE - (SJ + 1)          # smash frame f (> SJ) is now at CO + f
+    # B110 (user: a combo that fits his shape, joints checked): ONE procedural timeline (combo_seq): the
+    # right arm moves as a piece from his dragging stance (no IK on it: B104-B109's IK flipped the elbow
+    # and twisted the wrist up to 165 degrees); blow from below (anvil swept up through Leon 17-24), the
+    # anvil let down in front while the claw takes the beam, a stop, both hands lift it overhead, the
+    # smash (68-74) and back to the drag
+    CP, _g, _g2 = combo_seq()
+    CO = 0
     SP = CP
     wm = build(WP); sm_ = build(SP); im = build(IP); fm = build(FP); rm = build(RP); um = build(UP)
     print('walk', check(wm, WP), len(wm), '| smash', check(sm_, SP), len(sm_), '| idle', len(im), '| flex', len(fm))
     print('walk travel per frame', WP[-1].travel[2] * S / WN2)
-    NS = len(SP); h0, h1 = CO + int(round((SW_HIT[0] - SW0) / SW_SPEED)), CO + int(round((SW_HIT[1] - SW0) / SW_SPEED))
+    NS = len(SP); h0, h1 = CB_HIT2
     ev = {f: (0, 8) for f in range(0, 9)}                   # 8: keep turning to Leon (the first wind-up)
-    ev[10] = (0, 0x20)                                       # 0x20: the swing sound (blow from below)
-    ev.update({f: (0, 8) for f in range(UP_HIT[1] + 4, h0 - 6)})   # turning to him again for the smash
+    ev[13] = (0, 0x20)                                       # 0x20: the swing sound (blow from below)
+    ev.update({f: (0, 8) for f in range(40, 62)})            # turning to him again for the smash
     ev.update({h0 - 4: (0, 0x20)})
     # B85: no Free 1 (the game's check sweeps the hidden axe): stealth.c HerreroHit checks the anvil itself
     ss = seq(NS, ev); ws = seq(WN2 + 1, steps(WP)); is_ = seq(IN + 1, {}); fs = seq(len(FP), {}); rs = seq(len(RP), {})
