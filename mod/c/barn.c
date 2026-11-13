@@ -130,6 +130,34 @@ void HerreroYellAt(f32 x, f32 y, f32 z, u8* e, int se);
 /* B101: the HUD off for the scene, as the game's own events do (sce_com.cpp begin/end, PAL 0x80156E98):
  * Cckpt.lifeMeterDisp(sw) (PAL 0x800C0518, Cckpt 0x8027E4A8) and IdSys.dispSw(IDC_LIFE_METER 33, sw)
  * (PAL 0x8011C3CC, IdSys 0x8028481C) */
+/* B111 (user): Leon's lines, shown as the game shows lines while you play (r100, the two policemen on the
+ * way in: cMes.MesSet(no, 0x64, 0x147 - font height - line gap, attr 0x52, slot 0, colour 0, font 4):
+ * 0x40 all at once, 0x10 the game keeps running, 0x02 room text) -- our text instead of the room's
+ * (the message pointer, +0x98, as item.c's notice), 0x01000000 kept after its end until we delete it.
+ * Glyphs: the European font's sheet (font/common_p.fnt, 32 per row, code = 0x80 + index): space 0x80,
+ * A-Y 0xA7.., a-z 0xC1.., e acute 0xF0, o acute 0xF2, inverted ? 0x122, ? 0x9B; 00 page, 01 end */
+static const u16 SUB_QUE[] = { 0x0, 0x122, 0xB7, 0xD5, 0xF0, 0x80, 0xC8, 0xC1, 0x80, 0xD3, 0xC9, 0xC4, 0xCF, 0x80, 0xC5, 0xD3, 0xCF, 0x9B, 0x1 };      /* "Que ha sido eso" */
+static const u16 SUB_DONDE[] = { 0x0, 0x122, 0xAA, 0xC5, 0x80, 0xC4, 0xF2, 0xCE, 0xC4, 0xC5, 0x80, 0xD6, 0xC9, 0xC5, 0xCE, 0xC5, 0x9B, 0x1 };    /* "De donde viene" */
+#define SUB_WK 3
+static int sub_left;
+static u32 sub_attr;
+static void Sub(const u16* txt, int frames)
+{
+    u8* m0 = cMes + 4; u8* m = cMes + 4 + 236 * SUB_WK;
+    int fh = *(s8*)(m0 + 0x19), lg = *(s8*)(m0 + 0x77);
+    *(s8*)(m + 0x18) = *(s8*)(m0 + 0x18); *(s8*)(m + 0x19) = *(s8*)(m0 + 0x19);   /* the game's size, as slot 0 */
+    *(u16*)(m + 0x76) = *(u16*)(m0 + 0x76);
+    sub_attr = 0x52 | 0x01000000;
+    MesSet(cMes, 0, 0x64, 0x147 - fh - lg, sub_attr, SUB_WK, 0, 4);
+    *(const u16**)(m + 0x98) = txt;
+    sub_left = frames;
+}
+static void SubTick(void)
+{
+    if (sub_left <= 0) return;
+    ((void (*)(void*, int))0x800C0518)((void*)0x8027E4A8, 0);   /* the end code turns the life meter back on */
+    if (--sub_left == 0 && *(u32*)(cMes + 4 + 236 * SUB_WK + 0x80) == sub_attr) MesDelete(cMes, SUB_WK);
+}
 static void Hud(int on)
 {
     ((void (*)(void*, int))0x800C0518)((void*)0x8027E4A8, on);
@@ -415,6 +443,7 @@ static void GanadoHold(int on)
 /* B104: the first shot, from the scene's first frame (B103 set the camera only on the next frame: one
  * frame of the game camera with Leon already turned). Turn variant: on his face; stealth variant (he
  * already faces the window after the takedown): over his shoulder toward the window. A shake with the bang. */
+#define T_GO 100                         /* B111: he moves after his line (was 48) */
 static void Shot0(u8* pl, int tt)
 {
     f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C);
@@ -551,6 +580,7 @@ void BarnFrame(void)
     case 3: {                                            /* the scene */
         f32 lx = *(f32*)(pl + 0x94), ly = *(f32*)(pl + 0x98), lz = *(f32*)(pl + 0x9C);
         t++;
+        SubTick();
         /* ---- El Herrero: B98's scripted entrance (em10 Keeper 1/1/1, our motions, straight to MARK) */
         if (herrero && hr_scene_em == herrero && (*(u32*)herrero & 0x201) == 1) {
             f32 ux = MARK_X - dx, uz = MARK_Z - dz, L = Sq(ux * ux + uz * uz), hx, hz, sp, mv;
@@ -589,13 +619,14 @@ void BarnFrame(void)
         /* ---- Leon */
         if (ph == 0) {                                    /* hears the door, turns where he is */
             if (t == 40) SndCall(1, 0x1E, 0, 0, 0, 0);   /* a door kicked in (Leon's bank, always loaded) */
+            if (t == 52) Sub(SUB_QUE, 85);                /* B111 (user): his line, and a pause before he moves */
             if (t == 10 && vs) CrouchStand();             /* B105: he gets up, on camera */
-            if (t == 48 && vs) {                          /* B104: stealth variant: then to the window */
+            if (t == T_GO && vs) {                          /* B104: stealth variant: then to the window */
                 PlVirt(pl, 16, 0);
                 WalkTo(pl, 0); *(f32*)(pl + 0x404) = WW[wwi][0]; *(f32*)(pl + 0x40C) = WW[wwi][1];
                 ph = 1; ph_t = t; ls = 1; lt = t; best_d = 1e30f; stuck = 0;
             }
-            if (t == 48 && !vs) {                         /* B101: his quick 180 turn (m_MotTbl 0xB/0xC, hurt 0x6B/0x6C), played
+            if (t == T_GO && !vs) {                         /* B101: his quick 180 turn (m_MotTbl 0xB/0xC, hurt 0x6B/0x6C), played
                                                              through the game's own event routine 5/2 (pl_R1_Event_Smooth: the motion
                                                              to its end, then feet re-planted): B99 cut it at frame 21 and his
                                                              rotation was still in the pose, so he faced the window for a moment */
@@ -630,10 +661,11 @@ void BarnFrame(void)
                 SndCall(1, 0x1E, 0, 0, 0, 0);             /* B107 (user): another blow on the door, and the music */
                 HerreroYellAt(DOOR_X, 1900.0f, DOOR_Z, upper, 0x1A);
                 BossOn(); music = 1;
+                Sub(SUB_DONDE, 85);                       /* B111 (user): his line at the window, and a longer stop */
                 ls = 3; lt = t;
             } else if (ls == 3) {                         /* listens, then turns where he stands (the event walk turns on the
                                                              spot past 60 degrees) and goes */
-                if (t > lt + 24) { WalkTo(pl, wi); ls = 4; lt = t; best_d = 1e30f; stuck = 0; }
+                if (t > lt + 75) { WalkTo(pl, wi); ls = 4; lt = t; best_d = 1e30f; stuck = 0; }
             } else {
                 if (d < best_d - 2500.0f) { best_d = d; stuck = 0; } else if (t > lt + 30) stuck++;
                 if (wi < NWP - 1 && (d < 600.0f * 600.0f || stuck > 45)) {      /* next point, without stopping */
@@ -650,12 +682,20 @@ void BarnFrame(void)
             } else {                                      /* B103: as he turns and walks to the ladder the camera goes
                                                              round him, slowly, down to his feet (B102's swung round while he
                                                              stood): angle and distance about Leon, never through him */
-                f32 want = la + 3.14159265f + 0.35f, k = Sm((f32)(t - lt) / 60.0f) * 0.035f;
+                /* B111 (user: "for a moment it looks at the floor"): B103 recomputed the camera place from Leon
+                 * every frame but eased its TARGET in world space with a gain that starts at 0 -- while he walked
+                 * off, the camera went with him looking at the still point behind him, then down at the floor
+                 * (target 0.3 m high). Now the target and height are kept relative to him and eased there: it
+                 * goes round him, down to his legs, always on him */
+                static f32 tox, toy, toz, coy;
+                f32 want = la + 3.14159265f + 0.35f, k = Sm((f32)(t - lt) / 60.0f) * 0.035f, kt = 0.03f + Sm((f32)(t - lt) / 40.0f) * 0.05f;
+                if (t - lt <= 1) { tox = ctx - lx; toy = cty - ly; toz = ctz - lz; coy = cey - ly; }
                 cang += Wrap(want - cang) * k;
                 crad += (1800.0f - crad) * k;
-                cey += (ly + 700.0f - cey) * k;
-                cex = lx + Sin(cang) * crad; cez = lz + Cos(cang) * crad;
-                ctx += (lx + fa * 400.0f - ctx) * k * 2.0f; cty += (ly + 300.0f - cty) * k * 2.0f; ctz += (lz + fb * 400.0f - ctz) * k * 2.0f;
+                coy += (900.0f - coy) * kt;
+                tox += (fa * 300.0f - tox) * kt; toy += (750.0f - toy) * kt; toz += (fb * 300.0f - toz) * kt;
+                cex = lx + Sin(cang) * crad; cez = lz + Cos(cang) * crad; cey = ly + coy;
+                ctx = lx + tox; cty = ly + toy; ctz = lz + toz;
                 Cam(cex, cey, cez, ctx, cty, ctz, 46.0f);
             }
         } else if (ph == 2) {                             /* to the top of the ladder, at head height */
@@ -693,6 +733,7 @@ void BarnFrame(void)
         }
         if (t >= 2000 || (t > 120 && (press & PAD_A))) {
             PlVirt(pl, 24, 2);                            /* cPlayer::endEvent(2): routine 0, pad back */
+            if (sub_left > 0) { sub_left = 1; SubTick(); }
             barn_padlock = 0;
             /* B107 (user): the game camera right behind him (as after the panel: its copy of his matrix,
              * the C-stick angles at 0, and the snap flag) */

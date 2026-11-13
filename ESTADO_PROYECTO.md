@@ -630,6 +630,16 @@ Reglas de trabajo del usuario:
        en el frame más rápido del mazazo. Golpe de abajo (yunque barre el suelo y sube por delante, golpe
        17-24), baja el yunque delante y la garra coge la viga, pausa, la levanta con las dos sobre la cabeza,
        mazazo al suelo delante (68-74), vuelve a arrastrarla.
+   - **B111** (usuario: B110 bien; quitar el picado al suelo de la cámara camino de la escalera; frases de León):
+     · Cámara al ir a la escalera: B103 calculaba el sitio desde León cada frame pero suavizaba el PUNTO al
+       que mira en el mundo con una ganancia que empieza en 0: León se alejaba, la cámara iba con él mirando
+       al punto quieto de atrás y luego al suelo (0,3 m). Ahora punto y altura relativos a León (rodea a sus
+       piernas, siempre sobre él) y de ahí el arco suave a lo alto de la escalera.
+     · Frases como las del juego en juego (r100, los policías: MesSet(no, 0x64, 0x147 − alto fuente − interlínea,
+       attr 0x52, fuente 4)), texto propio por el puntero +0x98 (como item.c), slot 3, 0x01000000 y se borra
+       a los 85 frames. Glifos de font/common_p.fnt (32 por fila, código 0x80 + índice). "¿Qué ha sido eso?"
+       tras el primer golpe (t 52; León se mueve en t 100, antes 48) y "¿De dónde viene?" en la ventana
+       (parada 75 frames, antes 24).
    - Lag al cambiar de arma (usuario, tras B80+): hipótesis: prefetch.c necesita un bloque libre del heap
      para leer el wepXX.drs por adelantado; con los em*.drs inflados por el Herrero (+450 KB cada uno) no
      cabe y vuelve la lectura bloqueante (~250 ms). B88 deja solo em12 grande. Pendiente confirmar.
