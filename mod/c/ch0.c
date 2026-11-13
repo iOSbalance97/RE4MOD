@@ -102,7 +102,7 @@ static Guard gd[12];
 static int hidden, hide_no, card, card_t, road_wait;
 static int scene_n, watch_on, rw, kwait;
 static int win_done;
-static int scene_x, x_done, grab;                    /* C0-14: out of the house scene; a chaser at arm's length */
+static int scene_x, x_done, grab, xo;                    /* C0-14: out of the house scene; a chaser at arm's length */
 static u8 ins[3];                                    /* C0-14: the three who come in (gd index + 1) */
 static u8* hdoor;
 static int keep_open;                   /* C0-12: the north crossing scene */
@@ -187,10 +187,11 @@ static const f32 RUN0[2][3] = { { -16248.0f, 2684.0f, 31000.0f }, { -14383.0f, 2
 #define STABLE_Z 12963.0f
 /* C0-08: the user's black marks, closed with boxes (the room's own et01 box, EtcModelSet PAL 0x8010ACF0)
  * across the narrowest line of each passage (work: wall-to-wall chords), and an invisible stop behind them */
-static const f32 BLK[3][5] = {                       /* centre x, z, direction (rad), width, boxes */
+static const f32 BLK[4][5] = {                       /* centre x, z, direction (rad), width, boxes */
     { -10953.0f, 14439.0f, 1.5708f, 1200.0f, 2 },    /* the alley beside the stable */
-    {  -6245.0f, -5123.0f, 2.4435f, 1800.0f, 3 },    /* west of the house */
-    {  12960.0f, -12682.0f, 2.7925f, 2000.0f, 3 },   /* north-east of the house */
+    {  -6245.0f, -5123.0f, 2.4435f, 1800.0f, 2 },    /* west of the house */
+    {  12960.0f, -12682.0f, 2.7925f, 2000.0f, 2 },   /* north-east of the house */
+    {  -9000.0f, 12300.0f, 1.5708f, 1400.0f, 2 },    /* C0-17 (user's capture): west of the stable, up to the square */
 };
 static const f32 SIEGE[3][2] = { { 7169.0f, -4800.0f }, { 8700.0f, -5000.0f }, { 6300.0f, -4300.0f } };   /* house C's front */
 static const f32 LADDER[2] = { -5600.0f, -17300.0f };   /* C0-10b: the key house's ladder (ETS 5, id 6) */
@@ -208,7 +209,7 @@ static const Pat PATS[4] = {
     { { -3200.0f, 10400.0f }, { -1600.0f, -800.0f }, 2, 0, 0, -1.571f, 1.571f },
     { { -3200.0f, 8000.0f, 10800.0f, 11200.0f }, { 6400.0f, 2000.0f, 4000.0f, 8400.0f }, 4, 0, 0, -1.571f, 0.3f },
 };
-#define CYC2 1200                                                   /* foot of the ladder up */
+#define CYC2 1500                                                   /* foot of the ladder up */
 
 /* hook at EmSetFromList's entry: r111's list -> our guards */
 void Ch0EmList(void)
@@ -388,7 +389,7 @@ static void Patrol(int k, int pat)                   /* guard k walks patrol `pa
 static int PatSide(int pat)                          /* 1: toward the last waypoint */
 {
     if (pat == 1) return (road_wait || (cyc % CYC) < CYC / 2) ? 1 : 0;
-    return (cyc2 % CYC2) >= CYC2 / 2;
+    return (cyc2 % CYC2) >= (CYC2 * 3) / 5;   /* C0-17: away 60% (30 s), back 20 s */
 }
 
 static void Guards(void)
@@ -753,7 +754,7 @@ static void Block(void)                              /* behind the boxes: Ashley
 {
     int i;
     if (PY() > 1500.0f) return;
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < 4; i++) {
         f32 r = BLK[i][3] * 0.5f + 300.0f, dx = PX() - BLK[i][0], dz = PZ() - BLK[i][1], d2 = dx * dx + dz * dz, d;
         if (d2 >= r * r) continue;
         d = Sq(d2); if (d < 1.0f) { dx = 1.0f; dz = 0.0f; d = 1.0f; }
@@ -764,7 +765,7 @@ static void Block(void)                              /* behind the boxes: Ashley
 /* C0-09: the boxes. Making new ones (EtcModelSet in the middle of play, C0-08) showed nothing; now the room's
  * own eight boxes (ETS id 1 / 2, r111 entries 14-21) are moved into the passages just before the room sets its
  * etc models (hook at EtcModelListSet's entry, PAL 0x80106B68), the way the game itself places them. */
-static const f32 BOXY[3] = { 0.0f, 0.0f, 286.0f };  /* the ground of each passage (the room's floors) */
+static const f32 BOXY[4] = { 0.0f, 0.0f, 286.0f, 0.0f };  /* the ground of each passage (the room's floors) */
 void Ch0Ets(u8* list)
 {
     int i, b = 0, j = 0, c;
@@ -777,7 +778,7 @@ void Ch0Ets(u8* list)
         *(f32*)(d + 0x1C) = BARREL[c][0]; *(f32*)(d + 0x20) = BARREL[c][1]; *(f32*)(d + 0x24) = BARREL[c][2];
         c++;
     }
-    for (i = 0; i < n && b < 3; i++) {
+    for (i = 0; i < n && b < 4; i++) {
         u8* d = list + 0x10 + i * 0x28;
         f32 o;
         if (*(u16*)d != 1 && *(u16*)d != 2) continue;
@@ -999,7 +1000,7 @@ static int NorthScene(void)                          /* 1 while it runs */
         { f32 dx = gx - PX(), dz = gz - PZ(), dd = Sq(dx * dx + dz * dz) + 1.0f;
           dx /= dd; dz /= dd;
           CamTo(PX() - dx * 900.0f - dz * 400.0f, PY() + 1650.0f, PZ() - dz * 900.0f + dx * 400.0f, gx, 1300.0f, gz, 0.05f); }
-        if (nt >= 80) { nph = 2; nt = 0; }
+        if (nt >= 40) { nph = 2; nt = 0; }   /* C0-17: shorter */
     } else if (nph == 2) {                           /* she runs to the corner, the camera behind her */
         f32 dx = NRW[rw][0] - PX(), dz = NRW[rw][1] - PZ(), d = Sq(dx * dx + dz * dz);
         if (d < 450.0f || nt > 150) {
@@ -1027,7 +1028,10 @@ static int OutScene(void)
 {
     int k;
     if (!scene_x) {
-        if (stage < 2 || x_done || scene || InHouse() || pPL[0xFC] != 0) return 0;
+        if (stage < 2 || x_done || scene || pPL[0xFC] != 0 || pPL[0xFD] > 2) { xo = 0; return 0; }
+        /* C0-17: out for real: 1.5 m past the house's box (the window jump done) and 10 frames like that */
+        if (PX() > -1800.0f && PX() < 9300.0f && PZ() > -18000.0f && PZ() < -5000.0f) { xo = 0; return 0; }
+        if (++xo < 10) return 0;
         scene_x = 1; x_done = 1; Hud(0); CrouchOff(); ch0_crouch_force = 0;
         ncam[0] = PX(); ncam[1] = PY() + 1500.0f; ncam[2] = PZ();
         ncam[3] = PX(); ncam[4] = PY() + 1100.0f; ncam[5] = PZ();
@@ -1136,7 +1140,7 @@ void Ch0Frame(void)
                 f32 k = Sm((f32)scene_gate / 150.0f);
                 Cam(-13300.0f - 600.0f * k, 2900.0f + 300.0f * k, 18800.0f + 1500.0f * k, -15200.0f + 1800.0f * k, 3300.0f - 1200.0f * k, 27500.0f - 5000.0f * k, 48.0f);   /* C0-09: the alley climbs to 2.6 m */
             }
-            if (scene_gate >= 160) { scene_gate = 0; stage = 1; STOPF &= ~SPF_CAM; ch0_padlock = 0; Hud(1); }
+            if (scene_gate >= 160) { scene_gate = 0; stage = 1; cyc2 = 0;   /* C0-17: they turn away now */ STOPF &= ~SPF_CAM; ch0_padlock = 0; Hud(1); }
             return;
         }
         Block();
@@ -1173,7 +1177,7 @@ void Ch0Frame(void)
                     in = 0;
                     for (k = 0; k < NG; k++) {
                         u8* e = gd[k].e;
-                        if (!Alive(e) || (e[0xFC] != 1 && gd[k].st != G_CHASE) || k + 1 == ins[0] || k + 1 == ins[1]) continue;
+                        if (!Alive(e) || *(s16*)(e + 0x320) <= 0 || k + 1 == ins[0] || k + 1 == ins[1]) continue;   /* C0-17: any state */
                         dx = *(f32*)(e + 0x94) - PX(); dz = *(f32*)(e + 0x9C) - PZ();
                         if (dx * dx + dz * dz < best) { best = dx * dx + dz * dz; in = k + 1; }
                     }
@@ -1186,6 +1190,8 @@ void Ch0Frame(void)
                         *(f32*)(e + 0x98) = *(f32*)(e + 0x114) = 0.0f;
                         *(f32*)(e + 0x9C) = *(f32*)(e + 0x118) = DOOR_OUT_Z + oz;
                         *(f32*)(e + 0xA4) = 3.02f;
+                        *(u32*)e &= ~0x800u;                 /* C0-17: a far one may be suspended: wake it */
+                        if (e[0xFC] != 1) { e[0xFC] = 1; e[0xFD] = 1; e[0xFE] = 0; e[0xFF] = 0; }
                         g->role = R_DOOR; g->ax = DOOR_IN_X - 1200.0f + 1700.0f * (f32)(j & 1); g->az = DOOR_IN_Z - 1800.0f - 900.0f * (f32)(j == 2);
                         g->leg = 0; g->meter = 0.6f;
                         Hold(g);
@@ -1201,11 +1207,11 @@ void Ch0Frame(void)
                 DOOR_OPEN(d, &p, 0, 1, 0);
                 hdoor = d; keep_open = 1;
             }
-            if (scene == S_OPEN + 10) {
-                if (ins[0]) Walk(&gd[ins[0] - 1], gd[ins[0] - 1].ax, gd[ins[0] - 1].az);
+            if (scene == S_OPEN + 10) {              /* C0-17: the first (nearest) goes up, the others stay below */
+                if (ins[0]) { gd[ins[0] - 1].role = R_UP; gd[ins[0] - 1].leg = 0; }
                 else if (Alive(hman)) WalkE(hman, DOOR_IN_X, DOOR_IN_Z - 1500.0f);
             }
-            if (scene == S_OPEN + 35 && ins[1]) { gd[ins[1] - 1].role = R_UP; gd[ins[1] - 1].leg = 0; }   /* this one goes up */
+            if (scene == S_OPEN + 35 && ins[1]) Walk(&gd[ins[1] - 1], gd[ins[1] - 1].ax, gd[ins[1] - 1].az);
             if (scene == S_OPEN + 60 && ins[2]) Walk(&gd[ins[2] - 1], gd[ins[2] - 1].ax, gd[ins[2] - 1].az);
             Cam(5644.0f + sh, 1500.0f + sh * 0.5f, -9300.0f, DOOR_IN_X, 900.0f, DOOR_IN_Z, 50.0f);
             if (scene >= S_LEN) {
