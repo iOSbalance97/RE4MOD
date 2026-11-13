@@ -732,3 +732,11 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   detectada en la maleta (ItemMgr +0x14/+0x1C/+0x13). Escena: puerta cEmDoor id 0x41 junto a (6540,-6422),
   cEmDoor::setOpen PAL 0x800DE5A0 (sin sonido), tiembla con los golpes (ang = base_dir +0x778 + golpe), el
   ganado entra con GuardWalk. B con llave → r112 (-19691, 0, -19088, 0.988); final en (-4050, 51612).
+- **C0-11** (revisión C0-10: texto de B demasiado largo, llave como destello, sin escena al cogerla): texto de B
+  150 f y fuera a >2,6 m. Modelo 0x3B (r105 ITM, bin 33 KB + tpl 4 KB) al final de em12.drs (KM_OFS en
+  c/ch0_key.h); Ch0Ita lo lee con DVDReadPrio (PAL 0x80075BE8) a heap 13 y lo registra en g_pItemModelSys
+  (0x802B7FD4, work[id] = {bin, tpl}); orden en game.cpp: ItemModelRoomInit → SceAtInit → ITM → ETS.
+  Llave cogida: item.c QuickItem pone ch0_got (id 0x3B). Línea de visión: cSatMgr::hitCheck PAL 0x800B7FE0
+  sobre EatMgr 0x8027DE48 (SatMgr 0x8027DE28; en PAL cSatMgr mide 0x20). Patrullas R_PAT (PATS: vigía,
+  NE, plaza norte/sur), cyc2 de 960 f; escondites con los 5 barriles (ETS id 17/30) movidos en Ch0Ets;
+  escalera = ETS 5 (-4939, -17683).

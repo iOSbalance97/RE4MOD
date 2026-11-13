@@ -64,6 +64,7 @@ void ModMesTick(void)
 
 int IconStart(u8* m, int kind, u32 id, int vis);
 
+extern int ch0_got;
 int QuickItem(u8* w)
 {
     u8* it = w + 92;
@@ -76,6 +77,7 @@ int QuickItem(u8* w)
     void* model;
 
     IconStart(0, 0, 0, 0);                              /* a running icon ends (frees the item camera) */
+    if (id == 0x3B) ch0_got = 1;                     /* C0-10b: chapter 0, Ashley has taken the key */
     if (id >= 512) return 0;
     seen = pG + MOD_SEEN_OFS;
     if (!(seen[id >> 3] & (1 << (id & 7)))) {      /* first time: the full presentation */

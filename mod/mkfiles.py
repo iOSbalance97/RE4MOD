@@ -62,3 +62,24 @@ open('c/herrero_arc.h', 'w').write('/* mkfiles.py: em12.drs extra entries (ARC w
     '#define HR_ARC_W %d\n#define HR_TXT_W %d\n#define HR_TXT_W_PX %d\n#define HR_TXT_H_PX %d\n' %
     (SLOTS['ARC'] + 4, SLOTS['TXT'] + 4, *struct.unpack('>HH', open('data/tut_stealth.dim', 'rb').read())))
 print('em12.drs grows', delta, 'bin', hex(o_bin), 'tpl', hex(o_tpl), 'arc', hex(o_arc), 'txt', hex(o_txt))
+
+# C0-10b: the Insignia Key's pick-up model (item 0x3B), taken from r105's ITM, appended at the end of em12.drs
+# (past everything the game reads of it); ch0.c reads it from there when r111 is set up and registers it.
+sys.path.insert(0, '../tools/ch0')
+import arc as _arc
+_r = open('/tmp/r105.bin', 'rb').read() if os.path.exists('/tmp/r105.bin') else None
+if _r is None:
+    subprocess_ok = os.system('/tmp/yz2 /home/claude/disc/ext1/files/St1/r105.das 0x400 /tmp/r105.bin >/dev/null') == 0
+    _r = open('/tmp/r105.bin', 'rb').read()
+_o = _arc.get(_r, 'ITM')
+_x0, _oi, _ob, _ot = struct.unpack('>4I', _r[_o:_o + 16]); _n = struct.unpack('>I', _r[_o + _oi:_o + _oi + 4])[0]
+_ids = [struct.unpack('>H', _r[_o + _oi + 4 + k * 8:_o + _oi + 6 + k * 8])[0] for k in range(_n)]
+_k = _ids.index(0x3B)
+def _tbl(base, i): return struct.unpack('>I', _r[_o + base + 4 + i * 4:_o + base + 8 + i * 4])[0]
+_bin = _r[_o + _ob + _tbl(_ob, _k):_o + _ob + _tbl(_ob, _k + 1)]
+_tpl = _r[_o + _ot + _tbl(_ot, _k):_o + _ot + _tbl(_ot, _k + 1)]
+_blob = pad32(_bin) + pad32(_tpl)
+_nd = open('files/em/em12.drs', 'rb').read(); _nd = pad32(_nd); _km = len(_nd)
+open('files/em/em12.drs', 'wb').write(_nd + _blob)
+open('c/ch0_key.h', 'w').write('/* mkfiles.py: the key model at the end of em12.drs */\n#define KM_OFS 0x%X\n#define KM_LEN 0x%X\n#define KM_TPL 0x%X\n' % (_km, len(_blob), len(pad32(_bin))))
+print('key model at', hex(_km), len(_blob))
