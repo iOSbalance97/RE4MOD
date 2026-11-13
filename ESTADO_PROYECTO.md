@@ -692,3 +692,9 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   Native(): flag &= ~0x41, Be_flg |= 0x100 y &= ~0x08000000; tras persecución vuelven a casa; Sq() nueva
   (la anterior arrancaba Newton desde x y no convergía con distancias grandes); cartel recolocado
   (comprobado con una simulación del dibujo en Python sobre el atlas).
+- **C0-06** (usuario: el del camino chocaba con la pared; demasiados en la plaza; sincronizar el primero con
+  el que ves si sigues de frente; la pareja de la plaza junto a B y luego hacia el inicio): GU con 9 guardias;
+  0 camino ROAD_W↔ROAD_E por ciclo CYC 600 (este mirando al cruce −14239, 7377 / oeste mirando al inicio);
+  2 vigía gira a −0,184 (cruce) o 2,957 al ritmo del ciclo; 3/4 junto a B y, con Ashley pasado el
+  establo (x > −2000, z > 15000) o con la llave, andan a SQ_BACK (líneas rectas sin muros); rondas BV por
+  guardia (dirección libre de muros, work/place.py). Dibujo sobre el mapa: tools/ch0/guardias_c006.png.
