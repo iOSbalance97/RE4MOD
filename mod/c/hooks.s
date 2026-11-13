@@ -294,3 +294,20 @@ hook_ita:
     addi  r1,r1,16
     stwu  r1,-24(r1)          # original instruction
     b     ret_ita
+
+# C0-15: InverseKinematics' entry (PAL 0x80192084): r3 model -> Ch0Ik (parts with a broken IK chain: skip)
+    .globl hook_ik
+hook_ik:
+    stwu  r1,-16(r1)
+    mflr  r0
+    stw   r0,20(r1)
+    stw   r3,8(r1)
+    stw   r4,12(r1)
+    bl    Ch0Ik
+    lwz   r0,20(r1)
+    mtlr  r0
+    lwz   r3,8(r1)
+    lwz   r4,12(r1)
+    addi  r1,r1,16
+    stwu  r1,-576(r1)         # original instruction (0x9421FDC0)
+    b     ret_ik

@@ -416,10 +416,6 @@ static void Guards(void)
         if (!e || e[0xFC] != 1 || *(s16*)(e + 0x320) <= 0) continue;     /* hit, dying, being born... */
         ex = *(f32*)(e + 0x94); ez = *(f32*)(e + 0x9C);
         dx = PX() - ex; dz = PZ() - ez; d = Sq(dx * dx + dz * dz);
-        if (g->st == G_CHASE && d < 1700.0f && ph == 1 && !caught && !scene && !scene_n && !scene_x) {
-            f32 dy = PY() - *(f32*)(e + 0x98);
-            if (dy > -1500.0f && dy < 1500.0f) grab = 1;
-        }
         if (g->st == G_CHASE) {
             if (inh && !key && stage < 2) {          /* she got into the house: they lay siege to it */
                 int s = 0, j;
@@ -927,8 +923,8 @@ static const f32 NRW[2][2] = { { -26000.0f, -2250.0f }, { -25250.0f, -1500.0f } 
 #define N_SPAWN_Z (-9200.0f)
 #define N_STOP_X  (-22000.0f)
 #define N_STOP_Z  (-8500.0f)
-#define N_CAM_X   (-26000.0f)                        /* sees the alley top, his way and her corner */
-#define N_CAM_Z   (-4500.0f)
+#define N_CAM_X   (-23800.0f)                        /* C0-15 (video): west of his stop, sees his way east */
+#define N_CAM_Z   (-7500.0f)
 static f32 ncam[6];
 static int nt, nph;                                  /* the scene's own clock and step */
 int ch0_btn;                                         /* pad.c: buttons held for her in a scene */
@@ -991,7 +987,7 @@ static int NorthScene(void)                          /* 1 while it runs */
             CamTo(PX() - dx * 2600.0f, PY() + 1700.0f, PZ() - dz * 2600.0f, PX() + dx * 3000.0f, PY() + 900.0f, PZ() + dz * 3000.0f, 0.12f);
         }
     } else {                                         /* she is down: up to the alley's view, on him */
-        CamTo(N_CAM_X, 2600.0f, N_CAM_Z, gx, 1200.0f, gz, nt < 40 ? 0.05f : 0.08f);
+        CamTo(N_CAM_X, 2000.0f, N_CAM_Z, gx, 1200.0f, gz, nt < 40 ? 0.05f : 0.08f);
         if (nt == 30 && e) { Patrol(G_WATCH, 1); w->leg = 0; }   /* he turns and goes on his round */
         if (nt >= 150) {
             scene_n = 0; STOPF &= ~SPF_CAM; ch0_padlock = 0; ch0_stick = 0; ch0_btn = 0; ch0_crouch_force = 0; Hud(1);
@@ -1104,7 +1100,7 @@ void Ch0Frame(void)
         if (caught) {                                /* knocked down: fade, text, again */
             cap_t++;
             ch0_padlock = 1;
-            if (cap_t == 170) Restart();
+            if (cap_t == 200) Restart();      /* C0-15: grabbed, carried off two steps, then the screen */
             return;
         }
         if (scene_gate) {                            /* the south gate: two of them run in */
@@ -1128,9 +1124,7 @@ void Ch0Frame(void)
         }
         if (keep_open && Alive(hdoor) && keep_open++ < 600) *(s32*)(hdoor + 0x7E0) = 0x96;   /* C0-14: it stays open */
         if ((pPL[0xFC] == 1 || grab) && !scene && !scene_x) {
-            int j;
-            caught = 1; cap_t = 0; hidden = 0; ch0_crouch_force = 0; grab = 0; Hud(0);
-            for (j = 0; j < NG; j++) if (Alive(gd[j].e)) Hold(&gd[j]);   /* C0-14: no game grab (its crash) */
+            caught = 1; cap_t = 0; hidden = 0; ch0_crouch_force = 0; grab = 0; Hud(0);   /* C0-15: the game's own grab plays */
             return;
         }
         if (OutScene()) return;
@@ -1235,7 +1229,7 @@ int Ch0Black(void)
     if (!on) return 0;
     if (!ready) return 255;
     if (ph == 0) return 255 - Ramp(T_FADE_IN, T_LIT, t);
-    if (ph == 1 && caught) return Ramp(40, 90, cap_t);
+    if (ph == 1 && caught) return Ramp(80, 115, cap_t);
     if (ph == 2) return Ramp(60, 100, endt);
     if (ph == 4) return Ramp(25, 70, endt);                  /* C0-10: door B -> r112 */
     if (ph == 3) return 255 - Ramp(0, 40, t);
@@ -1250,7 +1244,7 @@ int Ch0Text(int k)
         if (k == 0) { if (t < T_TXT_FULL) return Ramp(T_TXT_IN, T_TXT_FULL, t); return 255 - Ramp(T_TXT_OUT, T_TXT_GONE, t); }
         return 0;
     }
-    if (k == 6 && caught) return Ramp(70, 90, cap_t);
+    if (k == 6 && caught) return Ramp(110, 130, cap_t);
     if (k == 7 && ph == 2) return Ramp(100, 120, endt);
     return 0;
 }
@@ -1258,4 +1252,21 @@ int Ch0Coords(int i)                                  /* test: Ashley x, y, z; -
 {
     if (!on || !ready || (ph != 1 && ph != 3) || caught || scene || card || !Ashley()) return -999999;
     return (int)*(f32*)(pPL + 0x94 + 4 * i);
+}
+
+/* C0-15: the crash when a Ganado grabs playable Ashley (C0-13: write to 0x1C0, PC 0x801925A8): the grab turns on
+ * IK for a part whose chain (the next two parts in the list) Ashley's model does not have. Hook at
+ * InverseKinematics' entry (PAL 0x80192084): such a part is marked "skip" (IK flag 0x80) before it runs. */
+void Ch0Ik(u8* m)
+{
+    u8* p;
+    int n = 0;
+    if (!m || (u32)m < 0x80000000u || (u32)m >= 0x81800000u) return;
+    for (p = *(u8**)(m + 0xF4); p && (u32)p >= 0x80000000u && (u32)p < 0x81800000u && n < 96; p = *(u8**)(p + 0xF4), n++) {
+        u32 f = *(u32*)(p + 0x1C0);
+        u8* j;
+        if (!(f & 4) || (f & 0x80)) continue;
+        j = *(u8**)(p + 0xF4);
+        if (!j || (u32)j < 0x80000000u || !*(u8**)(j + 0xF4)) *(u32*)(p + 0x1C0) = f | 0x80;
+    }
 }

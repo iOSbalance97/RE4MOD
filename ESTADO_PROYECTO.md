@@ -758,3 +758,7 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   cModel +0x298. Ventana del tejado = ETS 8 (WINDOW00, -938, 4200, -13150); la de la escalera ETS 0 (384, 4200,
   -6406) con HASIGO01 (354, -4727). "Rota" = bit0 de EtcModelFlg[no] en los datos guardados de la sala
   (GetEtcFlgPtr, NTSC 0x80132EE8; dirección PAL aún sin encontrar).
+- **C0-15**: el agarre del juego a Ashley jugable activa IK (bandera 4 en +0x1C0 de la parte) en partes cuya
+  cadena p->pList->pList no existe en su modelo → InverseKinematics escribe en NULL+0x1C0. Gancho en su entrada
+  (0x80192084, original stwu r1,-0x240) → Ch0Ik marca 0x80 (saltar) en esas partes. Captura: fundido 80-115,
+  texto 110-130, reinicio 200.
