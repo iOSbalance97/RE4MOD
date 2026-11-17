@@ -772,3 +772,8 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   Antorchas: torch de em11 (0x26A/0x26B) en em17.drs + parche de Em17WeaponSet (REL .text 0x440A8..0x440F0, mot[69]/
   [70] = ARC 0x26E/0x26F; ceros de mot[67/68/73-76] quitados: el trabajo se limpia al crear). Captura propia a 1,6 m
   (el agarre del juego cuelga en 0x8012DA30). Rodeo de esquinas (det/sk en Guard). R_UP por 4 puntos (UPW).
+- **C0-19**: antorcha = Wep 7 (0x800, mot[71]/[72]); la Wep 6 era la guadaña (motions vacías en em17 → voces raras,
+  sin carrera). Contenedor con la animación del juego (pl11 0x2C/0x43/0x45) y captura con la del secuestro
+  (ganado 0x29F/0x2A0 por R1 0x66, Ashley 0x2A2/0x2A3), clips en em12.drs (mkhide.py, CT_HD, ClipApply). El
+  agarre propio del juego a Ashley jugable es NeckHang (R1 0x36): su aviso cuelga en 0x8012DA30. Puerta: el
+  autocierre no usa Open_timer sino "nadie cerca" (bandera 0x20000000). Caja SMD 43 en los callejones del establo.

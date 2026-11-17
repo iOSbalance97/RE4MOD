@@ -381,37 +381,57 @@ void CrouchFrame(void)
 
 /* C0-03: the chapter 0 intro's scared clip on Ashley (anim/tools/mkscared.py, the user's Mixamo
  * 'Scared'): frame f (clip frames, looped), weight k over the game's pose; parts 1-25 + the root height. */
-#include "ch0_scared.h"
-void ScaredApply(f32 f, f32 k)
+/* C0-19: parts 1-25 from two clip rows (75 s16 euler 1e-4 rad each), blended at fr, weight k over the game's pose */
+static int PoseRows(u8* pl, const s16* ra, const s16* rb, f32 fr, f32 k)
 {
-    static const Q ident = { 1.0f, 0.0f, 0.0f, 0.0f };
-    u8* pl = pPL; u8* p; f32* l; f32 m[3][3], e[3], fr, y;
-    int i, a, b;
-    if (!pl || k <= 0.0f) return;
-    if (f < 0.0f) f = 0.0f;
-    if (f > (f32)(SC_N - 1)) f = (f32)(SC_N - 1);
-    a = (int)f; b = a + 1 < SC_N ? a + 1 : a; fr = f - (f32)a;
+    f32* l; f32 m[3][3], e[3];
+    int i, j;
     for (i = 0; i < 25; i++) {
         int no = i + 1;
-        Q qa, qb;
-        p = (u8*)getPartsPtr(pl, no);
-        if (!p) return;
+        Q q[2];
+        u8* p = (u8*)getPartsPtr(pl, no);
+        if (!p) return 0;
         l = (f32*)(p + 0x3C);
-        e[0] = sc_rot[a][i * 3] * 1e-4f; e[1] = sc_rot[a][i * 3 + 1] * 1e-4f; e[2] = sc_rot[a][i * 3 + 2] * 1e-4f;
-        EulerMtx(e, m); qa = MtxQ(m);
-        e[0] = sc_rot[b][i * 3] * 1e-4f; e[1] = sc_rot[b][i * 3 + 1] * 1e-4f; e[2] = sc_rot[b][i * 3 + 2] * 1e-4f;
-        EulerMtx(e, m); qb = MtxQ(m);
-        QMtx(QLerp(LQ(l), QLerp(qa, qb, fr), k), m);
+        for (j = 0; j < 2; j++) {
+            const s16* r = (j ? rb : ra) + i * 3;
+            e[0] = r[0] * 1e-4f; e[1] = r[1] * 1e-4f; e[2] = r[2] * 1e-4f;
+            EulerMtx(e, m); q[j] = MtxQ(m);
+        }
+        QMtx(QLerp(LQ(l), QLerp(q[0], q[1], fr), k), m);
         if (no == 1) SetL(l, m, l[3] * (1.0f - k), l[7] + (10.0f - l[7]) * k, l[11] * (1.0f - k));
         else if (no == 17) SetL(l, m, l[3] * (1.0f - k), l[7] * (1.0f - k), l[11] * (1.0f - k));
         else SetL(l, m, l[3], l[7], l[11]);
     }
-    p = (u8*)getPartsPtr(pl, 0);
+    return 1;
+}
+static void PoseRoot(u8* pl, f32 ry, f32 x, f32 y, f32 z, f32 k)
+{
+    static const Q ident = { 1.0f, 0.0f, 0.0f, 0.0f };
+    f32 m[3][3], e[3];
+    f32* l;
+    u8* p = (u8*)getPartsPtr(pl, 0);
     if (!p) return;
     l = (f32*)(p + 0x3C);
-    y = (sc_y[a] * (1.0f - fr) + sc_y[b] * fr) * (1094.0f / 1140.0f);
-    QMtx(QLerp(LQ(l), ident, k), m);
-    SetL(l, m, l[3] * (1.0f - k), l[7] + (y - l[7]) * k, l[11] * (1.0f - k));
+    e[0] = 0.0f; e[1] = ry; e[2] = 0.0f;
+    EulerMtx(e, m);
+    QMtx(QLerp(LQ(l), ry != 0.0f ? MtxQ(m) : ident, k), m);
+    SetL(l, m, l[3] + (x - l[3]) * k, l[7] + (y - l[7]) * k, l[11] + (z - l[11]) * k);
     partsWorldCalc(pl);
+}
+/* C0-19: a clip read from the disc (ch0.c: hiding in the container, carried off): rot[n][75], then root[n][4]
+ * (x, y, z, turn 1e-4 rad). Frame f is a row of the table (no wrap); xz = 0: the root keeps only height and turn. */
+void ClipApply(const s16* tab, int n, f32 f, f32 k, int xz)
+{
+    u8* pl = pPL; f32 fr;
+    const s16 *ra, *rb;
+    int a, b;
+    if (!pl || !tab || k <= 0.0f) return;
+    if (f < 0.0f) f = 0.0f;
+    if (f > (f32)(n - 1)) f = (f32)(n - 1);
+    a = (int)f; b = a + 1 < n ? a + 1 : a; fr = f - (f32)a;
+    if (!PoseRows(pl, tab + a * 75, tab + b * 75, fr, k)) return;
+    ra = tab + n * 75 + a * 4; rb = tab + n * 75 + b * 4;
+    PoseRoot(pl, (ra[3] + (rb[3] - ra[3]) * fr) * 1e-4f, xz ? ra[0] + (rb[0] - ra[0]) * fr : 0.0f,
+             ra[1] + (rb[1] - ra[1]) * fr, xz ? ra[2] + (rb[2] - ra[2]) * fr : 0.0f, k);
 }
 void CrouchOff(void) { want = 0; w = wu = 0.0f; shot = -1; }   /* C0-14: ch0.c scenes stand her up */

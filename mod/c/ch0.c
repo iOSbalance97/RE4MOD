@@ -57,6 +57,7 @@
 #include "ch0_msg.h"
 #include "ch0_key.h"
 #include "ch0_cont.h"
+#include "ch0_hide.h"
 
 #define STAGE G8(0x4FA8)
 #define ROOM  G8(0x4FA9)
@@ -103,6 +104,12 @@ int ch0_got;                                         /* item.c: the key has been
 static int stage;                                    /* C0-07: 0 start, 1 the gate scene done (grouped), 2 the key */
 static Guard gd[12];
 static int hidden, hide_no, card, card_t, road_wait;
+static f32 Sm(f32 x);
+static u8* ct_buf;                                  /* C0-18/19: container + clips (em12.drs, read in Ch0Ita) */
+static int hs, ht;                                   /* C0-19: hopping in (1) / out (3); frame */
+static u8* kid;                                      /* C0-19: the one carrying her off */
+void ClipApply(const s16* tab, int n, f32 f, f32 k, int xz);  /* crouch.c */
+#define ATARI_PL (*(u16*)(pPL + 0x2B4 + 0x1A))     /* atari.m_flag: 0x300 = collides with characters */
 static int scene_n, watch_on, rw, kwait;
 static int win_done;
 static int scene_x, x_done, grab, xo;                    /* C0-14: out of the house scene; a chaser at arm's length */
@@ -191,10 +198,10 @@ static const f32 RUN0[2][3] = { { -16248.0f, 2684.0f, 31000.0f }, { -14383.0f, 2
 /* C0-08: the user's black marks, closed with boxes (the room's own et01 box, EtcModelSet PAL 0x8010ACF0)
  * across the narrowest line of each passage (work: wall-to-wall chords), and an invisible stop behind them */
 static const f32 BLK[4][5] = {                       /* centre x, z, direction (rad), width, boxes */
-    { -10953.0f, 14439.0f, 1.5708f, 1200.0f, 2 },    /* the alley beside the stable */
+    { -10953.0f, 14439.0f, 1.5708f, 700.0f, 2 },     /* the alley beside the stable (C0-19: crates under the box) */
     {  -6245.0f, -5123.0f, 2.4435f, 1800.0f, 2 },    /* west of the house */
     {  12960.0f, -12682.0f, 2.7925f, 2000.0f, 2 },   /* north-east of the house */
-    {  -9000.0f, 12300.0f, 1.5708f, 1400.0f, 2 },    /* C0-17 (user's capture): west of the stable, up to the square */
+    {  -9000.0f, 12300.0f, 1.5708f, 700.0f, 2 },     /* C0-17 (user's capture): west of the stable, up to the square */
 };
 static const f32 SIEGE[3][2] = { { 7169.0f, -4800.0f }, { 8700.0f, -5000.0f }, { 6300.0f, -4300.0f } };   /* house C's front */
 static const f32 LADDER[2] = { -5600.0f, -17300.0f };   /* C0-10b: the key house's ladder (ETS 5, id 6) */
@@ -239,7 +246,7 @@ void Ch0EmList(void)
         if (e[1] != 0 || e[0] != 0) continue;
         memclr_asm(e, 32);
         e[0] = 1; e[1] = 0x17; e[2] = (u8)GU[k][4];
-        *(u32*)(e + 4) = 0x04000000u;                /* C0-12: torch (0x04000000 -> Wep 6); 0x20000 was dynamite */
+        *(u32*)(e + 4) = 0x800u;                     /* C0-19: the torch is Wep 7 (0x800, fire 0x10/0x14); 0x04000000 = the scythe */
         *(u16*)(e + 8) = 1000;
         *(s16*)(e + 0x0C) = GU[k][0] / 10; *(s16*)(e + 0x0E) = GU[k][1] / 10; *(s16*)(e + 0x10) = GU[k][2] / 10;
         *(s16*)(e + 0x14) = GU[k][3];
@@ -347,7 +354,7 @@ static u8* Spawn(f32 x, f32 y, f32 z, f32 ang, int type)    /* a torch Ganado (E
     u8* e;
     memclr_asm(rrec, 32);
     rrec[0] = 1; rrec[1] = 0x17; rrec[2] = (u8)type;
-    *(u32*)(rrec + 4) = 0x04000000u;
+    *(u32*)(rrec + 4) = 0x800u;
     *(u16*)(rrec + 8) = 1000;
     *(s16*)(rrec + 0x0C) = (s16)(x / 10.0f); *(s16*)(rrec + 0x0E) = (s16)(y / 10.0f); *(s16*)(rrec + 0x10) = (s16)(z / 10.0f);
     *(s16*)(rrec + 0x14) = (s16)(ang * 16384.0f / 3.14159265f);
@@ -429,8 +436,8 @@ static void Guards(void)
                 Walk(g, g->ax, g->az);
                 continue;
             }
-            if (!hidden && !scene && !scene_x && !scene_n && !caught && pPL[0xFC] == 0 && d < 1600.0f
-                && *(f32*)(e + 0x98) - PY() < 1200.0f && PY() - *(f32*)(e + 0x98) < 1200.0f) grab = 1;   /* C0-18: caught before the game's own grab (it crashes, PC 0x8012DA30) */
+            if (!hidden && !hs && !scene && !scene_x && !scene_n && !caught && pPL[0xFC] == 0 && d < 2600.0f
+                && *(f32*)(e + 0x98) - PY() < 1200.0f && PY() - *(f32*)(e + 0x98) < 1200.0f) { grab = 1; kid = e; }   /* C0-19: 2.6 m: the torch swing starts at 2.5 */   /* C0-18: caught before the game's own grab (it crashes, PC 0x8012DA30) */
             if (d > 15000.0f || (hidden && !g->lost)) g->lost++;
             else if (!hidden) g->lost = 0;
             if (g->lost > 120) {                     /* back home / to its patrol */
@@ -639,32 +646,68 @@ static int HideSpot(void)                            /* the hiding place Ashley 
     for (i = 0; i < NHIDE; i++) if (D2(CONT[i][0], CONT[i][2]) < HIDE_R * HIDE_R && PY() < CONT[i][1] + 1500.0f) return i;
     return -1;
 }
+/* C0-19: in and out of the container with the game's own partner motion (Ashley on the island when Leon tells
+ * her to hide: pl11 ARC 0x2C hop + 0x43 down; out 0x45 up + the hop), anim/tools/mkhide.py, read with the
+ * container (ct_buf + CT_HD). She goes over the long side nearest to her: from 400 outside the rim, facing it. */
+#define HD_TAB ((const s16*)(ct_buf + CT_HD))
+static f32 hsx, hsz, hnx, hnz;                       /* the outside point, the side's normal (outwards) */
+static u16 hs_atari;
+static void HideSide(int i)
+{
+    f32 c = Cs(CONT[i][3]), sn = Sn(CONT[i][3]), dx = PX() - CONT[i][0], dz = PZ() - CONT[i][2];
+    f32 lx = dx * c - dz * sn, lz = dx * sn + dz * c, sd = lx < 0.0f ? -1.0f : 1.0f;
+    if (lz > 450.0f) lz = 450.0f; else if (lz < -450.0f) lz = -450.0f;
+    hnx = c * sd; hnz = -sn * sd;                    /* the local x axis (cos, -sin) toward her */
+    hsx = CONT[i][0] + hnx * 985.0f + sn * lz;       /* 585 to the side + 400 */
+    hsz = CONT[i][2] + hnz * 985.0f + c * lz;
+}
+static void HidePlace(f32 x, f32 z, f32 nx, f32 nz)
+{
+    *(f32*)(pPL + 0x94) = x; *(f32*)(pPL + 0x9C) = z; *(f32*)(pPL + 0xA4) = Atan2f(nx, nz);
+}
 static void HideFrame(u16 trg)
 {
     int k;
+    if (hs) {                                        /* the hop: her place held, the clip on her */
+        f32 f = (f32)ht;
+        ch0_padlock = 1;
+        ATARI_PL &= ~0x300;
+        ht++;
+        if (hs == 1) {
+            HidePlace(hsx, hsz, -hnx, -hnz);
+            ClipApply(HD_TAB, HD_N, f, Sm(f / 6.0f), 1);
+            if (ht >= HD_IN - 1) { hs = 0; hidden = 1; }
+        } else {
+            HidePlace(hsx - hnx * 1179.0f, hsz - hnz * 1179.0f, hnx, hnz);
+            ClipApply(HD_TAB, HD_N, (f32)HD_OUT + f, 1.0f, 1);   /* its last row stands where she ends */
+            if (ht >= HD_KID - HD_OUT - 1) { hs = 0; HidePlace(hsx, hsz, hnx, hnz); ATARI_PL = hs_atari; ch0_padlock = 0; }
+        }
+        if (hidden || hs) { if (hidden) *(u32*)pPL &= ~2u; return; }
+    }
     if (!hidden) {
-        if ((trg & PAD_A) && HideSpot() >= 0 && pPL[0xFC] == 0) {
-            hidden = 1; hide_no = HideSpot(); ch0_crouch_force = 1;
+        *(u32*)pPL |= 2u;
+        if ((trg & PAD_A) && HideSpot() >= 0 && pPL[0xFC] == 0 && ct_buf) {
             for (k = 0; k < ngidx; k++) {            /* a chaser near enough sees her go in */
                 Guard* g = &gd[k];
                 if (g->e && g->st == G_CHASE) {
                     f32 dx = *(f32*)(g->e + 0x94) - PX(), dz = *(f32*)(g->e + 0x9C) - PZ();
-                    if (dx * dx + dz * dz < 4000.0f * 4000.0f) { hidden = 0; ch0_crouch_force = 0; return; }
+                    if (dx * dx + dz * dz < 4000.0f * 4000.0f) return;
                 }
             }
+            hide_no = HideSpot(); HideSide(hide_no); hs = 1; ht = 0; hs_atari = ATARI_PL;
         }
         return;
     }
-    ch0_padlock = 2;                                 /* still, crouched, the camera free (C0-12); Cross: out */
-    if (trg & PAD_A) { hidden = 0; ch0_crouch_force = 0; ch0_padlock = 0; }
-    if (hidden) *(u32*)pPL &= ~2u; else *(u32*)pPL |= 2u;   /* C0-18: inside the container: not drawn */
+    ch0_padlock = 2;                                 /* still, the camera free (C0-12); Cross: out */
+    *(u32*)pPL &= ~2u;                               /* C0-18: inside the container: not drawn */
+    if (trg & PAD_A) { hidden = 0; hs = 3; ht = 0; *(u32*)pPL |= 2u; }
 }
 int Ch0Card(void) { if (!on || !card) return 0; return card == 1 ? (card_t < 12 ? card_t * 255 / 12 : 255) : 255 - card_t * 255 / 12; }
 int Ch0Hide(void)
 {
     if (!on || !ready || ph != 1 || scene || scene_n || scene_gate || caught || card) return 0;
     if (key && D2(BX, BZ) < 2500.0f * 2500.0f) return 3;     /* C0-12: door B: Cross to open */
-    return hidden ? 2 : (HideSpot() >= 0 ? 1 : 0);
+    return hs ? 0 : hidden ? 2 : (HideSpot() >= 0 ? 1 : 0);
 }
 
 /* SceAt areas (pS->ot): doors off for the chapter; the bed's own check off until the key is taken */
@@ -718,7 +761,7 @@ static u8* HouseGanado(f32 x, f32 z, f32 ang)        /* a torch Ganado (EmSetEve
     u8* e;
     memclr_asm(hrec, 32);
     hrec[0] = 1; hrec[1] = 0x17; hrec[2] = 0;
-    *(u32*)(hrec + 4) = 0x04000000u;                 /* C0-18: a torch too (was dynamite) */
+    *(u32*)(hrec + 4) = 0x800u;                      /* C0-18: a torch too (was dynamite) */
     *(u16*)(hrec + 8) = 1000;
     *(s16*)(hrec + 0x0C) = (s16)(x / 10.0f); *(s16*)(hrec + 0x10) = (s16)(z / 10.0f);
     *(s16*)(hrec + 0x14) = (s16)(ang * 16384.0f / 3.14159265f);
@@ -741,7 +784,11 @@ static u8* HouseGanado(f32 x, f32 z, f32 ang)        /* a torch Ganado (EmSetEve
 #define T_SC_END   (T_STOP + 111)           /* 37 clip frames at 10 fps */
 #define T_SAY      (T_STOP + 55)
 #define T_FREE     (T_SC_END + 30)
-void ScaredApply(f32 f, f32 k);                      /* crouch.c */
+static void ScaredApply(f32 f, f32 k)                /* C0-19: the intro's clip, now with the others on the disc */
+{
+    if (f > (f32)(HD_N - HD_SC - 1)) f = (f32)(HD_N - HD_SC - 1);
+    if (ct_buf) ClipApply((const s16*)(ct_buf + CT_HD), HD_N, (f32)HD_SC + f, k, 0);
+}
 void CrouchOff(void);
 static f32 Sm(f32 x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) return 1.0f; return x * x * (3.0f - 2.0f * x); }
 static void IntroCam(void)                           /* from her feet, in front, up to her whole body */
@@ -874,7 +921,6 @@ static void KeyModel(void)
  * its body goes over r111's barrel model (ETM entry 52 "et1100.bin", 3680 bytes; ours 3424) while that is still
  * the untouched file (word 0 = 0x40: not yet relocated) and the barrel's texture (et11.eff, EFM 9, image 0) gets
  * our image header, the data already a pointer (unpacked 1: calcTplAddr leaves it). */
-static u8* ct_buf;
 static void Container(u8* etm)
 {
     u8 *bin = etm + 0x886E0, *tpl = etm + 0x89580 + 0x7640, *h;
@@ -891,23 +937,45 @@ static void Container(u8* etm)
     for (i = 0; i < 0x24; i += 4) *(u32*)(h + i) = *(u32*)(ct_buf + i);
     *(u8**)(h + 8) = ct_buf + CT_TEX; h[0x23] = 1;
 }
+/* C0-19 (user's photo): the two stable alleys are shut by the room's big wooden box (SMD 43, bin 41: 1.9 x 0.9 x
+ * 1.9 m) copied into two unused SMD works before the room makes its scenery (SceAtInit runs before SmdSetup); it
+ * is scenery only, so she is kept out of it here like out of the containers, and the crates sit under it. */
+static const f32 SBOX[2][2] = { { -10953.0f, 14439.0f }, { -9000.0f, 12300.0f } };
+static void SmdBoxes(u8* aev)
+{
+    u8 *smd = aev - (0x433BC0 - 0x341E0), *src = smd + 0x10 + 43 * 0x48;
+    int k, j = 0, i, n = *(u16*)(smd + 2);
+    if (n != 239 || src[0x24] != 41 || src[0x27] != 0x2B) return;
+    for (k = 0; k < n && j < 2; k++) {
+        u8* w = smd + 0x10 + k * 0x48;
+        if (w[0x27] != 0xFF && !(w[0x24] == 41 && w[0x27] == 0xFE)) continue;
+        for (i = 0; i < 0x48; i += 4) *(u32*)(w + i) = *(u32*)(src + i);
+        w[0x27] = 0xFE;
+        *(f32*)(w + 0) = SBOX[j][0]; *(f32*)(w + 4) = 0.0f; *(f32*)(w + 8) = SBOX[j][1];
+        *(f32*)(w + 0x10) = 1.5708f;
+        j++;
+    }
+}
 static void ContPush(void)                           /* she can't walk into one (its own bump is a 0.35 m post) */
 {
     int i;
-    for (i = 0; i < NHIDE; i++) {
-        f32 c = Cs(CONT[i][3]), sn = Sn(CONT[i][3]), dx = PX() - CONT[i][0], dz = PZ() - CONT[i][2];
-        f32 lx = dx * c - dz * sn, lz = dx * sn + dz * c, px = 850.0f - (lx < 0 ? -lx : lx), pz = 1130.0f - (lz < 0 ? -lz : lz);
-        if (px <= 0.0f || pz <= 0.0f || PY() > CONT[i][1] + 1200.0f) continue;
-        if (px < pz) lx = lx < 0 ? -850.0f : 850.0f; else lz = lz < 0 ? -1130.0f : 1130.0f;
-        *(f32*)(pPL + 0x94) = CONT[i][0] + lx * c + lz * sn;
-        *(f32*)(pPL + 0x9C) = CONT[i][2] - lx * sn + lz * c;
+    for (i = 0; i < NHIDE + 2; i++) {
+        f32 x = i < NHIDE ? CONT[i][0] : SBOX[i - NHIDE][0], z = i < NHIDE ? CONT[i][2] : SBOX[i - NHIDE][1];
+        f32 a = i < NHIDE ? CONT[i][3] : 1.5708f, y = i < NHIDE ? CONT[i][1] : 0.0f;
+        f32 hx = i < NHIDE ? 850.0f : 1210.0f, hz = i < NHIDE ? 1130.0f : 1190.0f;
+        f32 c = Cs(a), sn = Sn(a), dx = PX() - x, dz = PZ() - z;
+        f32 lx = dx * c - dz * sn, lz = dx * sn + dz * c, px = hx - (lx < 0 ? -lx : lx), pz = hz - (lz < 0 ? -lz : lz);
+        if (px <= 0.0f || pz <= 0.0f || PY() > y + 1200.0f) continue;
+        if (px < pz) lx = lx < 0 ? -hx : hx; else lz = lz < 0 ? -hz : hz;
+        *(f32*)(pPL + 0x94) = x + lx * c + lz * sn;
+        *(f32*)(pPL + 0x9C) = z - lx * sn + lz * c;
     }
 }
 void Ch0Ita(u8* aev, u8* ita)
 {
     int i, n;
-    (void)aev;
     if (!on || !pG || STAGE != 1 || !ita || (ROOM != 0x11 && ROOM != 0x12)) return;
+    if (ROOM == 0x11 && aev) SmdBoxes(aev);
     if (ita[0] != 'I' || ita[1] != 'T' || ita[2] != 'A') return;
     n = *(u16*)(ita + 6);
     for (i = 0; i < n; i++) ita[0x10 + i * 0x9C + 0x34] = 0;
@@ -1003,10 +1071,42 @@ static void RoofWindow(void)
         return;
     }
 }
+/* C0-19 (user): caught = carried off like the Ganados take Ashley in Leon's game (TakeAway): the Ganado lifts her
+ * onto his shoulder (his motion 0x29F, then 0x2A0 walking; plain MotionMove through his R1 0x66) and she plays
+ * her half from his archive (0x2A2 / 0x2A3, mkhide.py), held at his takeaway point (-176.17, 40.95). Started by
+ * us before the game's own grab of a playable Ashley (the strangle hold, whose prompt reads garbage: 0x8012DA30). */
+static f32 kx0, kz0;
+static u8* EmArc(u8* e, int w) { u8* a = *(u8**)(e + 0x378); return a + *(u32*)(a + w * 4); }
+static void KidStart(void)
+{
+    u8* e = kid;
+    f32 a = Atan2f(PX() - *(f32*)(e + 0x94), PZ() - *(f32*)(e + 0x9C)), c = Cs(a), sn = Sn(a);
+    *(f32*)(e + 0x94) = *(f32*)(e + 0x110) = PX() - (-194.22f * c + 582.05f * sn);   /* she 0.6 m in front of him */
+    *(f32*)(e + 0x9C) = *(f32*)(e + 0x118) = PZ() - (194.22f * sn + 582.05f * c);
+    *(f32*)(e + 0xA4) = a;
+    Native(e);
+    *(u32*)e &= ~0x800u;
+    e[0xFC] = 1; e[0xFD] = 0x66; e[0xFE] = 1; e[0xFF] = 0;
+    MotionSetCore(e, e + 0x1D8, EmArc(e, 0x29F), 0, 5, 1, 0);
+    *(u16*)(e + 0x2B4 + 0x1A) &= ~0x300;
+    kx0 = PX(); kz0 = PZ();
+    hs_atari = ATARI_PL; ATARI_PL &= ~0x300;
+}
+static void KidFrame(int t)
+{
+    u8* e = kid;
+    f32 ga = *(f32*)(e + 0xA4), c = Cs(ga), sn = Sn(ga);
+    f32 px = *(f32*)(e + 0x94) + (-176.17f * c + 40.95f * sn), pz = *(f32*)(e + 0x9C) + (176.17f * sn + 40.95f * c);
+    if (t < 50) { f32 k = Sm((f32)t / 50.0f); px = kx0 + (px - kx0) * k; pz = kz0 + (pz - kz0) * k; }
+    *(f32*)(pPL + 0x94) = px; *(f32*)(pPL + 0x9C) = pz; *(f32*)(pPL + 0xA4) = ga + 3.14159265f;
+    if (t == 48) MotionSetCore(e, e + 0x1D8, EmArc(e, 0x2A0), 0, 5, 5, 0);
+    ClipApply(HD_TAB, HD_N, (f32)(HD_KID + (t < 50 ? t : 50 + (t - 50) % 76)), 1.0f, 0);
+}
 static void Restart(void)                            /* caught: the room again from the checkpoint */
 {
     hidden = 0; ch0_crouch_force = 0;
-    if (pPL) *(u32*)pPL |= 2u;
+    if (pPL) { *(u32*)pPL |= 2u; if (hs_atari) ATARI_PL = hs_atari; }
+    hs = 0; kid = 0;
     if (!cp) { road_wait = 1; cyc = 0; stage = 0; ch0_got = 0; watch_on = 0; }
     scene_n = 0; scene_x = 0; grab = 0; keep_open = 0; x_done = 0;
     scene_gate = 0;
@@ -1210,10 +1310,11 @@ void Ch0Frame(void)
         if (caught) {                                /* knocked down: fade, text, again */
             cap_t++;
             ch0_padlock = 1;
+            if (kid) KidFrame(cap_t - 1);
             {   /* C0-18: everyone stops where they are (no grab, no blow) */
                 int j;
-                for (j = 0; j < NG; j++) if (Alive(gd[j].e) && gd[j].e[0xFC] == 1 && gd[j].st != G_HOLD) Hold(&gd[j]);
-                if (Alive(hman) && hman[0xFC] == 1 && hman[0xFD] != 1) { *(u32*)(hman + 0x3C8) &= ~1u; Native(hman); hman[0xFD] = 1; hman[0xFE] = 0; }
+                for (j = 0; j < NG; j++) if (Alive(gd[j].e) && gd[j].e != kid && gd[j].e[0xFC] == 1 && gd[j].st != G_HOLD) Hold(&gd[j]);
+                if (Alive(hman) && hman != kid && hman[0xFC] == 1 && hman[0xFD] != 1) { *(u32*)(hman + 0x3C8) &= ~1u; Native(hman); hman[0xFD] = 1; hman[0xFE] = 0; }
             }
             if (cap_t == 200) Restart();      /* C0-15: grabbed, carried off two steps, then the screen */
             return;
@@ -1230,22 +1331,33 @@ void Ch0Frame(void)
             return;
         }
         Block();
-        ContPush();
-        if (Alive(hman) && hman[0xFC] == 1 && !hidden && !scene && !scene_x) {   /* C0-18: the house one too */
+        if (!hs) ContPush();
+        if (Alive(hman) && hman[0xFC] == 1 && !hidden && !scene && !scene_x && !caught) {   /* C0-18: the house one too */
             f32 hx = *(f32*)(hman + 0x94) - PX(), hz = *(f32*)(hman + 0x9C) - PZ(), hy = *(f32*)(hman + 0x98) - PY();
-            if (hx * hx + hz * hz < 1600.0f * 1600.0f && hy < 1200.0f && hy > -1200.0f && pPL[0xFC] == 0) grab = 1;
+            if (hx * hx + hz * hz < 2600.0f * 2600.0f && hy < 1200.0f && hy > -1200.0f && pPL[0xFC] == 0 && !hs) { grab = 1; kid = hman; }
         }
-        if (after_key && --after_key == 0) AfterKey();
+        if (after_key && --after_key == 0) { AfterKey(); hdoor = HouseDoor(); keep_open = hdoor != 0; }   /* C0-19: back at the bed: the door is open as they left it */
         if (!scene && NorthScene()) return;
         if (stage == 0 && !scene && D2(STABLE_X, STABLE_Z) < 2500.0f * 2500.0f) {   /* passing the stable */
             scene_gate = 1; Hud(0);
             Runners(1); Patrol(2, 3); Patrol(3, 4);
             return;
         }
-        if (keep_open && Alive(hdoor) && keep_open++ < 600) *(s32*)(hdoor + 0x7E0) = 0x96;   /* C0-14: it stays open */
+        if (keep_open && Alive(hdoor)) {             /* C0-19: it stays open: the game shuts an open door as soon as nobody
+                                                        is near it (emDoorDoorAutoCloseCk, flag 0x20000000); once fully open
+                                                        (0x10000000, routine 0) the flag goes, so it never shuts; if it did, again */
+            u32* fl = (u32*)(hdoor + 0x3C8);
+            if (hdoor[0xFD] == 0 && (*fl & 0x10000000u)) *fl &= ~0x20000000u;
+            else if (hdoor[0xFD] == 3 || (hdoor[0xFD] == 0 && !(*fl & 0x20000000u))) {
+                Vec p; p.x = DOOR_OUT_X; p.y = 0.0f; p.z = DOOR_OUT_Z;
+                DOOR_OPEN(hdoor, &p, 0, 1, 0);
+            }
+        }
         if ((pPL[0xFC] == 1 || grab) && !scene && !scene_x) {
-            caught = 1; cap_t = grab ? 50 : 0; hidden = 0; ch0_crouch_force = 0; grab = 0; Hud(0);   /* C0-15: the game's own grab plays */
+            caught = 1; cap_t = 0; hidden = 0; ch0_crouch_force = 0; Hud(0);   /* C0-15: the game's own grab plays */
             *(u32*)pPL |= 2u;                       /* C0-18: seen again (hidden in a container) */
+            if (grab && Alive(kid) && ct_buf) KidStart(); else kid = 0;
+            grab = 0;
             return;
         }
         if (OutScene()) return;
