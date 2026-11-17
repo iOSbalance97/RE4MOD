@@ -777,3 +777,6 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   (ganado 0x29F/0x2A0 por R1 0x66, Ashley 0x2A2/0x2A3), clips en em12.drs (mkhide.py, CT_HD, ClipApply). El
   agarre propio del juego a Ashley jugable es NeckHang (R1 0x36): su aviso cuelga en 0x8012DA30. Puerta: el
   autocierre no usa Open_timer sino "nadie cerca" (bandera 0x20000000). Caja SMD 43 en los callejones del establo.
+- **C0-20**: captura con el agarre real (em17 REL .text 0x1D670: R1 0x36 → 0x66), Ashley visible dentro del contenedor,
+  se levanta antes de saltar, escena de la puerta sur también en la puerta de la casa, OtNext con comprobación
+  de puntero (cuelgue 0x802CFB1C al cargar), rodeo con Clear() (SatMgr 0x8027DE28), miedo tras la ventana.

@@ -84,6 +84,16 @@ open('files/em/em12.drs', 'wb').write(_nd + _blob)
 open('c/ch0_key.h', 'w').write('/* mkfiles.py: the key model at the end of em12.drs */\n#define KM_OFS 0x%X\n#define KM_LEN 0x%X\n#define KM_TPL 0x%X\n' % (_km, len(_blob), len(pad32(_bin))))
 print('key model at', hex(_km), len(_blob))
 
+# C0-20: the grab. em17's br_Catch sends a grab of the playable Ashley (pl_type 1) to the strangle hold, R1 0x36
+# (stw of 0x01360000 into r_no at REL .text 0x1D670), whose prompt reads a garbage text pointer (hang at
+# 0x8012DA30). It goes to R1 0x66 (R300TakeAshley: a plain MotionMove) instead; ch0.c sees it and plays the carry.
+_d17 = bytearray(open(SRC + 'em17.drs', 'rb').read())
+_rel17 = 0x400 + struct.unpack('>I', _d17[0x404:0x408])[0]
+_o = _rel17 + 0xB4 + 0x1D670
+assert _d17[_o:_o + 8] == bytes.fromhex('3c000136901f00fc') and _d17[_o - 0x14:_o - 0x10] == bytes.fromhex('880b4fc4')
+_d17[_o:_o + 4] = bytes.fromhex('3c000166')
+open('files/em/em17.drs', 'wb').write(_d17)
+print('em17.drs: catch of Ashley -> R1 0x66')
 # C0-19: no change to em17 any more. C0-18 put em11's weapon in mot[69]/[70] for Wep 6: that is the scythe (the
 # zealots' weapon), its motions (0x13A/0x140/0x144) are empty in em17 (odd voices, no run). The village torch is
 # Wep 7 (list flag 0x800, mot[71]/[72] = ARC 0x270/0x271, already in em17; fire = setEffAlways 0x10/0x14).

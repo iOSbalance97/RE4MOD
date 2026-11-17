@@ -375,6 +375,13 @@ static int Los(u8* e, int crouched)
     b.x = PX(); b.y = PY() + (crouched ? 700.0f : 1200.0f); b.z = PZ();
     return HITCHECK(EATMGR, &a, &b, &c, 0, 0, 0) == 0;
 }
+static int Clear(u8* e, f32 x, f32 z)                /* C0-20: no wall (room SAT) at knee height from e to (x, z) */
+{
+    Vec a, b, c;
+    a.x = *(f32*)(e + 0x94); a.y = *(f32*)(e + 0x98) + 500.0f; a.z = *(f32*)(e + 0x9C);
+    b.x = x; b.y = a.y; b.z = z;
+    return HITCHECK((void*)0x8027DE28, &a, &b, &c, 0, 0, 0) == 0;
+}
 static void Steer(u8* e, f32 tx, f32 tz)              /* C0-12: walking straight at its target (no feints) */
 {
     f32 dx = tx - *(f32*)(e + 0x94), dz = tz - *(f32*)(e + 0x9C);
@@ -436,8 +443,6 @@ static void Guards(void)
                 Walk(g, g->ax, g->az);
                 continue;
             }
-            if (!hidden && !hs && !scene && !scene_x && !scene_n && !caught && pPL[0xFC] == 0 && d < 2600.0f
-                && *(f32*)(e + 0x98) - PY() < 1200.0f && PY() - *(f32*)(e + 0x98) < 1200.0f) { grab = 1; kid = e; }   /* C0-19: 2.6 m: the torch swing starts at 2.5 */   /* C0-18: caught before the game's own grab (it crashes, PC 0x8012DA30) */
             if (d > 15000.0f || (hidden && !g->lost)) g->lost++;
             else if (!hidden) g->lost = 0;
             if (g->lost > 120) {                     /* back home / to its patrol */
@@ -460,11 +465,17 @@ static void Guards(void)
             goto meter;
         }
         if (g->role != R_UP && g->st == G_WALK && !scene && !scene_gate) {
-            if (++g->sk >= 75) {                     /* hardly moved in 2.5 s while walking: a detour to one side */
+            if (++g->sk >= 90) {                     /* hardly moved in 3 s while walking: a detour to one side */
                 f32 mx = ex - g->sx, mz = ez - g->sz, ux = g->tx - ex, uz = g->tz - ez, l = Sq(ux * ux + uz * uz), sd;
-                if (mx * mx + mz * mz < 250.0f * 250.0f && l > 600.0f) {
-                    ux /= l; uz /= l; g->side ^= 1; sd = g->side ? 2200.0f : -2200.0f;
-                    g->qx = ex + uz * sd - ux * 500.0f; g->qz = ez - ux * sd - uz * 500.0f; g->det = 150;
+                int j;
+                if (mx * mx + mz * mz < 150.0f * 150.0f && l > 600.0f) {
+                    ux /= l; uz /= l;
+                    for (j = 0; j < 4; j++) {                /* C0-20: only a side with no wall on the way (the narrow road:
+                                                                the 2.2 m step put the road guard against the wall) */
+                        g->side ^= 1; sd = (g->side ? 1.0f : -1.0f) * (j < 2 ? 2200.0f : 1100.0f);
+                        g->qx = ex + uz * sd - ux * 500.0f; g->qz = ez - ux * sd - uz * 500.0f;
+                        if (Clear(e, g->qx, g->qz)) { g->det = 150; break; }
+                    }
                 }
                 g->sk = 0; g->sx = ex; g->sz = ez;
             }
@@ -665,9 +676,17 @@ static void HidePlace(f32 x, f32 z, f32 nx, f32 nz)
 {
     *(f32*)(pPL + 0x94) = x; *(f32*)(pPL + 0x9C) = z; *(f32*)(pPL + 0xA4) = Atan2f(nx, nz);
 }
+void CrouchStand(void);                              /* crouch.c */
+int CrouchLegs(void);
+void CrouchOff(void);
 static void HideFrame(u16 trg)
 {
     int k;
+    if (hs == 5) {                                   /* C0-20 (user): crouched: she stands up first */
+        ch0_padlock = 1;
+        if (CrouchLegs() && ++ht < 45) return;
+        CrouchOff(); HideSide(hide_no); hs = 1; ht = 0; hs_atari = ATARI_PL;
+    }
     if (hs) {                                        /* the hop: her place held, the clip on her */
         f32 f = (f32)ht;
         ch0_padlock = 1;
@@ -676,16 +695,16 @@ static void HideFrame(u16 trg)
         if (hs == 1) {
             HidePlace(hsx, hsz, -hnx, -hnz);
             ClipApply(HD_TAB, HD_N, f, Sm(f / 6.0f), 1);
-            if (ht >= HD_IN - 1) { hs = 0; hidden = 1; }
+            if (ht >= HD_IN) { hs = 0; hidden = 1; }
         } else {
             HidePlace(hsx - hnx * 1179.0f, hsz - hnz * 1179.0f, hnx, hnz);
             ClipApply(HD_TAB, HD_N, (f32)HD_OUT + f, 1.0f, 1);   /* its last row stands where she ends */
-            if (ht >= HD_KID - HD_OUT - 1) { hs = 0; HidePlace(hsx, hsz, hnx, hnz); ATARI_PL = hs_atari; ch0_padlock = 0; }
+            if (ht >= HD_KID - HD_OUT) { hs = 0; HidePlace(hsx, hsz, hnx, hnz); ATARI_PL = hs_atari; ch0_padlock = 0; }
+            return;
         }
-        if (hidden || hs) { if (hidden) *(u32*)pPL &= ~2u; return; }
+        if (hs) return;
     }
     if (!hidden) {
-        *(u32*)pPL |= 2u;
         if ((trg & PAD_A) && HideSpot() >= 0 && pPL[0xFC] == 0 && ct_buf) {
             for (k = 0; k < ngidx; k++) {            /* a chaser near enough sees her go in */
                 Guard* g = &gd[k];
@@ -694,13 +713,19 @@ static void HideFrame(u16 trg)
                     if (dx * dx + dz * dz < 4000.0f * 4000.0f) return;
                 }
             }
-            hide_no = HideSpot(); HideSide(hide_no); hs = 1; ht = 0; hs_atari = ATARI_PL;
+            hide_no = HideSpot(); ht = 0;
+            if (CrouchLegs()) { CrouchStand(); ch0_crouch_force = 0; hs = 5; return; }
+            HideSide(hide_no); hs = 1; hs_atari = ATARI_PL;
         }
         return;
     }
+    /* C0-20 (user): she stays in sight, down inside, turned to the side she came in by (the game turns her
+       round inside too): the first row of the way out, at its start point */
     ch0_padlock = 2;                                 /* still, the camera free (C0-12); Cross: out */
-    *(u32*)pPL &= ~2u;                               /* C0-18: inside the container: not drawn */
-    if (trg & PAD_A) { hidden = 0; hs = 3; ht = 0; *(u32*)pPL |= 2u; }
+    ATARI_PL &= ~0x300;
+    HidePlace(hsx - hnx * 1179.0f, hsz - hnz * 1179.0f, hnx, hnz);
+    ClipApply(HD_TAB, HD_N, (f32)HD_OUT, 1.0f, 1);
+    if (trg & PAD_A) { hidden = 0; hs = 3; ht = 0; }
 }
 int Ch0Card(void) { if (!on || !card) return 0; return card == 1 ? (card_t < 12 ? card_t * 255 / 12 : 255) : 255 - card_t * 255 / 12; }
 int Ch0Hide(void)
@@ -716,6 +741,7 @@ static u8* OtNext(u8* p)
     u32 v;
     while ((v = *(u32*)p) != 0xFFFFFFFFu) {
         p = (u8*)(v | 0x80000000u);
+        if ((u32)p >= 0x81800000u || ((u32)p & 3)) return 0;   /* C0-20: mid-load the list is stale (0x802CFB1C) */
         if ((s32)v < 0) return p;
     }
     return 0;
@@ -1105,7 +1131,7 @@ static void KidFrame(int t)
 static void Restart(void)                            /* caught: the room again from the checkpoint */
 {
     hidden = 0; ch0_crouch_force = 0;
-    if (pPL) { *(u32*)pPL |= 2u; if (hs_atari) ATARI_PL = hs_atari; }
+    if (pPL && hs_atari) ATARI_PL = hs_atari;
     hs = 0; kid = 0;
     if (!cp) { road_wait = 1; cyc = 0; stage = 0; ch0_got = 0; watch_on = 0; }
     scene_n = 0; scene_x = 0; grab = 0; keep_open = 0; x_done = 0;
@@ -1209,10 +1235,14 @@ static int OutScene(void)
 {
     int k;
     if (!scene_x) {
+        static int wj;                               /* C0-20: she went through the roof window (ETS 8, x -938) */
+        if (stage >= 2 && pPL[0xFD] > 2 && D2(-938.0f, -13150.0f) < 2500.0f * 2500.0f) wj = 1;
         if (stage < 2 || x_done || scene || pPL[0xFC] != 0 || pPL[0xFD] > 2) { xo = 0; return 0; }
-        /* C0-17: out for real: 1.5 m past the house's box (the window jump done) and 10 frames like that */
-        if (PX() > -1800.0f && PX() < 9300.0f && PZ() > -18000.0f && PZ() < -5000.0f) { xo = 0; return 0; }
-        if (++xo < 10) return 0;
+        /* C0-17: out for real: 1.5 m past the house's box and 10 frames like that; C0-20 (user): or right as the
+           window jump ends, on the roof side */
+        if (!(wj && PX() < -1000.0f) && PX() > -1800.0f && PX() < 9300.0f && PZ() > -18000.0f && PZ() < -5000.0f) { xo = 0; return 0; }
+        if (++xo < (wj ? 2 : 10)) return 0;
+        wj = 0;
         scene_x = 1; x_done = 1; Hud(0); CrouchOff(); ch0_crouch_force = 0;
         ncam[0] = PX(); ncam[1] = PY() + 1500.0f; ncam[2] = PZ();
         ncam[3] = PX(); ncam[4] = PY() + 1100.0f; ncam[5] = PZ();
@@ -1331,14 +1361,19 @@ void Ch0Frame(void)
             return;
         }
         Block();
-        if (!hs) ContPush();
-        if (Alive(hman) && hman[0xFC] == 1 && !hidden && !scene && !scene_x && !caught) {   /* C0-18: the house one too */
-            f32 hx = *(f32*)(hman + 0x94) - PX(), hz = *(f32*)(hman + 0x9C) - PZ(), hy = *(f32*)(hman + 0x98) - PY();
-            if (hx * hx + hz * hz < 2600.0f * 2600.0f && hy < 1200.0f && hy > -1200.0f && pPL[0xFC] == 0 && !hs) { grab = 1; kid = hman; }
+        if (!hs && !hidden) ContPush();
+        {   /* C0-20 (user): caught when one really grabs her: em17's br_Catch (REL .text 0x1D670, mkfiles.py) now
+               sends the grab of a playable Ashley to R1 0x66 instead of the strangle hold 0x36 */
+            int j;
+            for (j = 0; j <= NG && !caught && !grab; j++) {
+                u8* e = j < NG ? gd[j].e : hman;
+                if (Alive(e) && e[0xFC] == 1 && e[0xFD] == 0x66) { grab = 1; kid = e; }
+            }
         }
         if (after_key && --after_key == 0) { AfterKey(); hdoor = HouseDoor(); keep_open = hdoor != 0; }   /* C0-19: back at the bed: the door is open as they left it */
         if (!scene && NorthScene()) return;
-        if (stage == 0 && !scene && D2(STABLE_X, STABLE_Z) < 2500.0f * 2500.0f) {   /* passing the stable */
+        if (stage == 0 && !scene && (D2(STABLE_X, STABLE_Z) < 2500.0f * 2500.0f
+            || D2(DOOR_OUT_X, DOOR_OUT_Z) < 2000.0f * 2000.0f)) {   /* passing the stable; C0-20: or the key house's door */
             scene_gate = 1; Hud(0);
             Runners(1); Patrol(2, 3); Patrol(3, 4);
             return;
@@ -1355,7 +1390,6 @@ void Ch0Frame(void)
         }
         if ((pPL[0xFC] == 1 || grab) && !scene && !scene_x) {
             caught = 1; cap_t = 0; hidden = 0; ch0_crouch_force = 0; Hud(0);   /* C0-15: the game's own grab plays */
-            *(u32*)pPL |= 2u;                       /* C0-18: seen again (hidden in a container) */
             if (grab && Alive(kid) && ct_buf) KidStart(); else kid = 0;
             grab = 0;
             return;
@@ -1373,7 +1407,9 @@ void Ch0Frame(void)
                rattles with them, then it is opened (the game's own door, no sound) and one walks in */
             if (scene >= 30 && scene < 96 && b < 7) sh = (f32)(7 - b) * 9.0f * ((b & 1) ? 1.0f : -1.0f);
             if (d && scene < S_OPEN) *(f32*)(d + 0xA4) = *(f32*)(d + 0x778) + sh * 0.0012f;
-            if (scene == S_OPEN - 8) {               /* C0-14 (user): the three nearest to Ashley come in */
+            if (scene == 2) {                        /* C0-14 (user): the three nearest to Ashley come in; C0-20: picked
+                                                        and taken to the door as soon as she has the key (a far one,
+                                                        put there only just before the door opened, came in late) */
                 int j;
                 ins[0] = ins[1] = ins[2] = 0;
                 for (j = 0; j < 3; j++) {
@@ -1386,23 +1422,28 @@ void Ch0Frame(void)
                         if (dx * dx + dz * dz < best) { best = dx * dx + dz * dz; in = k + 1; }
                     }
                     ins[j] = (u8)in;
-                    if (in) {
-                        Guard* g = &gd[in - 1];
-                        u8* e = g->e;
-                        f32 ox = j == 0 ? 0.0f : j == 1 ? -650.0f : 650.0f, oz = (f32)j * 700.0f;
-                        *(f32*)(e + 0x94) = *(f32*)(e + 0x110) = DOOR_OUT_X + ox;
-                        *(f32*)(e + 0x98) = *(f32*)(e + 0x114) = 0.0f;
-                        *(f32*)(e + 0x9C) = *(f32*)(e + 0x118) = DOOR_OUT_Z + oz;
-                        *(f32*)(e + 0xA4) = 3.02f;
-                        *(u32*)e &= ~0x800u;                 /* C0-17: a far one may be suspended: wake it */
-                        if (e[0xFC] != 1) { e[0xFC] = 1; e[0xFD] = 1; e[0xFE] = 0; e[0xFF] = 0; }
-                        g->role = R_DOOR; g->ax = DOOR_IN_X - 1200.0f + 1700.0f * (f32)(j & 1); g->az = DOOR_IN_Z - 1800.0f - 900.0f * (f32)(j == 2);
-                        g->leg = 0; g->meter = 0.6f;
-                        Hold(g);
-                    }
                 }
                 door_in = ins[0];
                 if (!ins[0] && !Alive(hman)) hman = HouseGanado(DOOR_OUT_X, DOOR_OUT_Z, 3.02f);
+            }
+            if ((scene >= 2 && scene <= 12) || (scene >= S_OPEN - 8 && scene <= S_OPEN - 2)) {   /* at the door (again
+                just before it opens). C0-20: held there several frames: one far away was put back on its way by
+                the collision (it slides from where it was) and came in after the scene */
+                int j;
+                for (j = 0; j < 3; j++) if (ins[j] && Alive(gd[ins[j] - 1].e)) {
+                    Guard* g = &gd[ins[j] - 1];
+                    u8* e = g->e;
+                    f32 ox = j == 0 ? 0.0f : j == 1 ? -650.0f : 650.0f, oz = (f32)j * 700.0f;
+                    *(f32*)(e + 0x94) = *(f32*)(e + 0x110) = DOOR_OUT_X + ox;
+                    *(f32*)(e + 0x98) = *(f32*)(e + 0x114) = 0.0f;
+                    *(f32*)(e + 0x9C) = *(f32*)(e + 0x118) = DOOR_OUT_Z + oz;
+                    *(f32*)(e + 0xA4) = 3.02f;
+                    *(u32*)e &= ~0x800u;                 /* C0-17: a far one may be suspended: wake it */
+                    if (e[0xFC] != 1) { e[0xFC] = 1; e[0xFD] = 1; e[0xFE] = 0; e[0xFF] = 0; }
+                    g->role = R_DOOR; g->ax = DOOR_IN_X - 1200.0f + 1700.0f * (f32)(j & 1); g->az = DOOR_IN_Z - 1800.0f - 900.0f * (f32)(j == 2);
+                    g->leg = 0; g->meter = 0.6f; g->det = 0;
+                    Hold(g);
+                }
             }
             if (scene == S_OPEN && d) {
                 Vec p;
