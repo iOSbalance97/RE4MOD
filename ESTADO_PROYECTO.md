@@ -796,3 +796,4 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   (perseguidor a 1,25 m, de frente, ±0,7 rad → R1 0x33; gcool 90 f); tras Restart espera a Ashley en rpos con FC 0
   (ROOM no cambia en la recarga); marcadores solo con g->vis; pad.c quita Y y Z con Ashley en el capítulo
   (Ch0On); ch0.c a -Oz (4,5 KB libres).
+- **C0-24**: marcadores otra vez sin g->vis (el usuario los quiere a través de paredes). Latas descartadas.

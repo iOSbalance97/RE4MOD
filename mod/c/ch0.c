@@ -649,7 +649,7 @@ int Ch0Mark(int k, f32* x, f32* y, f32* z)
     if (!Alive(g->e) || g->e[0xFC] != 1) return 0;
     *x = *(f32*)(g->e + 0x94); *y = *(f32*)(g->e + 0x98) + 2050.0f; *z = *(f32*)(g->e + 0x9C);
     if (g->st == G_CHASE) return 100;
-    if (g->meter < 0.03f || !g->vis) return 0;       /* C0-23: only one that can see her (no dots through floors / walls) */
+    if (g->meter < 0.03f) return 0;
     return (int)(g->meter * 99.0f) + 1;
 }
 /* C0-18: the island's containers (r310) in place of the barrels, each along the nearest wall (tools: the walls of
