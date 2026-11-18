@@ -791,4 +791,8 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
 - **C0-22**: escena del camino a 3,2 m; caída = pl11 0x32 (20 f) + 0x33 (28 f) sentada (0x6A bajaba 4,4 m);
   embestida sin SEQ; PL_LIFE también durante la captura; WinCam solo con R1 8/0x0C/0x0E/0x13 (no correr) y en
   todos los saltos; captura: Be_flg 0x08000000 a los que persiguen (em10CatchPLRtnCk: pWeapon sin esa bandera
-  solo deja Wep 9). DOL: 544 B libres.
+  solo deja Wep 9). DOL: 544 B libres. OJO: 0x08000000 = "a por la compañera": con pSUB 0 rompe (C0-23).
+- **C0-23**: sin Be_flg 0x08000000 (em10NeckMove leía pSUB 0 → 0x34, PC 0x80074A04); captura iniciada por ch0.c
+  (perseguidor a 1,25 m, de frente, ±0,7 rad → R1 0x33; gcool 90 f); tras Restart espera a Ashley en rpos con FC 0
+  (ROOM no cambia en la recarga); marcadores solo con g->vis; pad.c quita Y y Z con Ashley en el capítulo
+  (Ch0On); ch0.c a -Oz (4,5 KB libres).

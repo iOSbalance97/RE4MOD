@@ -23,7 +23,8 @@ static u32 prev_raw;
 extern int barn_padlock;                    /* barn.c */
 extern int ch0_padlock, ch0_stick;          /* ch0.c: chapter 0 intro (no input / a forced stick) */
 extern s8 ch0_sx, ch0_sy;
-extern int ch0_btn;                          /* C0-12: buttons held for her in a scene */
+extern int ch0_btn;
+int Ch0On(void);                          /* C0-12: buttons held for her in a scene */
 u16 barn_pad;                               /* the remapped buttons before barn.c's lock */
 
 void PadRemap(void)
@@ -81,6 +82,7 @@ void PadRemap(void)
         if (l3) out |= PAD_B;
         if (r3) out |= PAD_Z;
         if (StealthKilling()) { out = StealthPad(0); p->stickX = p->stickY = 0; p->substickX = p->substickY = 0; }
+        if (G8(0x4FC4) == 1 && Ch0On()) out &= ~(PAD_Y | PAD_Z);   /* C0-23: chapter 0: no case, no map */
     }
     prev_raw = p->button;
     barn_pad = (u16)out;

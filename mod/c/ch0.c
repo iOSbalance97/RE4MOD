@@ -109,6 +109,9 @@ static u8* ct_buf;                                  /* C0-18/19: container + cli
 static int hs, ht;                                   /* C0-19: hopping in (1) / out (3); frame */
 static u8* kid;                                      /* C0-19: the one carrying her off */
 static int scene_r, wcam;                            /* C0-21: the road guard's capture; the window jump's camera */
+static Vec* rpos;                                    /* C0-23: after a restart, where she must be before play goes on */
+static u8 gcool[16];                                 /* C0-23: frames until a guard may grab again */
+int Ch0On(void) { return on; }
 void ClipApply(const s16* tab, int n, f32 f, f32 k, int xz);  /* crouch.c */
 #define ATARI_PL (*(u16*)(pPL + 0x2B4 + 0x1A))     /* atari.m_flag: 0x300 = collides with characters */
 static int scene_n, watch_on, rw, kwait;
@@ -646,7 +649,7 @@ int Ch0Mark(int k, f32* x, f32* y, f32* z)
     if (!Alive(g->e) || g->e[0xFC] != 1) return 0;
     *x = *(f32*)(g->e + 0x94); *y = *(f32*)(g->e + 0x98) + 2050.0f; *z = *(f32*)(g->e + 0x9C);
     if (g->st == G_CHASE) return 100;
-    if (g->meter < 0.03f) return 0;
+    if (g->meter < 0.03f || !g->vis) return 0;       /* C0-23: only one that can see her (no dots through floors / walls) */
     return (int)(g->meter * 99.0f) + 1;
 }
 /* C0-18: the island's containers (r310) in place of the barrels, each along the nearest wall (tools: the walls of
@@ -1160,6 +1163,8 @@ static void Restart(void)                            /* caught: the room again f
     scene_gate = 0;
     PL_LIFE = PL_LIFE_MAX;
     ready = 0; scene = 0; caught = 0; ch0_padlock = 1;
+    rpos = cp ? &kpos : &apos;                       /* C0-23: the same room: ROOM is 0x11 all through the load, so wait
+                                                        for her at the start (else her old state caught her again) */
     ROOM_JUMP(0x111, cp ? &kpos : &apos, cp ? &krot : &arot, 0);
 }
 
@@ -1406,8 +1411,9 @@ void Ch0Frame(void)
     SayTick();
     if (!ready) {                                    /* still loading: keep it black and still */
         ch0_padlock = 1; ch0_stick = 0;
-        if (Ashley() && (ph != 3 || ROOM == 0x12)) {
-            ready = 1; t = 0;
+        if (rpos && pPL && D2(rpos->x, rpos->z) > 1200.0f * 1200.0f) return;
+        if (Ashley() && (ph != 3 || ROOM == 0x12) && (!rpos || pPL[0xFC] == 0)) {
+            ready = 1; t = 0; rpos = 0;
             if (ph == 0) Hud(0); else { ch0_padlock = 0; Hud(1); }
             if (ph == 1 && stage >= 1) Runners(0);
             if (ph == 1 && watch_on && !Alive(gd[G_WATCH].e)) { WatchSpawn(PATS[0].x[0], PATS[0].z[0], -1.571f); Patrol(G_WATCH, 1); }
@@ -1492,9 +1498,23 @@ void Ch0Frame(void)
                 u8* e = j < NG ? gd[j].e : hman;
                 if (!Alive(e)) continue;
                 if (e[0xA92] == 7) e[0xA92] = 0;
-                /* C0-22 (user: they came up and did nothing): em10CatchPLRtnCk wants no pWeapon or Be_flg 0x08000000
-                   (+0x3E0); a chaser gets it (Native clears it again when it stops chasing) */
-                if (j < NG ? gd[j].st == G_CHASE : (*(u32*)(e + 0x3C8) & 1u) != 0) *(u32*)(e + 0x3E0) |= 0x08000000u;
+                if (gcool[j]) gcool[j]--;
+                /* C0-23: em10CatchPLRtnCk never grabs with something in the hand (pWeapon) unless Be_flg 0x08000000,
+                   and that bit means "after the partner": with no partner (pSUB 0) em10NeckMove read 0x34 (the warning
+                   in the video, PC 0x80074A04). So the grab is started here: a chaser at arm's length in front of her
+                   goes to Catch (R1 0x33); its br_Catch sends it on to 0x66 (mkfiles.py) = the carrying off */
+                if ((j < NG ? gd[j].st == G_CHASE : e[0xFD] != 1) && e[0xFC] == 1 && e[0xFD] != 0x33 && e[0xFD] != 0x66
+                    && !gcool[j] && pPL[0xFC] == 0 && !hs && !hidden && !scene && !scene_x && !scene_n && !scene_gate) {
+                    f32 dx = PX() - *(f32*)(e + 0x94), dz = PZ() - *(f32*)(e + 0x9C), dy = PY() - *(f32*)(e + 0x98);
+                    f32 da = Atan2f(dx, dz) - *(f32*)(e + 0xA4);
+                    while (da > 3.14159265f) da -= 6.2831853f;
+                    while (da < -3.14159265f) da += 6.2831853f;
+                    if (dx * dx + dz * dz < 1250.0f * 1250.0f && dy < 300.0f && dy > -300.0f && da < 0.7f && da > -0.7f) {
+                        *(f32*)(e + 0xA4) += da;
+                        e[0xFD] = 0x33; e[0xFE] = 0; e[0xFF] = 0;
+                        gcool[j] = 90;
+                    }
+                }
             }
         }
         if (RoadScene()) return;
