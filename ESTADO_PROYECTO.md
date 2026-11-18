@@ -780,3 +780,11 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
 - **C0-20**: captura con el agarre real (em17 REL .text 0x1D670: R1 0x36 → 0x66), Ashley visible dentro del contenedor,
   se levanta antes de saltar, escena de la puerta sur también en la puerta de la casa, OtNext con comprobación
   de puntero (cuelgue 0x802CFB1C al cargar), rodeo con Clear() (SatMgr 0x8027DE28), miedo tras la ventana.
+- **C0-21** (cierre del pueblo): giro animado dentro del contenedor (hs 2, fila HD_OUT); antorcha sin ataque
+  (em+0xA92 Wep_type 7 → 0 cada fotograma); vida llena (PL_LIFE) contra el cuelgue del continuar; OtNext con tope;
+  miedo con piernas juntas (mkhide.py _knees_in); caída pl11 0x6A en el disco (HD_FALL 340); RoadScene: el del
+  camino gira, anda, Ashley cae (SndCall 1/52 y 1/67), cámara atrás, embestida ARC 0x86/0x87 por R1 0x66 → caught;
+  escena norte con pausa (45) y cámara interpolada; pad.c sin agacharse con ch0_padlock; cajas SMD 43 en BLK0/BLK3
+  (escala x en +0x18, ángulo 0); escalera de la plaza (ETS id 8) enterrada, la trasera (-4939, -17683) dispara
+  scene_gate; WinCam (cámara exterior en el salto por la ventana, pasa a OutScene); ganados congelados en
+  scene_gate / scene_r. DOL: 800 B libres.
