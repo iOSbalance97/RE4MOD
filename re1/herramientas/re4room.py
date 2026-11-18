@@ -254,6 +254,29 @@ def main():
     base = os.path.dirname(a.obj)
     V = place(V, a.colocar, a.escala)
     texnames = sorted({mats[m] for m in set(M) if mats.get(m)})
+    # límite del juego: el índice de textura de una parte es de 1 byte (0xFF = ninguna) -> color + alfa <= 254.
+    # Si se pasa, las texturas menos vistas (por área) usan la más parecida (color medio) de las que quedan.
+    M = np.asarray(M, dtype=object)
+    area = np.linalg.norm(np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]), axis=1)
+    uso = {t: 0.0 for t in texnames}
+    for m in set(M):
+        if mats.get(m): uso[mats[m]] += float(area[M == m].sum())
+    info = {}
+    for t in texnames:
+        im_, has_a_ = prep_texture(os.path.join(base, t), a.tex_max)      # mismo criterio de alfa que al codificar
+        im = np.asarray(im_.convert('RGBA'), float)
+        info[t] = (im[..., :3].mean((0, 1)), bool(has_a_))
+    vivas = sorted(texnames, key=lambda t: -uso[t]); cambio = {}
+    while len(vivas) + sum(info[t][1] for t in vivas) > 254:
+        t = vivas.pop()
+        pares = [k for k in vivas if info[k][1] == info[t][1]] or vivas
+        cambio[t] = min(pares, key=lambda k: np.linalg.norm(info[k][0] - info[t][0]))
+    if cambio:
+        for t in list(cambio):
+            while cambio[t] in cambio: cambio[t] = cambio[cambio[t]]
+        mats = {m: cambio.get(tx, tx) if tx else tx for m, tx in mats.items()}
+        print(f'texturas: {len(texnames)} -> {len(vivas)} (las {len(cambio)} menos vistas usan la más parecida)')
+        texnames = sorted(vivas)
     tex_id = {t: i for i, t in enumerate(texnames)}
     images = []; alpha_tex = {}
     for t in texnames:

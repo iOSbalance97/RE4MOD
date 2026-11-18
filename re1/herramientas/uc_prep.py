@@ -8,8 +8,22 @@ r = sys.argv[1]
 src = f'/home/claude/uc/obj/{r}'; dst = f'/home/claude/uc/m/{r}'
 os.makedirs(dst, exist_ok=True)
 V, T, F, M, G, mats = objload.load(f'{src}/sala.obj')
+texdir = {m: src for m in mats}
+# objetos colocados (puertas, muebles...) de ucobjs.py, ya en coordenadas del mundo de UC
+for ob in (f'/home/claude/uc/objs/{r}/objetos.obj', f'/home/claude/uc/objs/{r}/relleno.obj'):
+  if os.path.exists(ob):
+      V2, T2, F2_, M2_, G2, mats2 = objload.load(ob)
+      F2_ = F2_.copy(); F2_[:, :3] += len(V); F2_[:, 3:] += len(T)
+      V = np.concatenate([V, V2]); T = np.concatenate([T, T2]); F = np.concatenate([F, F2_])
+      M = np.concatenate([np.asarray(M, dtype=object), np.asarray(M2_, dtype=object)])
+      for m, t in mats2.items(): mats[m] = t; texdir[m] = os.path.dirname(ob)
+      print(r, 'objetos añadidos:', len(F2_), 'triángulos')
 ymax = V[F[:, :3]][:, :, 1].max(1)
-keep = V[F[:, :3]][:, :, 1].min(1) > -1.0   # el reflejo es una copia invertida bajo y=0: fuera todo lo que baja del suelo
+# el reflejo del suelo son modelos aparte (rNNN_MirrorModel / _mirror / _Mirror): fuera por nombre, no por altura
+import glob, re
+partes = sorted(o for o in glob.glob(f'{src}/*.obj') if not o.endswith('/sala.obj'))
+espejo = {f'p{k}' for k, o in enumerate(partes) if 'mirror' in os.path.basename(o).lower()}
+keep = np.array([re.match(r'(p\d+)m', str(m)) is None or re.match(r'(p\d+)m', str(m)).group(1) not in espejo for m in M])
 F2, M2 = F[keep], M[keep]
 with open(f'{dst}/sala.obj', 'w') as f:
     f.write('mtllib sala.mtl\n')
@@ -26,5 +40,5 @@ with open(f'{dst}/sala.mtl', 'w') as f:
         f.write(f'newmtl {m}\nKd 1 1 1\n')
         if t:
             f.write(f'map_Kd {t}\n')
-            if not os.path.exists(f'{dst}/{t}'): shutil.copy(f'{src}/{t}', f'{dst}/{t}')
-print(r, 'triángulos', len(F), '->', len(F2), 'sin reflejo')
+            if not os.path.exists(f'{dst}/{t}'): shutil.copy(f'{texdir[m]}/{t}', f'{dst}/{t}')
+print(r, 'triángulos', len(F), '->', len(F2), 'sin los modelos de reflejo', sorted(espejo))
