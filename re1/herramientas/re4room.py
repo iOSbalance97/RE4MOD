@@ -122,7 +122,8 @@ def prep_texture(path, tex_max):
     w, h = im.size
     s = 1.0
     while max(w, h) * s > tex_max: s /= 2
-    nw, nh = max(8, int(w * s)), max(8, int(h * s))
+    p2 = lambda n: 1 << max(3, int(round(np.log2(max(n, 1)))))   # GX repite solo en potencias de 2
+    nw, nh = min(p2(w * s), tex_max), min(p2(h * s), tex_max)
     if (nw, nh) != (w, h):
         im = im.resize((nw, nh), Image.LANCZOS)
     alpha = np.asarray(im)[..., 3]
