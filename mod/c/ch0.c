@@ -138,6 +138,8 @@ static const f32 KEYP[3] = { 2400.0f, 3965.0f, -8450.0f };   /* on the bed (its 
 static Vec fpos = { -19691.0f, 0.0f, -19088.0f }, frot = { 0.0f, 0.988f, 0.0f };
 #define EX (-4050.0f)                                /* r112's way down to the cemetery (r118): the end */
 #define EZ 51612.0f
+#define IRON_X (-9239.0f)                            /* the iron door (ETS id 13) */
+#define IRON_Z 42598.0f
 static int talk_t;                                   /* the message on screen: frames left */
 static int door_in;                                  /* C0-10: gd index + 1 of the one who comes in */
 static u32 talk_attr;
@@ -231,7 +233,7 @@ void Ch0EmList(void)
 {
     int i, k = 0;
     if (!on || !pG || STAGE != 1) return;
-    if (ROOM == 0x12 || ROOM == 0x18) {              /* C0-10: the road to the church, empty for now; C0-25: the cemetery too */
+    if (ROOM == 0x12) {                              /* C0-10: the road to the church, empty for now */
         for (i = 0; i < 256; i++) {
             u8* e = EMLIST(i);
             if (*(u16*)(e + 0x18) == 0x100 + ROOM) { e[0] = 0; e[1] = 0; }
@@ -265,7 +267,7 @@ void Ch0EmList(void)
     memclr_asm(gd, sizeof(gd));
 }
 
-static int Ashley(void) { return pPL && PLTYPE == 1 && STAGE == 1 && (ROOM == 0x11 || ROOM == 0x12 || ROOM == 0x18); }
+static int Ashley(void) { return pPL && PLTYPE == 1 && STAGE == 1 && (ROOM == 0x11 || ROOM == 0x12); }
 static int Alive(u8* e) { return e && (u32)e >= 0x80000000u && (u32)e < 0x81800000u && (*(u32*)e & 0x201) == 1; }
 
 static u8* EmFind(int no)                            /* the live work made from list entry `no` */
@@ -749,7 +751,7 @@ static void HideFrame(u16 trg)
 int Ch0Card(void) { if (!on || !card) return 0; return card == 1 ? (card_t < 12 ? card_t * 255 / 12 : 255) : 255 - card_t * 255 / 12; }
 int Ch0Hide(void)
 {
-    if (on && ready && ph == 3) return doc ? 0 : prompt;   /* C0-25: 3 open, 4 touch, 5 use, 6 read */
+    if (on && ready && ph == 3) return doc || talk_t > 0 ? 0 : prompt;   /* C0-26: not over a message */   /* C0-25: 3 open, 4 touch, 5 use, 6 read */
     if (!on || !ready || ph != 1 || scene || scene_n || scene_gate || scene_r || caught || card) return 0;
     if (key && D2(BX, BZ) < 2500.0f * 2500.0f) return 3;     /* C0-12: door B: Cross to open */
     return hs ? 0 : hidden ? 2 : (HideSpot() >= 0 ? 1 : 0);
@@ -772,10 +774,14 @@ static void Areas(void)
     if (!pS) return;
     for (p = OtNext(pS + 140); p && n < 400; p = OtNext(p), n++) {
         f32* q = (f32*)(p + 0x14); f32 cx, cz; u8 at = p[0x4A];
-        if (p[0x35] == 1) { if (!(ROOM == 0x12 && p[0x36] == 1)) p[0x34] &= ~1; continue; }   /* doors; C0-25: r112's way
-                                                                               down to the cemetery (r118) is the game's */
-        if (ROOM != 0x11) { if (p[0x35] == 8 || p[0x35] == 5) p[0x34] &= ~1; continue; }   /* C0-25: no saving (the typewriter is
-                                                                               ours), r118's grave lines are Leon's */
+        if (p[0x35] == 1) { p[0x34] &= ~1; continue; }                     /* doors */
+        if (ROOM != 0x11) {                          /* C0-25: no saving (the typewriter is ours); C0-26: the iron door's
+                                                        own "Abrir" off until the candles are done */
+            if (p[0x05] == 1) { cx = (q[0] + q[2] + q[4] + q[6]) * 0.25f; cz = (q[1] + q[3] + q[5] + q[7]) * 0.25f; }
+            else { cx = q[0]; cz = q[1]; }
+            if (p[0x35] == 8 || (!fire_ok && (cx - IRON_X) * (cx - IRON_X) + (cz - IRON_Z) * (cz - IRON_Z) < 3000.0f * 3000.0f)) p[0x34] &= ~1;
+            continue;
+        }
         if (key || p[0x35] == 0x10 || at == 2 || at == 4 || at == 5 || at == 26) continue;
         if (*(f32*)(p + 0x08) < 2500.0f) continue;                          /* upstairs only */
         if (p[0x05] == 1) { cx = (q[0] + q[2] + q[4] + q[6]) * 0.25f; cz = (q[1] + q[3] + q[5] + q[7]) * 0.25f; }
@@ -1029,7 +1035,7 @@ static void ContPush(void)                           /* she can't walk into one 
 void Ch0Ita(u8* aev, u8* ita)
 {
     int i, n;
-    if (!on || !pG || STAGE != 1 || !ita || (ROOM != 0x11 && ROOM != 0x12 && ROOM != 0x18)) return;
+    if (!on || !pG || STAGE != 1 || !ita || (ROOM != 0x11 && ROOM != 0x12)) return;
     if (ROOM == 0x11 && aev) SmdBoxes(aev);
     if (ita[0] != 'I' || ita[1] != 'T' || ita[2] != 'A') return;
     n = *(u16*)(ita + 6);
@@ -1398,21 +1404,19 @@ static int RoadScene(void)                           /* 1 while it runs */
 }
 
 /* C0-25 (user): Part 2. Through door B there is no way back (r112's door to the village is off) and no saving: the
- * typewriter only gets "Vaya máquina más antigua...". Down to the cemetery (r118, the game's own door): on the way
- * up to the gate by the blue torches stand six candles (r118 SMD mesh 79, numbered along the way up); a paper
- * between the torches reads "El orden del fuego ... 325.416": touching them 3, 2, 5, 4, 1, 6 opens the gate; past
- * it is the church (Part 3: for now the end of the test). */
-static const f32 CANDLE[6][3] = { { -14194.0f, 5462.0f, -31235.0f }, { -12092.0f, 5658.0f, -19887.0f },
-    { -6505.0f, 6639.0f, -28663.0f }, { -2034.0f, 8027.0f, -26529.0f }, { 5144.0f, 9736.0f, -24796.0f },
-    { 9141.0f, 10858.0f, -21318.0f } };
+ * typewriter only gets "Vaya máquina más antigua...". C0-26 (user's video: the puzzle is not in the cemetery but in
+ * r112's cellar, down the ladder by the typewriter): along the tunnel stand six candles (r112 SMD mesh 26, numbered
+ * as she meets them), the last by the iron door (ETS id 13) beside the blue torches (SMD mesh 31); on the wall
+ * between those torches a paper: "El orden del fuego ... 325.416". Touching the candles 3, 2, 5, 4, 1, 6 unlocks the
+ * iron door; past it the way down to the church (r118) ends the test (Part 3). */
+static const f32 CANDLE[6][3] = { { -17885.0f, -5290.0f, 392.0f }, { -9843.0f, -7951.0f, 7648.0f },
+    { -9608.0f, -7493.0f, 14145.0f }, { -3085.0f, -7550.0f, 25904.0f }, { -6861.0f, -7871.0f, 29331.0f },
+    { -10950.0f, -7516.0f, 42105.0f } };
 static const u8 FIRE[6] = { 3, 2, 5, 4, 1, 6 };
 #define TW_X (-16428.0f)                             /* r112's typewriter (AEV 4, save) */
 #define TW_Z (-15836.0f)
-#define GATE_X 12086.0f                              /* between the torches (ETS id 20 at z -19918 / -15649) */
-#define GATE_Z0 (-19700.0f)
-#define GATE_Z1 (-15850.0f)
-#define DOC_X 11250.0f
-#define DOC_Z (-19100.0f)
+#define DOC_X (-12500.0f)                            /* where she stood, facing the wall between the blue torches */
+#define DOC_Z 37834.0f
 static int Part2Near(f32 x, f32 z, f32 r) { return D2(x, z) < r * r && pPL[0xFC] == 0 && pPL[0xFD] <= 3; }
 static void Part2(u16 trg)
 {
@@ -1423,41 +1427,40 @@ static void Part2(u16 trg)
         if (doc > 20 && (trg & PAD_A)) { doc = 0; ch0_padlock = 0; }
         return;
     }
-    if (ROOM == 0x12) {
-        if (Part2Near(TW_X, TW_Z, 1500.0f)) {
-            prompt = 5;
-            if ((trg & PAD_A) && talk_t <= 0) Say(MSG_TYPEW, 150);
-        }
+    if (ROOM != 0x12) return;
+    if (fire_ok && D2(EX, EZ) < 2500.0f * 2500.0f && pPL[0xFC] == 0) { ph = 2; endt = 0; ch0_padlock = 1; Hud(0); return; }
+    if (!fire_ok && PY() < -6000.0f && PX() > IRON_X + 1500.0f && PZ() > IRON_Z - 3000.0f && PZ() < IRON_Z + 6000.0f) {
+        *(f32*)(pPL + 0x94) = -10449.0f; *(f32*)(pPL + 0x9C) = 42124.0f;   /* through it before the candles: back */
+        Say(MSG_SHUT, 90);
+    }
+    if (Part2Near(TW_X, TW_Z, 1500.0f)) {
+        prompt = 5;
+        if ((trg & PAD_A) && talk_t <= 0) Say(MSG_TYPEW, 150);
         return;
     }
-    if (ROOM != 0x18) return;
-    if (!fire_ok && PY() > 9000.0f && PZ() > GATE_Z0 - 600.0f && PZ() < GATE_Z1 + 600.0f && PX() > GATE_X - 700.0f && PX() < GATE_X + 1500.0f)
-        *(f32*)(pPL + 0x94) = GATE_X - 700.0f;      /* shut: she stops before it */
-    if (fire_ok && PX() > GATE_X + 800.0f && PZ() > GATE_Z0 - 2000.0f && PZ() < GATE_Z1 + 2000.0f && PY() > 9000.0f) {
-        ph = 2; endt = 0; ch0_padlock = 1; Hud(0); return;   /* through: on to the church (Part 3) */
-    }
-    if (Part2Near(DOC_X, DOC_Z, 900.0f)) {
+    if (Part2Near(DOC_X, DOC_Z, 1000.0f)) {
         prompt = 6;
-        if (trg & PAD_A) { doc = 1; ch0_padlock = 1; }
+        if (trg & PAD_A) { doc = 1; ch0_padlock = 1; if (talk_t > 0) { talk_t = 1; SayTick(); } }
         return;
     }
-    if (!fire_ok && Part2Near(GATE_X - 700.0f, (GATE_Z0 + GATE_Z1) * 0.5f, 1600.0f)) {
-        prompt = 3;
-        if ((trg & PAD_A) && talk_t <= 0) Say(MSG_SHUT, 90);
-        return;
-    }
-    for (i = 0; i < 6; i++) {
+    for (i = 0; i < 6 && !fire_ok; i++) {
         f32 dy = PY() - CANDLE[i][1];
         if (dy < -1800.0f || dy > 600.0f) continue;
-        if (Part2Near(CANDLE[i][0], CANDLE[i][2], 1300.0f)) { best = i; break; }
+        if (Part2Near(CANDLE[i][0], CANDLE[i][2], 1100.0f)) { best = i; break; }
     }
-    if (best < 0 || fire_ok) return;
-    prompt = 4;
-    if (!(trg & PAD_A)) return;
-    if (best + 1 == FIRE[fire_n]) fire_n++;          /* the next in the order */
-    else fire_n = best + 1 == FIRE[0] ? 1 : 0;       /* wrong: from the start */
-    if (fire_n >= 6) { fire_ok = 1; Say(MSG_CLICK, 120); }
-    else Say(MSG_FLAME, 60);
+    if (best >= 0) {
+        prompt = 4;
+        if (!(trg & PAD_A) || talk_t > 0) return;
+        if (best + 1 == FIRE[fire_n]) fire_n++;      /* the next in the order */
+        else fire_n = best + 1 == FIRE[0] ? 1 : 0;   /* wrong: from the start */
+        if (fire_n >= 6) { fire_ok = 1; Say(MSG_CLICK, 120); }
+        else Say(MSG_FLAME, 60);
+        return;
+    }
+    if (!fire_ok && Part2Near(IRON_X, IRON_Z, 1700.0f)) {   /* the game's own "Abrir" is off until then */
+        prompt = 3;
+        if ((trg & PAD_A) && talk_t <= 0) Say(MSG_SHUT, 90);
+    }
 }
 int Ch0Doc(void) { return on && ph == 3 && doc ? (doc < 10 ? doc * 25 : 250) : 0; }
 
@@ -1481,7 +1484,7 @@ void Ch0Frame(void)
     if (!ready) {                                    /* still loading: keep it black and still */
         ch0_padlock = 1; ch0_stick = 0;
         if (rpos && pPL && D2(rpos->x, rpos->z) > 1200.0f * 1200.0f) return;
-        if (Ashley() && (ph != 3 || ROOM == 0x12 || ROOM == 0x18) && (!rpos || pPL[0xFC] == 0)) {
+        if (Ashley() && (ph != 3 || ROOM == 0x12) && (!rpos || pPL[0xFC] == 0)) {
             ready = 1; t = 0; rpos = 0;
             if (ph == 0) Hud(0); else { ch0_padlock = 0; Hud(1); }
             if (ph == 1 && stage >= 1) Runners(0);
@@ -1746,8 +1749,8 @@ int Ch0Text(int k)
         return 0;
     }
     if (k == 6 && caught) return Ramp(110, 130, cap_t);
-    if (k == 7 && ph == 2 && ROOM != 0x18) return Ramp(100, 120, endt);
-    if (k == 8 && ph == 2 && ROOM == 0x18) return Ramp(100, 120, endt);   /* C0-25: end of Part 2 */
+    if (k == 7 && ph == 2 && !fire_ok) return Ramp(100, 120, endt);
+    if (k == 8 && ph == 2 && fire_ok) return Ramp(100, 120, endt);   /* C0-25: end of Part 2 */
     return 0;
 }
 int Ch0Coords(int i)                                  /* test: Ashley x, y, z; -999999 = off */

@@ -804,3 +804,7 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   puerta entre las antorchas ETS 20 (x 12086) bloqueada hasta resolverlo; papel en (11250, -19100) en HUD propio
   (fuente con 2-6 y '.'); al cruzar → ph 2 "Fin de la Parte 2 (prueba)". PAL: SceAtPtr 0x8015257C, SceAtDataReset
   0x801527C8, SceAtSetEnable 0x80152838 (sin usar aún). Key_flg PAL = pG+0x51E8 (NTSC +0xC).
+- **C0-26** (vídeo del usuario: el acertijo va en el sótano de r112, no en r118): r118 fuera del capítulo otra vez;
+  velas = r112 SMD malla 26 (6 de 7; la 7.ª está pasada la puerta), puerta de hierro ETS 13 (-9239, 42598), sus
+  áreas (<3 m) apagadas hasta resolver; papel en la pared entre las antorchas azules (malla 31) en (-12500, 37834);
+  fin de la prueba en EX/EZ solo con las velas hechas. Aviso de Ch0Hide oculto mientras hay mensaje.
