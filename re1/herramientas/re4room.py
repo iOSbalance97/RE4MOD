@@ -270,8 +270,9 @@ def main():
         import decimate
     groups = []
     stats = dict(tris_in=len(F), tris_out=0)
-    for g in dict.fromkeys(G):
-        sel = G == g
+    GM = np.array([f'{g}\x00{m}' for g, m in zip(G, M)])     # sub-malla = grupo + material (si el OBJ no trae grupos, por material)
+    for g in dict.fromkeys(GM):
+        sel = GM == g
         tn = mats.get(M[sel][0])
         if not tn:
             continue          # sin textura (la que falta): se omite
