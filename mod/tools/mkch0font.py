@@ -14,7 +14,9 @@ CARD = ['Cap\u00edtulo 0 \u2014 Hace 11 horas',
         '\x01 Continuar']
 TEXTS = CARD + ['Hace 11 horas', '“Tengo que salir de aquí.”', 'Está cerrada.',
          'Tiene que haber una llave en algún sitio.', '\x01 Coger la llave', 'Has cogido la llave.',
-         'Ashley ha sido capturada', 'Fin de la Parte 1 (prueba)', 'La puerta se abre.', '\x01 Esconderse', '\x01 Salir', '!']
+         'Ashley ha sido capturada', 'Fin de la Parte 1 (prueba)', 'La puerta se abre.', '\x01 Esconderse', '\x01 Salir', '!',
+         'El orden del fuego', 'En la noche oscura, las velas guiarán tu camino.', '325.416', '\x01 Leer', '\x01 Tocar',
+         '\x01 Usar', 'Fin de la Parte 2 (prueba)']   # C0-25: part 2 (r112 / r118)
 CH = sorted(set(''.join(TEXTS)) - {' '})
 S = 3; SIZE = 18; GH = 24; W = 512   # C0-04: smaller cells (the dol is nearly full); hud.c scales by 4/3
 f = ImageFont.truetype(F, SIZE * S)

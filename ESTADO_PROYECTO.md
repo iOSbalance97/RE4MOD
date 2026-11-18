@@ -797,3 +797,10 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   (ROOM no cambia en la recarga); marcadores solo con g->vis; pad.c quita Y y Z con Ashley en el capítulo
   (Ch0On); ch0.c a -Oz (4,5 KB libres).
 - **C0-24**: marcadores otra vez sin g->vis (el usuario los quiere a través de paredes). Latas descartadas.
+- **C0-25**: captura: IK del juego de Ashley apagado mientras la llevan (Ch0Ik: 0x80 en las raíces con 0x4,
+  restaurado al acabar); mkhide IKBASE (canal 32/160 = giro base del IK) solo para el secuestro. Parte 2: r112 sin
+  puerta de vuelta (AEV 0) ni guardado (AEV 4 id 8; Part2: "Vaya máquina más antigua..."), puerta AEV 1 a r118 del
+  juego; r118 sin enemigos (lista 0x118 vacía) y sin áreas id 5; velas = SMD malla 79 (6), orden FIRE 3 2 5 4 1 6;
+  puerta entre las antorchas ETS 20 (x 12086) bloqueada hasta resolverlo; papel en (11250, -19100) en HUD propio
+  (fuente con 2-6 y '.'); al cruzar → ph 2 "Fin de la Parte 2 (prueba)". PAL: SceAtPtr 0x8015257C, SceAtDataReset
+  0x801527C8, SceAtSetEnable 0x80152838 (sin usar aún). Key_flg PAL = pG+0x51E8 (NTSC +0xC).

@@ -108,6 +108,7 @@ static f32 Sm(f32 x);
 static u8* ct_buf;                                  /* C0-18/19: container + clips (em12.drs, read in Ch0Ita) */
 static int hs, ht;                                   /* C0-19: hopping in (1) / out (3); frame */
 static u8* kid;                                      /* C0-19: the one carrying her off */
+static int prompt, doc, fire_n, fire_ok;            /* C0-25: part 2 (r112 / r118) */
 static int scene_r, wcam;                            /* C0-21: the road guard's capture; the window jump's camera */
 static Vec* rpos;                                    /* C0-23: after a restart, where she must be before play goes on */
 static u8 gcool[16];                                 /* C0-23: frames until a guard may grab again */
@@ -167,7 +168,7 @@ void Ch0Jump(u32* a)
     lpos = *(Vec*)a[1]; lrot = *(Vec*)a[2]; larg = (int)a[3];
     PL_SELECT(1);
     a[0] = 0x111; a[1] = (u32)&apos; a[2] = (u32)&arot;
-    hidden = 0; ch0_crouch_force = 0; card = 0; road_wait = 1; cyc = 0; stage = 0; scene_gate = 0;
+    hidden = 0; ch0_crouch_force = 0; card = 0; road_wait = 1; cyc = 0; stage = 0; scene_gate = 0; fire_n = 0; fire_ok = 0; doc = 0;
     on = 1; ph = 0; t = 0; ready = 0; endt = 0; key = 0; b_seen = 0; cp = 0; caught = 0; scene = 0; door_in = 0; talk_t = 0; ch0_got = 0; cyc2 = 0; scene_n = 0; watch_on = 0; scene_x = 0; x_done = 0; grab = 0; keep_open = 0; win_done = 0;
 }
 
@@ -230,10 +231,10 @@ void Ch0EmList(void)
 {
     int i, k = 0;
     if (!on || !pG || STAGE != 1) return;
-    if (ROOM == 0x12) {                              /* C0-10: the road to the church, empty for now */
+    if (ROOM == 0x12 || ROOM == 0x18) {              /* C0-10: the road to the church, empty for now; C0-25: the cemetery too */
         for (i = 0; i < 256; i++) {
             u8* e = EMLIST(i);
-            if (*(u16*)(e + 0x18) == 0x112) { e[0] = 0; e[1] = 0; }
+            if (*(u16*)(e + 0x18) == 0x100 + ROOM) { e[0] = 0; e[1] = 0; }
         }
         ngidx = 0; hman = 0;
         memclr_asm(gd, sizeof(gd));
@@ -264,7 +265,7 @@ void Ch0EmList(void)
     memclr_asm(gd, sizeof(gd));
 }
 
-static int Ashley(void) { return pPL && PLTYPE == 1 && STAGE == 1 && (ROOM == 0x11 || ROOM == 0x12); }
+static int Ashley(void) { return pPL && PLTYPE == 1 && STAGE == 1 && (ROOM == 0x11 || ROOM == 0x12 || ROOM == 0x18); }
 static int Alive(u8* e) { return e && (u32)e >= 0x80000000u && (u32)e < 0x81800000u && (*(u32*)e & 0x201) == 1; }
 
 static u8* EmFind(int no)                            /* the live work made from list entry `no` */
@@ -748,6 +749,7 @@ static void HideFrame(u16 trg)
 int Ch0Card(void) { if (!on || !card) return 0; return card == 1 ? (card_t < 12 ? card_t * 255 / 12 : 255) : 255 - card_t * 255 / 12; }
 int Ch0Hide(void)
 {
+    if (on && ready && ph == 3) return doc ? 0 : prompt;   /* C0-25: 3 open, 4 touch, 5 use, 6 read */
     if (!on || !ready || ph != 1 || scene || scene_n || scene_gate || scene_r || caught || card) return 0;
     if (key && D2(BX, BZ) < 2500.0f * 2500.0f) return 3;     /* C0-12: door B: Cross to open */
     return hs ? 0 : hidden ? 2 : (HideSpot() >= 0 ? 1 : 0);
@@ -770,7 +772,10 @@ static void Areas(void)
     if (!pS) return;
     for (p = OtNext(pS + 140); p && n < 400; p = OtNext(p), n++) {
         f32* q = (f32*)(p + 0x14); f32 cx, cz; u8 at = p[0x4A];
-        if (p[0x35] == 1) { p[0x34] &= ~1; continue; }                     /* doors */
+        if (p[0x35] == 1) { if (!(ROOM == 0x12 && p[0x36] == 1)) p[0x34] &= ~1; continue; }   /* doors; C0-25: r112's way
+                                                                               down to the cemetery (r118) is the game's */
+        if (ROOM != 0x11) { if (p[0x35] == 8 || p[0x35] == 5) p[0x34] &= ~1; continue; }   /* C0-25: no saving (the typewriter is
+                                                                               ours), r118's grave lines are Leon's */
         if (key || p[0x35] == 0x10 || at == 2 || at == 4 || at == 5 || at == 26) continue;
         if (*(f32*)(p + 0x08) < 2500.0f) continue;                          /* upstairs only */
         if (p[0x05] == 1) { cx = (q[0] + q[2] + q[4] + q[6]) * 0.25f; cz = (q[1] + q[3] + q[5] + q[7]) * 0.25f; }
@@ -1024,7 +1029,7 @@ static void ContPush(void)                           /* she can't walk into one 
 void Ch0Ita(u8* aev, u8* ita)
 {
     int i, n;
-    if (!on || !pG || STAGE != 1 || !ita || (ROOM != 0x11 && ROOM != 0x12)) return;
+    if (!on || !pG || STAGE != 1 || !ita || (ROOM != 0x11 && ROOM != 0x12 && ROOM != 0x18)) return;
     if (ROOM == 0x11 && aev) SmdBoxes(aev);
     if (ita[0] != 'I' || ita[1] != 'T' || ita[2] != 'A') return;
     n = *(u16*)(ita + 6);
@@ -1392,6 +1397,70 @@ static int RoadScene(void)                           /* 1 while it runs */
     return 1;
 }
 
+/* C0-25 (user): Part 2. Through door B there is no way back (r112's door to the village is off) and no saving: the
+ * typewriter only gets "Vaya máquina más antigua...". Down to the cemetery (r118, the game's own door): on the way
+ * up to the gate by the blue torches stand six candles (r118 SMD mesh 79, numbered along the way up); a paper
+ * between the torches reads "El orden del fuego ... 325.416": touching them 3, 2, 5, 4, 1, 6 opens the gate; past
+ * it is the church (Part 3: for now the end of the test). */
+static const f32 CANDLE[6][3] = { { -14194.0f, 5462.0f, -31235.0f }, { -12092.0f, 5658.0f, -19887.0f },
+    { -6505.0f, 6639.0f, -28663.0f }, { -2034.0f, 8027.0f, -26529.0f }, { 5144.0f, 9736.0f, -24796.0f },
+    { 9141.0f, 10858.0f, -21318.0f } };
+static const u8 FIRE[6] = { 3, 2, 5, 4, 1, 6 };
+#define TW_X (-16428.0f)                             /* r112's typewriter (AEV 4, save) */
+#define TW_Z (-15836.0f)
+#define GATE_X 12086.0f                              /* between the torches (ETS id 20 at z -19918 / -15649) */
+#define GATE_Z0 (-19700.0f)
+#define GATE_Z1 (-15850.0f)
+#define DOC_X 11250.0f
+#define DOC_Z (-19100.0f)
+static int Part2Near(f32 x, f32 z, f32 r) { return D2(x, z) < r * r && pPL[0xFC] == 0 && pPL[0xFD] <= 3; }
+static void Part2(u16 trg)
+{
+    int i, best = -1;
+    prompt = 0;
+    if (doc) {                                       /* reading the paper: Cross closes it */
+        ch0_padlock = 1; doc++;
+        if (doc > 20 && (trg & PAD_A)) { doc = 0; ch0_padlock = 0; }
+        return;
+    }
+    if (ROOM == 0x12) {
+        if (Part2Near(TW_X, TW_Z, 1500.0f)) {
+            prompt = 5;
+            if ((trg & PAD_A) && talk_t <= 0) Say(MSG_TYPEW, 150);
+        }
+        return;
+    }
+    if (ROOM != 0x18) return;
+    if (!fire_ok && PY() > 9000.0f && PZ() > GATE_Z0 - 600.0f && PZ() < GATE_Z1 + 600.0f && PX() > GATE_X - 700.0f && PX() < GATE_X + 1500.0f)
+        *(f32*)(pPL + 0x94) = GATE_X - 700.0f;      /* shut: she stops before it */
+    if (fire_ok && PX() > GATE_X + 800.0f && PZ() > GATE_Z0 - 2000.0f && PZ() < GATE_Z1 + 2000.0f && PY() > 9000.0f) {
+        ph = 2; endt = 0; ch0_padlock = 1; Hud(0); return;   /* through: on to the church (Part 3) */
+    }
+    if (Part2Near(DOC_X, DOC_Z, 900.0f)) {
+        prompt = 6;
+        if (trg & PAD_A) { doc = 1; ch0_padlock = 1; }
+        return;
+    }
+    if (!fire_ok && Part2Near(GATE_X - 700.0f, (GATE_Z0 + GATE_Z1) * 0.5f, 1600.0f)) {
+        prompt = 3;
+        if ((trg & PAD_A) && talk_t <= 0) Say(MSG_SHUT, 90);
+        return;
+    }
+    for (i = 0; i < 6; i++) {
+        f32 dy = PY() - CANDLE[i][1];
+        if (dy < -1800.0f || dy > 600.0f) continue;
+        if (Part2Near(CANDLE[i][0], CANDLE[i][2], 1300.0f)) { best = i; break; }
+    }
+    if (best < 0 || fire_ok) return;
+    prompt = 4;
+    if (!(trg & PAD_A)) return;
+    if (best + 1 == FIRE[fire_n]) fire_n++;          /* the next in the order */
+    else fire_n = best + 1 == FIRE[0] ? 1 : 0;       /* wrong: from the start */
+    if (fire_n >= 6) { fire_ok = 1; Say(MSG_CLICK, 120); }
+    else Say(MSG_FLAME, 60);
+}
+int Ch0Doc(void) { return on && ph == 3 && doc ? (doc < 10 ? doc * 25 : 250) : 0; }
+
 static void Leave(void)                              /* C0-10: door B with the key: on to the road to the church */
 {
     int k;
@@ -1412,7 +1481,7 @@ void Ch0Frame(void)
     if (!ready) {                                    /* still loading: keep it black and still */
         ch0_padlock = 1; ch0_stick = 0;
         if (rpos && pPL && D2(rpos->x, rpos->z) > 1200.0f * 1200.0f) return;
-        if (Ashley() && (ph != 3 || ROOM == 0x12) && (!rpos || pPL[0xFC] == 0)) {
+        if (Ashley() && (ph != 3 || ROOM == 0x12 || ROOM == 0x18) && (!rpos || pPL[0xFC] == 0)) {
             ready = 1; t = 0; rpos = 0;
             if (ph == 0) Hud(0); else { ch0_padlock = 0; Hud(1); }
             if (ph == 1 && stage >= 1) Runners(0);
@@ -1425,11 +1494,7 @@ void Ch0Frame(void)
     if (!Ashley()) return;                           /* menus, death screen... */
     t++;
     Areas();
-    if (ph == 3) {                                   /* C0-10: r112, the road to the church */
-        if (ROOM != 0x12) return;
-        if (D2(EX, EZ) < 2500.0f * 2500.0f && pPL[0xFC] == 0) { ph = 2; endt = 0; ch0_padlock = 1; Hud(0); }
-        return;
-    }
+    if (ph == 3) { Part2(trg); return; }             /* C0-25: r112, r118 */
     if (ph == 4) {                                   /* door B: the message, black, r112 */
         endt++;
         ch0_padlock = 1;
@@ -1681,7 +1746,8 @@ int Ch0Text(int k)
         return 0;
     }
     if (k == 6 && caught) return Ramp(110, 130, cap_t);
-    if (k == 7 && ph == 2) return Ramp(100, 120, endt);
+    if (k == 7 && ph == 2 && ROOM != 0x18) return Ramp(100, 120, endt);
+    if (k == 8 && ph == 2 && ROOM == 0x18) return Ramp(100, 120, endt);   /* C0-25: end of Part 2 */
     return 0;
 }
 int Ch0Coords(int i)                                  /* test: Ashley x, y, z; -999999 = off */
@@ -1693,11 +1759,27 @@ int Ch0Coords(int i)                                  /* test: Ashley x, y, z; -
 /* C0-15: the crash when a Ganado grabs playable Ashley (C0-13: write to 0x1C0, PC 0x801925A8): the grab turns on
  * IK for a part whose chain (the next two parts in the list) Ashley's model does not have. Hook at
  * InverseKinematics' entry (PAL 0x80192084): such a part is marked "skip" (IK flag 0x80) before it runs. */
+/* C0-25 (user: her legs bent badly when carried): the game's own leg / arm IK ran on her after the carry clip, pulling
+ * the feet to where her standing motion has them (down on the ground under the Ganado's shoulder). While she is
+ * carried her IK chains are skipped too (0x80), and given back after. */
+static u8* ikoff[4];
 void Ch0Ik(u8* m)
 {
     u8* p;
-    int n = 0;
+    int n = 0, k;
     if (!m || (u32)m < 0x80000000u || (u32)m >= 0x81800000u) return;
+    if (m == pPL) {
+        if (kid && caught) {
+            for (p = *(u8**)(m + 0xF4), k = 0; p && (u32)p >= 0x80000000u && (u32)p < 0x81800000u && n < 96 && k < 4; p = *(u8**)(p + 0xF4), n++) {
+                u32 f = *(u32*)(p + 0x1C0);
+                if (!(f & 4) || (f & 0x80)) continue;
+                *(u32*)(p + 0x1C0) = f | 0x80; ikoff[k++] = p;
+            }
+            return;
+        }
+        for (k = 0; k < 4; k++) if (ikoff[k]) { *(u32*)(ikoff[k] + 0x1C0) &= ~0x80u; ikoff[k] = 0; }
+        n = 0;
+    }
     for (p = *(u8**)(m + 0xF4); p && (u32)p >= 0x80000000u && (u32)p < 0x81800000u && n < 96; p = *(u8**)(p + 0xF4), n++) {
         u32 f = *(u32*)(p + 0x1C0);
         u8* j;

@@ -45,6 +45,7 @@ def pose(vals):
     for i in (9, 15): R[i] = R[PAR[i]] @ L[i]
     for i in (21, 25): R[i] = R[PAR[i]] @ L[i]
     return R, P
+IKBASE = False                                       # C0-25: the IK base turn channels (kind 32 legs, 160 arms)
 def clip(w, src=None):
     m = drs.ent(*(src or (A, OFFS)), w - 4); mf, ch = mot.parse(m); rows = []; roots = []
     for f in range(mf):
@@ -55,6 +56,7 @@ def clip(w, src=None):
             elif c['kind'] == 4: vals[(c['no'], 'pos')] = v
             elif c['kind'] == 1 and c['no'] == 0: mv = np.array(v)
             elif c['kind'] == 64 and c['no'] == 0: vals[(0, 'rot')] = v; ry = v[1]
+            elif IKBASE and c['kind'] in (32, 160) and (c['no'], 'rot') not in vals: vals[(c['no'], 'rot')] = v
         if not any(k == (0, 'rot') for k in vals): ry = 0.0
         R, P = pose(vals)
         e = []
@@ -75,7 +77,9 @@ rin, oin = seq([0x2C, 0x43]); rout, oout = seq([0x45, 0x2C])
 # C0-19: carried off (the Ganado's archive, em17: 0x2A2 the lift onto the shoulder, 0x2A3 held there); her place
 # is set by ch0.c from the Ganado (the takeaway offset), so the root keeps only its height and turn
 _D7, _A7, _N7, _R7, _O7, _T7 = drs.arc('/home/claude/disc/ext1/files/em/em17.drs')
-rkid, okid = seq([0x2A2, 0x2A3], (_A7, _O7)); okid = [[0, r[1], 0, r[3]] for r in okid]
+IKBASE = True    # C0-25 (user: her legs bent the wrong way when carried): the thigh's own turn sets the knee's side
+rkid, okid = seq([0x2A2, 0x2A3], (_A7, _O7)); IKBASE = False
+okid = [[0, r[1], 0, r[3]] for r in okid]
 # C0-19: the intro's scared clip (mkscared.py, was in the DOL) moves here too: its rows and its root height
 import re
 _h = open('/home/claude/re4mod/mod/c/ch0_scared.h').read()

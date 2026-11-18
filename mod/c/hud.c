@@ -538,7 +538,7 @@ int StealthDiag(int i);
 
 void BarnFrame(void);
 void Ch0Frame(void);
-int Ch0Black(void); int Ch0Text(int k); int Ch0Coords(int i);
+int Ch0Black(void); int Ch0Text(int k); int Ch0Coords(int i); int Ch0Doc(void);
 int Ch0Mark(int k, f32* x, f32* y, f32* z); int Ch0Hide(void); int Ch0Card(void);
 void ModFrame(void)
 {
@@ -698,10 +698,10 @@ static void Line(const char* s, f32 cx, f32 y, f32 k, int a)    /* white text wi
 }
 static void Ch0Draw(void)
 {
-    Mtx44 p; Mtx m; int i, a[8], any = 0;
-    int bk = Ch0Black(), cx = Ch0Coords(0), hd = Ch0Hide(), nm = 0, cd = Ch0Card();
+    Mtx44 p; Mtx m; int i, a[9], any = 0;
+    int bk = Ch0Black(), cx = Ch0Coords(0), hd = Ch0Hide(), nm = 0, cd = Ch0Card(), dc = Ch0Doc();
     f32 mx[16], my[16]; int ml[16];
-    for (i = 0; i < 8; i++) { a[i] = Ch0Text(i); any |= a[i]; }
+    for (i = 0; i < 9; i++) { a[i] = Ch0Text(i); any |= a[i]; }
     for (i = 0; i < 16; i++) {                               /* C0-03: the guards' markers, projected */
         f32 x, y, z;
         int lv = Ch0Mark(i, &x, &y, &z);
@@ -717,7 +717,7 @@ static void Ch0Draw(void)
             if (qw > 1.0f) { mx[nm] = 320.0f * (1.0f + qx / qw); my[nm] = 240.0f * (1.0f - qy / qw); ml[nm] = lv; nm++; }
         }
     }
-    if (!bk && !any && cx == -999999 && !hd && !nm && !cd) return;
+    if (!bk && !any && cx == -999999 && !hd && !nm && !cd && !dc) return;
     GXSetAlphaCompare(7, 0, 1, 7, 0); GXSetColorUpdate(1); GXSetAlphaUpdate(0); GXSetCullMode(0);
     C_MTXOrtho(p, 0.0f, 480.0f, 0.0f, 640.0f, 0.0f, -100.0f); GXSetProjection(p, 1);
     PSMTXIdentity(m); GXLoadPosMtxImm(m, 0); GXSetCurrentMtx(0);
@@ -763,9 +763,23 @@ static void Ch0Draw(void)
     if (hd == 1) Line("\x01 Esconderse", 320.0f, 400.0f, 1.0f, 230);
     if (hd == 2) Line("\x01 Salir", 320.0f, 400.0f, 1.0f, 230);
     if (hd == 3) Line("\x01 Abrir", 320.0f, 400.0f, 1.0f, 230);
+    if (hd == 4) Line("\x01 Tocar", 320.0f, 400.0f, 1.0f, 230);   /* C0-25: part 2 */
+    if (hd == 5) Line("\x01 Usar", 320.0f, 400.0f, 1.0f, 230);
+    if (hd == 6) Line("\x01 Leer", 320.0f, 400.0f, 1.0f, 230);
+    if (dc) {                                                /* C0-25: the paper between the blue torches */
+        ModeFlat();
+        Quad(110.0f, 120.0f, 420.0f, 230.0f, (u32)(dc * 215 / 255), 0);
+        Quad(110.0f, 120.0f, 420.0f, 2.0f, 0xC8B89000u | (u32)(dc * 200 / 255), 0);
+        Quad(110.0f, 348.0f, 420.0f, 2.0f, 0xC8B89000u | (u32)(dc * 200 / 255), 0);
+        Line("El orden del fuego", 320.0f, 142.0f, 1.1f, dc);
+        Line("En la noche oscura, las velas guiar\xe1n tu camino.", 320.0f, 205.0f, 0.72f, dc);
+        Line("325.416", 320.0f, 255.0f, 1.2f, dc);
+        Line("\x01 Continuar", 320.0f, 318.0f, 0.8f, dc);
+    }
     if (a[0]) Line("Hace 11 horas", 320.0f, 240.0f - 30.0f, 1.9f, a[0]);
     if (a[6]) Line("Ashley ha sido capturada", 320.0f, 224.0f, 1.3f, a[6]);
     if (a[7]) Line("Fin de la Parte 1 (prueba)", 320.0f, 224.0f, 1.3f, a[7]);
+    if (a[8]) Line("Fin de la Parte 2 (prueba)", 320.0f, 224.0f, 1.3f, a[8]);
     GXSetZMode(1, 3, 1); GXSetAlphaUpdate(1);
 }
 
