@@ -13,7 +13,7 @@ de un pack para *The Movies*) metidas en RE4 GameCube PAL (G4BP08) como si fuera
 - `mkiso_re1.py TAG`: ISO de prueba + parche xdelta sobre la ISO limpia del disco 1.
 - `patches/HNN/`: parches de prueba (H = hall).
 
-Receta de H01 (hall en r102, entrada por la puerta 25 de r101):
+Receta (H02 = esto para r102 y lo mismo con r103 / "-6.2,-6.72,0.3,-47609,12,7084,0.318"):
 ```
 P="-6.2,-6.72,0.3,-19691,0,-19088,-0.584"
 python3 herramientas/re4room.py MainHall/p_RE1_MainHall.obj hall --decimar 0.4 --tex-max 256 --colocar="$P"
