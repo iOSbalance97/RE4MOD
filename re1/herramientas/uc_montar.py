@@ -4,6 +4,7 @@
 - AEV nuevo por sala: solo nuestras puertas (registro de puerta copiado de r101.das, puerta 2 del pueblo)
 uso: uc_montar.py conexiones.json St1_original salida_St1"""
 import json, os, struct, sys
+import numpy as np
 sys.path.insert(0, '/home/claude/tools'); sys.path.insert(0, '/home/claude/re4src/tools'); sys.argv += []
 import drs, re4inject as RI
 CONX, SRC, DST = sys.argv[1:4]
@@ -19,20 +20,39 @@ def plantilla():
     aev = [d for t, d in e if drs.tag_name(t) == 'AEV'][0]
     return bytearray(aev[0x10 + 2 * 0x9C:0x10 + 3 * 0x9C])     # puerta 2: pueblo -> granja
 
+RADIO = 700.0
 TPL = plantilla()
 assert TPL[0x35] == 1 and TPL[0x6D] == 0x03
 
 def door_rec(no, trig, dest_room, pos, ang):
     r = bytearray(TPL)
-    struct.pack_into('>3f', r, 0x08, trig[1] - 300.0, 2600.0, 900.0)     # suelo, alto, radio (cilindro)
-    struct.pack_into('>2f', r, 0x14, trig[0], trig[2])
-    r[0x1C:0x34] = bytes(0x18)
+    # AREA_HIT_DATA en 0x04: be_flag, tipo (1 = XZ4, 2 = cilindro), pad; cuerpo desde 0x08
+    r[4], r[5], r[6], r[7] = 1, 2, 0, 0
+    struct.pack_into('>5f', r, 0x08, trig[1] - 300.0, 2600.0, RADIO, trig[0], trig[2])   # suelo, alto, radio, x, z
+    r[0x1C:0x34] = bytes(0x18)                                                         # pad[6]
     r[0x36] = no
     struct.pack_into('>4f', r, 0x5C, *pos, ang)
     r[0x6C], r[0x6D], r[0x6E], r[0x6F] = 1, dest_room & 0xFF, 0, 0
     return bytes(r)
 
 conx = json.load(open(CONX))
+# llegadas: lejos de TODOS los disparadores de la sala de destino (las puertas saltan solas al pisarlas)
+import pickle
+fl = pickle.load(open('/tmp/fl.pkl', 'rb'))
+LIBRE = 1.3                                            # m entre la llegada y cualquier disparador de esa sala
+for c in conx:
+    for me, m in ((c['a'], c['A']), (c['b'], c['B'])):
+        trigs = np.array([q['trig'] for cc in conx for mm, q in ((cc['a'], cc['A']), (cc['b'], cc['B'])) if mm == me]) / 1000
+        P = fl[me]; cen = np.array(c['centro']) / 1000; old = np.array(m['llegada']) / 1000
+        dt = np.min(np.hypot(P[:, None, 0] - trigs[None, :, 0], P[:, None, 2] - trigs[None, :, 2]), 1)
+        dd = np.hypot(P[:, 0] - cen[0], P[:, 2] - cen[2])
+        for dy, rmax in ((0.6, 3.5), (1.5, 5.0), (2.5, 6.0)):          # escaleras: se admite subir algo
+            ok = (dt > LIBRE) & (np.abs(P[:, 1] - cen[1]) < dy) & (dd < rmax)
+            if ok.any(): break
+        assert ok.any(), (me, c['a'], c['b'])
+        j = np.where(ok)[0][np.argmin(np.abs(dd[ok] - 1.5) + 0.5 * np.hypot(*(P[ok] - old)[:, [0, 2]].T))]
+        q = P[j]; v = q - cen
+        m['llegada'] = [float(x * 1000) for x in q]; m['ang'] = float(np.arctan2(v[0], v[2]))
 os.makedirs(DST, exist_ok=True)
 resumen = []
 for uc, ids in MAPA.items():
@@ -62,4 +82,10 @@ for uc, ids in MAPA.items():
         orig = os.path.getsize(f'{SRC}/{name}.das')
         print(f'{name} <- UC {uc}: {len(recs)} puertas, descomprimido {len(nb)//1024} KB, fichero {len(das)//1024} KB (original {orig//1024} KB)')
         assert len(nb) <= 5800 * 1024, 'sala demasiado grande'
+for uc in MAPA:
+    trigs = [np.array(m['trig']) for c in conx for me, m in ((c['a'], c['A']), (c['b'], c['B'])) if me == uc]
+    arr = [np.array(m['llegada']) for c in conx for me, m in ((c['a'], c['A']), (c['b'], c['B'])) if me == uc]
+    dmin = min(np.hypot(*(a_ - t)[[0, 2]]) for a_ in arr for t in trigs)
+    print(f'  {uc}: llegada más cercana a un disparador {dmin/1000:.2f} m')
+    assert dmin > RADIO + 500, uc
 for uc, o, d in resumen: print(f'  {uc} -> {o} (r{d:03x})')
