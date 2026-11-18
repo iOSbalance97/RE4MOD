@@ -1267,7 +1267,7 @@ static int OutScene(void)
     int k;
     if (!scene_x) {
         static int wj;                               /* C0-20: she went through the roof window (ETS 8, x -938) */
-        if (stage >= 2 && pPL[0xFD] > 2 && D2(-938.0f, -13150.0f) < 2500.0f * 2500.0f) wj = 1;
+        if (stage >= 2 && pPL[0xFD] == 0x0C && D2(-938.0f, -13150.0f) < 2500.0f * 2500.0f) wj = 1;   /* C0-22: the jump over, not the run */
         if (stage < 2 || x_done || scene || pPL[0xFC] != 0 || pPL[0xFD] > 2) { xo = 0; return 0; }
         /* C0-17: out for real: 1.5 m past the house's box and 10 frames like that; C0-20 (user): or right as the
            window jump ends, on the roof side */
@@ -1275,7 +1275,7 @@ static int OutScene(void)
         if (++xo < (wj ? 2 : 10)) return 0;
         wj = 0;
         scene_x = 1; x_done = 1; Hud(0); CrouchOff(); ch0_crouch_force = 0;
-        if (wcam != 2) {                             /* C0-21: from the window jump's camera, eased */
+        if (!wcam) {                                 /* C0-21: from the window jump's camera, eased */
             ncam[0] = PX(); ncam[1] = PY() + 1500.0f; ncam[2] = PZ();
             ncam[3] = PX(); ncam[4] = PY() + 1100.0f; ncam[5] = PZ();
         }
@@ -1299,22 +1299,32 @@ static int OutScene(void)
     return 1;
 }
 
-/* C0-21 (user): the window jump (upstairs onto the roof) had the camera hit the frame: a camera of our own outside,
- * on her, while she goes through; OutScene goes on from it */
+/* C0-21 (user): the window jump had the camera hit the frame: a camera of our own outside, on her, while she
+ * jumps; C0-22 (user): only for the jump itself (it came on running by the window: R1 3 is the run) and for every
+ * jump: over (R1 0x0C pl_R1_Fance: the window), down a level (8), falling (0x0E, 0x13). Ahead of her, to one side
+ * and up, looking at her; OutScene goes on from it after the window, else the game's camera is given back. */
+static int wct;
+static int Jumping(void) { u8 r = pPL[0xFD]; return pPL[0xFC] == 0 && (r == 8 || r == 0x0C || r == 0x0E || r == 0x13); }
 static void WinCam(void)
 {
     if (!wcam) {
-        if (pPL[0xFD] > 2 && PY() > 2500.0f && PX() > -1300.0f && D2(-938.0f, -13150.0f) < 1500.0f * 1500.0f) {
-            wcam = 1;
-            ncam[0] = -4600.0f; ncam[1] = 5900.0f; ncam[2] = PZ() + 1800.0f;
+        if (Jumping()) {
+            f32 a = *(f32*)(pPL + 0xA4), fx = Sn(a), fz = Cs(a);
+            wcam = 1; wct = 0;
+            ncam[0] = PX() + fx * 3600.0f + fz * 1500.0f; ncam[1] = PY() + 2600.0f; ncam[2] = PZ() + fz * 3600.0f - fx * 1500.0f;
             ncam[3] = PX(); ncam[4] = PY() + 900.0f; ncam[5] = PZ();
         }
         return;
     }
-    if (wcam == 2) { if (stage < 2 || x_done) { wcam = 0; STOPF &= ~SPF_CAM; } return; }
     STOPF |= SPF_CAM;
-    CamTo(-4600.0f, 5900.0f, ncam[2], PX(), PY() + 900.0f, PZ(), 0.25f);
-    if (pPL[0xFD] <= 2 || pPL[0xFC] != 0) wcam = 2;
+    if (wcam == 2) {                                 /* landed: held a moment for OutScene, then back to the game */
+        Cam(ncam[0], ncam[1], ncam[2], ncam[3], ncam[4], ncam[5], 50.0f);
+        if (Jumping()) wcam = 1;
+        else if (++wct > 12) { wcam = 0; STOPF &= ~SPF_CAM; }
+        return;
+    }
+    CamTo(ncam[0], ncam[1], ncam[2], PX(), PY() + 900.0f, PZ(), 0.25f);
+    if (!Jumping()) { wcam = 2; wct = 0; }
 }
 
 /* C0-21 (user): the road guard (back to her on the road) can't be passed: as she comes near he turns, walks at
@@ -1329,7 +1339,7 @@ static int RoadScene(void)                           /* 1 while it runs */
     gx = *(f32*)(e + 0x94); gz = *(f32*)(e + 0x9C);
     dx = gx - PX(); dz = gz - PZ(); d = Sq(dx * dx + dz * dz);
     if (!scene_r) {
-        if (!road_wait || hs || hidden || e[0xFC] != 1 || pPL[0xFC] != 0 || pPL[0xFD] > 3 || d > 6500.0f) return 0;
+        if (!road_wait || hs || hidden || e[0xFC] != 1 || pPL[0xFC] != 0 || pPL[0xFD] > 3 || d > 3200.0f) return 0;   /* C0-22 (user): nearer */
         scene_r = 1; rt = 0; Hud(0); CrouchOff(); ch0_crouch_force = 0;
         a = *(f32*)(pPL + 0xA4);
         ncam[0] = PX() - Sn(a) * 1600.0f + Cs(a) * 500.0f; ncam[1] = PY() + 1600.0f; ncam[2] = PZ() - Cs(a) * 1600.0f - Sn(a) * 500.0f;
@@ -1341,28 +1351,31 @@ static int RoadScene(void)                           /* 1 while it runs */
     STOPF |= SPF_CAM;
     a = Atan2f(dx, dz);
     if (rt == 0) {                                   /* he turns round, then walks at her */
-        e[0xFD] = scene_r < 22 ? 1 : 0x14;
+        if (scene_r < 22) e[0xFD] = 1;
         if (scene_r < 22) { if (e[0xFE] == 1) Turn(e, a + 3.14159265f, 0.15f); }
         else {
-            if (scene_r == 22) WalkE(e, PX(), PZ());
-            *(s32*)(e + 0x3E4) = 300;
-            *(f32*)(e + 0x92C) = PX(); *(f32*)(e + 0x934) = PZ();
-            Steer(e, PX(), PZ());
+            if (d < 1500.0f) { if (e[0xFD] != 1) { e[0xFD] = 1; e[0xFE] = 0; e[0xFF] = 0; } }   /* over her: waits */
+            else {
+                if (e[0xFD] != 0x14) WalkE(e, PX(), PZ());
+                *(s32*)(e + 0x3E4) = 300;
+                *(f32*)(e + 0x92C) = PX(); *(f32*)(e + 0x934) = PZ();
+                Steer(e, PX(), PZ());
+            }
         }
-        if (scene_r > 30 && (d < 1700.0f || scene_r > 300)) {   /* he throws himself on her */
+        if (scene_r > 34 + 52 && (d < 1900.0f || scene_r > 300)) {   /* she is sat on the ground: he throws himself on her */
             rt = 1;
             Native(e);
             e[0xFC] = 1; e[0xFD] = 0x66; e[0xFE] = 1; e[0xFF] = 0;
             *(f32*)(e + 0xA4) = a + 3.14159265f;
-            MotionSetCore(e, e + 0x1D8, EmArc(e, 0x86), EmArc(e, 0x87), 10, 1, 0);
+            MotionSetCore(e, e + 0x1D8, EmArc(e, 0x86), 0, 10, 1, 0);   /* C0-22: no seq (its hit events)  */
         }
     } else rt++;
     *(f32*)(pPL + 0xA4) = a;                         /* she faces him */
     if (scene_r >= 34) {                             /* she falls on her backside, and stays down */
         f = (f32)(scene_r - 34);
-        if (f > 18.99f) f = 18.99f;
+        if (f > (f32)(HD_N - HD_FALL) - 1.01f) f = (f32)(HD_N - HD_FALL) - 1.01f;   /* C0-22: knocked back, sits up */
         if (scene_r == 34) SndCall(1, 52, 0, 0, 0, 0);
-        if (scene_r == 46) SndCall(1, 67, 0, 0, 0, 0);
+        if (scene_r == 43) SndCall(1, 67, 0, 0, 0, 0);
         ClipApply(HD_TAB, HD_N, (f32)HD_FALL + f, Sm((f32)(scene_r - 34) / 4.0f), 0);
     }
     {   /* the camera: over her shoulder on him, then slowly back and up, the two in sight */
@@ -1446,6 +1459,7 @@ void Ch0Frame(void)
         return;
     }
     if (ph == 1) {
+        PL_LIFE = PL_LIFE_MAX;                       /* C0-22: also while caught (a blow there killed her: the restart hung) */
         if (caught) {                                /* knocked down: fade, text, again */
             cap_t++;
             ch0_padlock = 1;
@@ -1476,7 +1490,11 @@ void Ch0Frame(void)
             int j;
             for (j = 0; j <= NG; j++) {
                 u8* e = j < NG ? gd[j].e : hman;
-                if (Alive(e) && e[0xA92] == 7) e[0xA92] = 0;
+                if (!Alive(e)) continue;
+                if (e[0xA92] == 7) e[0xA92] = 0;
+                /* C0-22 (user: they came up and did nothing): em10CatchPLRtnCk wants no pWeapon or Be_flg 0x08000000
+                   (+0x3E0); a chaser gets it (Native clears it again when it stops chasing) */
+                if (j < NG ? gd[j].st == G_CHASE : (*(u32*)(e + 0x3C8) & 1u) != 0) *(u32*)(e + 0x3E0) |= 0x08000000u;
             }
         }
         if (RoadScene()) return;

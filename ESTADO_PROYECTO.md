@@ -788,3 +788,7 @@ Diseño completo en el proyecto de Claude: `claude/capitulo-0-ashley.md`. Herram
   (escala x en +0x18, ángulo 0); escalera de la plaza (ETS id 8) enterrada, la trasera (-4939, -17683) dispara
   scene_gate; WinCam (cámara exterior en el salto por la ventana, pasa a OutScene); ganados congelados en
   scene_gate / scene_r. DOL: 800 B libres.
+- **C0-22**: escena del camino a 3,2 m; caída = pl11 0x32 (20 f) + 0x33 (28 f) sentada (0x6A bajaba 4,4 m);
+  embestida sin SEQ; PL_LIFE también durante la captura; WinCam solo con R1 8/0x0C/0x0E/0x13 (no correr) y en
+  todos los saltos; captura: Be_flg 0x08000000 a los que persiguen (em10CatchPLRtnCk: pWeapon sin esa bandera
+  solo deja Wep 9). DOL: 544 B libres.

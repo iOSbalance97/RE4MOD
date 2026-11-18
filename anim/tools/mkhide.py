@@ -113,7 +113,10 @@ _new = [_knees_in(r) for r in rsc]
 osc = [[o[0], int(round(o[1] - (_foot_y(nw) - _foot_y(od)))), o[2], o[3]] for o, nw, od in zip(osc, _new, rsc)]   # feet on the floor
 rsc = _new
 # C0-21: the road guard's scene: she falls back on her bottom (pl11 0x6a, the partner knocked down; in place)
-rfa, ofa = seq([0x6A]); ofa = [[0, r[1], 0, r[3]] for r in ofa]
+# C0-22 (video: 0x6A drops her 4.4 m: a fall down a hole): knocked back onto her back (0x32, first 20 frames, in
+# place) and sitting up on her bottom (0x33, 0-27): she ends sat on the ground, legs out, facing him
+r1, o1 = seq([0x32]); r2, o2 = seq([0x33])
+rfa = r1[:20] + r2[:28]; ofa = [[0, r[1], 0, r[3]] for r in o1[:20] + o2[:28]]
 rows = rin + rout + rkid + rsc + rfa; roots = oin + oout + okid + osc + ofa; n = len(rows)
 import struct
 blob = b''.join(struct.pack('>75h', *e) for e in rows) + b''.join(struct.pack('>4h', *r) for r in roots)
