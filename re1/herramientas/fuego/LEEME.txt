@@ -1,0 +1,1 @@
+et1400_invisible.bin: modelo de la antorcha TAIMATU01 (etc 0x14) con los vértices colapsados en (0,300,0); el resto del ETM se copia de r10c al montar

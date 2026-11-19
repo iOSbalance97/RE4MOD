@@ -10,6 +10,8 @@ import json, os, struct, sys
 import numpy as np
 sys.path.insert(0, '/home/claude/tools'); sys.path.insert(0, '/home/claude/re4src/tools')
 import drs, re4inject as RI
+import uc_ambiente
+LUCES = json.load(open('/home/claude/uc/luces.json'))
 CONX, SRC, DST = sys.argv[1:4]
 MAPA = {'r102': [0x103, 0x113], 'r101': [0x102], 'r100': [0x104], 'r103': [0x112], 'r104': [0x106], 'r105': [0x107],
         'r106': [0x108], 'r107': [0x109], 'r108': [0x10a], 'r109': [0x10b], 'r111': [0x10c], 'r112': [0x10d],
@@ -17,7 +19,7 @@ MAPA = {'r102': [0x103, 0x113], 'r101': [0x102], 'r100': [0x104], 'r103': [0x112
 DESTINO = {k: v[-1] for k, v in MAPA.items()}
 PUEBLO = {0x103: 0x101, 0x113: 0x111}                       # puerta principal del vestíbulo: vuelta al pueblo
 PUEBLO_POS = (39371.68359375, 3201.473388671875, -26666.533203125, -1.503808856010437)
-ANULAR = {'ITA', 'ETS'}                                              # objetos recogibles y sueltos (se renombran)
+ANULAR = {'ITA'}                                              # objetos recogibles y sueltos (se renombran)
 VACIAR = {'FCV', 'SEQ'}                                              # cinemáticas: solo las usa el código de la sala
 # H07-H09 anulaban también CAM/EAR/SAR/ESE/FSE/EFF/ETM/BIN/TPL: pantalla gris. Se vuelve a lo de H06 (se conservan).
 
@@ -81,6 +83,8 @@ for uc, ids in MAPA.items():
         base = f'/home/claude/uc/re4/{uc}'
         new = {'SMD': open(f'{base}/mod/sala.smd', 'rb').read(), 'SMX': open(f'{base}/mod/sala.smx', 'rb').read(),
                'SAT': open(f'{base}/col/sala.sat', 'rb').read(), 'EAT': open(f'{base}/col/sala.eat', 'rb').read(), 'AEV': aev}
+        amb, n_llamas, n_luces = uc_ambiente.ambiente(name, LUCES[uc]['llamas'], LUCES[uc]['lamparas'])
+        new.update(amb)
         done = set(); out = []; anul = []
         for t, d in entries:
             n = drs.tag_name(t)
@@ -88,12 +92,41 @@ for uc, ids in MAPA.items():
             elif n in VACIAR: out.append([b'x' + t[1:], bytes(32)]); anul.append(n)
             elif n in ANULAR: out.append([b'x' + t[1:], d]); anul.append(n)
             else: out.append([t, d])
-        assert done == set(new), (name, done)
+        for n in ('EAR', 'ETS', 'ETM'):                      # la sala original puede no tenerlas: se añaden
+            if n not in done: out.append([n.encode() + b'\0', new[n]]); done.add(n)
+        assert done == set(new), (name, set(new) - done)
         nb = RI.pack_body(out, rel)
         das = RI.write_das(sig, snd_rec, snd, nb)
         open(f'{DST}/{name}.das', 'wb').write(das)
-        print(f'{name} <- UC {uc}: {len(recs)} puertas, descomprimido {len(nb)/1e6:.2f} MB, fichero {len(das)/1e6:.2f} MB, '
+        print(f'{name} <- UC {uc}: {n_llamas} llamas, {n_luces} luces, {len(recs)} puertas, descomprimido {len(nb)/1e6:.2f} MB, fichero {len(das)/1e6:.2f} MB, '
               f'anulados {len(anul)} ({",".join(sorted(set(anul)))})')
         if len(nb) > len(body): print(f'   ¡{name} MAYOR que la original ({len(body)/1e6:.2f} MB)!'); grandes.append(uc)
+# r120: primera sala de una partida nueva -> puerta automática (trg 2, como la puerta 2 del pueblo) que cubre
+# toda la sala y lleva a la entrada del vestíbulo (r103). Sus scripts se vacían en los Rel (relpatch) y sus
+# enemigos en el ESL.
+def puerta_auto():
+    sig, sr, snd, body, c = RI.read_das(f'{SRC}/r101.das')
+    e, _ = RI.parse_body(body)
+    aev = [d for t, d in e if drs.tag_name(t) == 'AEV'][0]
+    r = bytearray(aev[0x10 + 2 * 0x9C:0x10 + 3 * 0x9C]); assert r[0x38] == 2
+    r[4], r[5] = 1, 1
+    struct.pack_into('>3f', r, 0x08, -100000.0, 200000.0, 0.0)
+    for k, (x, z) in enumerate(((-900000, -900000), (900000, -900000), (900000, 900000), (-900000, 900000))):
+        struct.pack_into('>2f', r, 0x14 + 8 * k, x, z)
+    pts = [struct.unpack('>2f', r[0x14 + 8 * k:0x1C + 8 * k]) for k in range(4)]
+    if not hit_xz4(pts, (0.0, 0.0)):
+        for k, (x, z) in enumerate(pts[::-1]): struct.pack_into('>2f', r, 0x14 + 8 * k, x, z)
+    assert hit_xz4([struct.unpack('>2f', r[0x14 + 8 * k:0x1C + 8 * k]) for k in range(4)], (0.0, 0.0))
+    r[0x36] = 0
+    r[0x38] = 1                                   # trg 1: salta mientras Leon está dentro (sin pulsar nada)
+    struct.pack_into('>4f', r, 0x5C, *ENTRADA)
+    r[0x6C], r[0x6D], r[0x6E], r[0x6F] = 1, 0x03, 0, 0
+    return b'AEV\0' + struct.pack('>HH8x', 0x104, 1) + bytes(r)
+sig, snd_rec, snd, body, _ = RI.read_das(f'{SRC}/r120.das')
+entries, rel = RI.parse_body(body)
+out = [[t, d] for t, d in entries if drs.tag_name(t) != 'AEV'] + [[b'AEV\0', puerta_auto()]]
+nb = RI.pack_body(out, rel); das = RI.write_das(sig, snd_rec, snd, nb)
+open(f'{DST}/r120.das', 'wb').write(das)
+print(f'r120 (partida nueva): puerta automática al vestíbulo, descomprimido {len(nb)/1e6:.2f} MB (original {len(body)/1e6:.2f})')
 for x in resumen: print('  %s (%s) -> %s = %s' % x)
 print('MAYORES QUE LA ORIGINAL:', sorted(set(grandes)))
