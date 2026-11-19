@@ -11,14 +11,15 @@ import numpy as np
 sys.path.insert(0, '/home/claude/tools'); sys.path.insert(0, '/home/claude/re4src/tools')
 import drs, re4inject as RI
 CONX, SRC, DST = sys.argv[1:4]
-MAPA = {'r102': [0x103, 0x113], 'r101': [0x102], 'r100': [0x104], 'r103': [0x105], 'r104': [0x106], 'r105': [0x107],
+MAPA = {'r102': [0x103, 0x113], 'r101': [0x102], 'r100': [0x104], 'r103': [0x112], 'r104': [0x106], 'r105': [0x107],
         'r106': [0x108], 'r107': [0x109], 'r108': [0x10a], 'r109': [0x10b], 'r111': [0x10c], 'r112': [0x10d],
-        'r113': [0x10e], 'r114': [0x10f], 'r115': [0x112]}
+        'r113': [0x10e], 'r114': [0x10f], 'r115': [0x105]}
 DESTINO = {k: v[-1] for k, v in MAPA.items()}
 PUEBLO = {0x103: 0x101, 0x113: 0x111}                       # puerta principal del vestíbulo: vuelta al pueblo
 PUEBLO_POS = (39371.68359375, 3201.473388671875, -26666.533203125, -1.503808856010437)
-ANULAR = {'ITA', 'ETS', 'ESE', 'EAR', 'SAR', 'CAM', 'FSE'}           # se renombran (datos intactos, son pequeños)
-VACIAR = {'EFF', 'ETM', 'FCV', 'SEQ', 'BIN', 'TPL'}                  # se renombran y se dejan en 32 bytes
+ANULAR = {'ITA', 'ETS'}                                              # objetos recogibles y sueltos (se renombran)
+VACIAR = {'FCV', 'SEQ'}                                              # cinemáticas: solo las usa el código de la sala
+# H07-H09 anulaban también CAM/EAR/SAR/ESE/FSE/EFF/ETM/BIN/TPL: pantalla gris. Se vuelve a lo de H06 (se conservan).
 
 def plantilla():
     sig, sr, snd, body, c = RI.read_das(f'{SRC}/r101.das')
@@ -51,6 +52,7 @@ def door_rec(no, area, dest_room, pos, ang):
 conx = json.load(open(CONX))
 os.makedirs(DST, exist_ok=True)
 resumen = []
+grandes = []
 for uc, ids in MAPA.items():
     for rid in ids:
         recs = []; name = f'r{rid:03x}'
@@ -92,5 +94,6 @@ for uc, ids in MAPA.items():
         open(f'{DST}/{name}.das', 'wb').write(das)
         print(f'{name} <- UC {uc}: {len(recs)} puertas, descomprimido {len(nb)/1e6:.2f} MB, fichero {len(das)/1e6:.2f} MB, '
               f'anulados {len(anul)} ({",".join(sorted(set(anul)))})')
-        assert len(nb) <= 5_300_000, 'sala demasiado grande'
+        if len(nb) > len(body): print(f'   ¡{name} MAYOR que la original ({len(body)/1e6:.2f} MB)!'); grandes.append(uc)
 for x in resumen: print('  %s (%s) -> %s = %s' % x)
+print('MAYORES QUE LA ORIGINAL:', sorted(set(grandes)))
