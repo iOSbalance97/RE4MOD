@@ -238,6 +238,10 @@ def place(V, spec, scale):
     return P @ R.T + np.array([x, y, z]) / scale
 
 
+# GLOBAL_WK::texObj[0xF8] (0x3010..0x4F10): el juego crea un GXTexObj por textura de la sala; más de 248 pisa
+# prim_*, RoomMes, cámaras y Rtp (H07: cuelgue en getNearPoint). Se deja margen.
+MAX_TEX = 240
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('obj'); ap.add_argument('out')
@@ -267,7 +271,7 @@ def main():
         im = np.asarray(im_.convert('RGBA'), float)
         info[t] = (im[..., :3].mean((0, 1)), bool(has_a_))
     vivas = sorted(texnames, key=lambda t: -uso[t]); cambio = {}
-    while len(vivas) + sum(info[t][1] for t in vivas) > 254:
+    while len(vivas) + sum(info[t][1] for t in vivas) > MAX_TEX:
         t = vivas.pop()
         pares = [k for k in vivas if info[k][1] == info[t][1]] or vivas
         cambio[t] = min(pares, key=lambda k: np.linalg.norm(info[k][0] - info[t][0]))
