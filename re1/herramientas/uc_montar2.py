@@ -29,6 +29,15 @@ def plantilla():
     return r
 TPL = plantilla()
 
+ENTRADA = (-47609.0, 12.0, 7084.0, 1.889)        # donde deja la puerta norte del pueblo, dentro del vestíbulo
+
+def hit_xz4(p, q):
+    x, z = q
+    (x0, z0), (x1, z1), (x2, z2), (x3, z3) = p
+    if (x3 - x0) * (z - z0) > (z3 - z0) * (x - x0) or (x1 - x0) * (z - z0) < (z1 - z0) * (x - x0): return False
+    if (x3 - x2) * (z - z2) < (z3 - z2) * (x - x2) or (x1 - x2) * (z - z2) > (z1 - z2) * (x - x2): return False
+    return True
+
 def door_rec(no, area, dest_room, pos, ang):
     r = bytearray(TPL)
     r[4], r[5], r[6], r[7] = 1, 1, 0, 0                               # AREA_HIT_DATA: en uso, XZ4
@@ -44,7 +53,7 @@ os.makedirs(DST, exist_ok=True)
 resumen = []
 for uc, ids in MAPA.items():
     for rid in ids:
-        recs = []
+        recs = []; name = f'r{rid:03x}'
         for q in conx:
             for me, other, area, lleg in ((q['a'], q['b'], 'area_a', 'llegada_b'), (q['b'], q['a'], 'area_b', 'llegada_a')):
                 if me != uc: continue
@@ -53,8 +62,18 @@ for uc, ids in MAPA.items():
                 else:
                     L = q[lleg]; recs.append(door_rec(len(recs), q[area], DESTINO[other], L['pos'], L['ang'])); dest = DESTINO[other]
                 resumen.append((f'r{rid:03x}', uc, other, f'r{dest:03x}'))
+        if uc == 'r102':
+            # rescate: al cargar una partida guardada en la granja (r103/r113 originales) se aparece fuera del vestíbulo;
+            # cuatro franjas alrededor de él (todo lo de fuera) llevan con el botón a la entrada del vestíbulo
+            X0, X1, Z0, Z1 = -51450.0, -30930.0, -4950.0, 14910.0
+            for xa, xb, za, zb in ((-120000, X0, -100000, 80000), (X1, 60000, -100000, 80000), (X0, X1, -100000, Z0), (X0, X1, Z1, 80000)):
+                pts = [(xa, za), (xb, za), (xb, zb), (xa, zb)]
+                if not hit_xz4(pts, ((xa + xb) / 2, (za + zb) / 2)): pts = pts[::-1]
+                assert hit_xz4(pts, ((xa + xb) / 2, (za + zb) / 2))
+                recs.append(door_rec(len(recs), dict(floor=-3000.0, height=12000.0, pts=pts), rid, ENTRADA[:3], ENTRADA[3]))
+                resumen.append((name, uc, 'FUERA (rescate)', name))
+            assert not any(hit_xz4(p_, ENTRADA[0::2][:2]) for p_ in [])
         aev = b'AEV\0' + struct.pack('>HH8x', 0x104, len(recs)) + b''.join(recs)
-        name = f'r{rid:03x}'
         sig, snd_rec, snd, body, _ = RI.read_das(f'{SRC}/{name}.das')
         entries, rel = RI.parse_body(body)
         base = f'/home/claude/uc/re4/{uc}'

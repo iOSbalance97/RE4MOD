@@ -10,6 +10,8 @@ from re4col import write_sat
 
 ap = argparse.ArgumentParser(); ap.add_argument('sala'); ap.add_argument('out'); ap.add_argument('--colocar', required=True)
 ap.add_argument('--tipo', default='chit')
+ap.add_argument('--suelo-extra', default='', help='x0,z0,x1,z1,y en mm: plano de suelo de seguridad (baldosas de 10 m)')
+ap.add_argument('--bloque', type=float, default=2000.0)
 a = ap.parse_args()
 os.makedirs(a.out, exist_ok=True)
 V, N, A = ucol.load(f'/home/claude/uc/r/{a.sala}/{a.sala}_{a.tipo}.col')
@@ -30,7 +32,19 @@ flip = (c * Nr).sum(1) < 0
 T[flip] = T[flip][:, [0, 2, 1]]
 T = T[keep]; ny = ny[keep]
 K = np.where(ny > 0.97, 0, np.where(ny >= 0.5, 1, 2))
-sat = write_sat(SV, T, K, np.zeros(len(T), int), block_size=2000.0)
+if a.suelo_extra:
+    x0, z0, x1, z1, yy = [float(v) for v in a.suelo_extra.split(',')]
+    xs = np.arange(x0, x1 + 1, 10000.0); zs = np.arange(z0, z1 + 1, 10000.0)
+    base = len(SV); extra_v = [(x, yy, z) for z in zs for x in xs]; nx = len(xs)
+    tris = []
+    for j in range(len(zs) - 1):
+        for i in range(nx - 1):
+            a_, b_, c_, d_ = base + j * nx + i, base + j * nx + i + 1, base + (j + 1) * nx + i, base + (j + 1) * nx + i + 1
+            tris += [(a_, c_, b_), (b_, c_, d_)]           # normal hacia arriba
+    SV = np.concatenate([SV, np.array(extra_v)]); T = np.concatenate([T, np.array(tris)]); K = np.concatenate([K, np.zeros(len(tris), int)])
+    n_ = np.cross(SV[T[-1, 1]] - SV[T[-1, 0]], SV[T[-1, 2]] - SV[T[-1, 0]]); assert n_[1] > 0
+    print(f'suelo de seguridad: {len(tris)} triángulos a y={yy:.0f} mm')
+sat = write_sat(SV, T, K, np.zeros(len(T), int), block_size=a.bloque)
 open(f'{a.out}/sala.sat', 'wb').write(sat); open(f'{a.out}/sala.eat', 'wb').write(sat)
 with open(f'{a.out}/colision.obj', 'w') as f:
     f.writelines(f'v {x/1000} {y/1000} {z/1000}\n' for x, y, z in SV)
