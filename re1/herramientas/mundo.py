@@ -63,7 +63,7 @@ ENLACES = [
     ('m:r100:0', 'g:te_bar:comedor'), ('m:r100:1', 'g:norte:vestibulo'), ('g:te_bar:norte', 'g:norte:te'),
     ('g:te_bar:sotano', 'g:ascensor:ascensor'),
     # mansión 1F este
-    ('m:r105:0', 'g:bano:entrada'), ('m:r105:1', 'g:salon:entrada'), ('g:bano:salon', 'g:salon:bano'), ('g:bano:caldera', 'g:bano:cal_in'),
+    ('m:r105:0', 'g:bano:entrada'), ('m:r105:1', 'g:salon:entrada'), ('g:bano:salon', 'g:salon:bano'),
     ('m:r106:0', 'g:oscuro:entrada'), ('m:r106:1', 'g:arte:entrada'), ('g:oscuro:cementerio', 'g:cementerio:galeria'),
     ('g:oscuro:techado', 'g:techado:oscuro'), ('g:cementerio:altar', 'g:altar:cripta'), ('v:altar_vestibulo', 'g:altar:vestibulo'),
     # mansión 2F

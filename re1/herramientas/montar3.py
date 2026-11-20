@@ -65,29 +65,16 @@ for sname in [s for s in mundo.HUECO if not s.startswith('r1')]:
     meta = json.load(open(f'/home/claude/gen/{sname}/meta.json'))
     for d in meta['puertas']:
         ep(f'g:{sname}:{d["id"]}', [mundo.HUECO[sname]], (d['centro'][0] * 1000, d['centro'][2] * 1000), d['normal'], d['ancho'] * 1000, d['centro'][1] * 1000)
+import pisable
 for rr, pts in mundo.AREAS.items():
-    Tc = floors(f'/home/claude/uc/re4/{rr}/col/colision.obj')
+    P = pisable.Pisable(f'/home/claude/uc/re4/{rr}/col/colision.obj'); comp = int(np.argmax(P.tam))
     for k, (x, z) in pts.items():
-        best = None
-        for dx in np.arange(-2.5, 2.51, 0.25):
-            for dz in np.arange(-2.5, 2.51, 0.25):
-                h = heights(Tc, x + dx, z + dz)
-                if len(h):
-                    dd = dx * dx + dz * dz
-                    if best is None or dd < best[0]: best = (dd, x + dx, z + dz, float(h.min()))
-        assert best, (rr, k)
-        _, px, pz, py = best
-        # hacia dentro: hacia el centro de lo pisable de alrededor (3 m)
-        S = []
-        for dx in np.arange(-3, 3.01, 0.5):
-            for dz in np.arange(-3, 3.01, 0.5):
-                h = heights(Tc, px + dx, pz + dz)
-                if len(h) and np.abs(h - py).min() < 0.6: S.append((dx, dz))
-        S = np.array(S); n = S.mean(0) if len(S) else np.array([0.0, 1.0])
-        if np.linalg.norm(n) < 1e-3: n = np.array([0.0, 1.0])
-        # el punto de puerta se retrasa 0,6 m hacia fuera para que el área quede en el borde
-        ep(f'a:{rr}:{k}', [mundo.HUECO[rr]], ((px - n[0] / np.linalg.norm(n) * 0.6) * 1000, (pz - n[1] / np.linalg.norm(n) * 0.6) * 1000), n, 1400.0, py * 1000)
-
+        p, v, dist = P.ajustar(x, z, comp)
+        if dist > 2.0: print(f'  aviso: puerta {rr}:{k} movida {dist:.1f} m para quedar en la zona pisable principal')
+        c = p[[0, 2]] - v * 0.6
+        ep(f'a:{rr}:{k}', [mundo.HUECO[rr]], c * 1000, v, 1400.0, p[1] * 1000)
+        q, _, _ = P.ajustar(*(p[[0, 2]] + v * 0.9), comp, margen=0.4)           # llegada: dentro del mismo componente
+        EP[f'a:{rr}:{k}']['pos'] = (float(q[0] * 1000), float(q[1] * 1000), float(q[2] * 1000))
 # 3) registros AEV por hueco
 TPL = UM.TPL
 def door_rec(no, area, dest, pos, ang):

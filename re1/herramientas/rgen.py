@@ -208,6 +208,41 @@ def construir(spec):
         (a, b), n = LADOS[l][0](c['r']), LADOS[l][1]
         a = np.array(a, float); b = np.array(b, float); u = (b - a) / np.linalg.norm(b - a)
         return a, b, u, np.array(n, float)
+    # las posiciones se escriben desde la esquina de x/z menor; las paredes N y O van al revés (de x/z mayor a menor)
+    def lon(cid, l): x0, z0, x1, z1 = cel[cid]['r']; return (x1 - x0) if l in 'NS' else (z1 - z0)
+    def conv(cid, l, pos): return lon(cid, l) - pos if l in 'NO' else pos
+    spec['pasos'] = [tuple([p[0], p[1], conv(p[0], p[1], p[2])] + list(p[3:])) for p in spec.get('pasos', [])]
+    for d in spec.get('puertas', []): d['pos'] = conv(d['celda'], d['lado'], d['pos'])
+    spec['cuadros'] = [(q[0], q[1], conv(q[0], q[1], q[2])) + tuple(q[3:]) for q in spec.get('cuadros', [])]
+    # comprobación: cada paso debe dar a otra celda (que comparta esa pared) con su paso enfrente
+    def punto(cid, l, pos):
+        c = cel[cid]; (a, b), _ = LADOS[l][0](c['r']), None
+        a = np.array(a, float); b = np.array(b, float); return a + (b - a) / np.linalg.norm(b - a) * pos
+    S.avisos = []
+    pts = [(p[0], punto(p[0], p[1], p[2])) for p in spec['pasos']]
+    for cid, q in pts:
+        if not any(o != cid and np.linalg.norm(q - q2) < 0.3 for o, q2 in pts):
+            S.avisos.append(f'paso de {cid} en ({q[0]:.1f},{q[1]:.1f}) sin paso enfrente')
+    # despejar: fuera los muebles que estorban delante de puertas y pasos (1,6 m de fondo)
+    zonas = []
+    for p in spec['pasos']:
+        c = cel[p[0]]; (a, b), n = LADOS[p[1]][0](c['r']), np.array(LADOS[p[1]][1], float)
+        a = np.array(a, float); u = (np.array(b, float) - a); u /= np.linalg.norm(u); q = a + u * p[2]
+        for sgn in (1, -1):
+            e = [q - u * (p[3] / 2 + 0.3), q + u * (p[3] / 2 + 0.3), q - u * (p[3] / 2 + 0.3) + sgn * n * 1.4, q + u * (p[3] / 2 + 0.3) + sgn * n * 1.4]
+            zonas.append((np.min(e, 0), np.max(e, 0), c['y']))
+    for d in spec.get('puertas', []):
+        c = cel[d['celda']]; (a, b), n = LADOS[d['lado']][0](c['r']), np.array(LADOS[d['lado']][1], float)
+        a = np.array(a, float); u = (np.array(b, float) - a); u /= np.linalg.norm(u); q = a + u * d['pos']; w = d.get('ancho', 1.0)
+        e = [q - u * (w / 2 + 0.4), q + u * (w / 2 + 0.4), q - u * (w / 2 + 0.4) + n * 1.8, q + u * (w / 2 + 0.4) + n * 1.8]
+        zonas.append((np.min(e, 0), np.max(e, 0), c['y']))
+    keep = []
+    for m in spec.get('muebles', []):
+        x0, z0, x1, z1 = m[1:5]; yb = m[7] if len(m) > 7 else 0.0
+        if any(x0 < hi[0] and x1 > lo[0] and z0 < hi[1] and z1 > lo[1] and abs(yb - yy) < 1.0 for lo, hi, yy in zonas):
+            S.avisos.append(f'mueble {m[0]} en ({x0},{z0}) quitado: tapa un paso o una puerta')
+        else: keep.append(m)
+    spec['muebles'] = keep
     for p in spec.get('pasos', []):
         cid, l, pos, w = p[:4]; alto = p[4] if len(p) > 4 else 2.7
         ab[(cid, l)].append((pos - w / 2, pos + w / 2, alto, 'paso'))

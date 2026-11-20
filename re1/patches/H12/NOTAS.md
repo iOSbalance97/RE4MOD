@@ -64,6 +64,14 @@ de lo pisable (el punto se ajusta al suelo de la colisión de UC); una lámpara 
 vuelven al vestíbulo normal r113, como en H11); llegadas sobre suelo pisable y fuera de las áreas de puerta del
 destino; antorchas = luces de antorcha; tamaños. Parche = ISO esperada (ida y vuelta con xdelta).
 
+## Recorrido a pie (recorrido_H12.py)
+Sobre la colisión, rejilla de 0,25 m, escalones < 0,45 m, paredes a la altura de Leon: en las salas nuevas y en las
+de fuera, desde cada llegada se alcanzan todas las puertas de la sala (escaleras incluidas); en las de UC de la
+mansión, cada puerta es alcanzable desde alguna llegada (algunas tienen dos plantas con puertas distintas, como en RE1).
+Arreglados con esto: pasos entre celdas puestos en la pared equivocada, rampas de escalera separadas del rellano,
+muebles delante de puertas, y puertas de las salas de fuera que caían en zonas aisladas (ahora se ajustan a la zona
+pisable principal). La caldera se une al pasillo con un paso.
+
 ## Sin probar en juego (pendiente)
 De H11: dirección de la linterna, altura de las llamas, cantidad de luz, si la puerta automática de r120 salta
 nada más empezar, puertas 09 y 24. De H12: cambio de fase St1↔St2 con los scripts vaciados, colisión de las salas

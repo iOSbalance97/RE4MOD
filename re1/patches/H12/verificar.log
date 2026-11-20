@@ -1,0 +1,9 @@
+salas montadas: 62
+alcanzables desde el vestíbulo: 63 | sin llegar: ninguna
+PROBLEMAS 6
+r215 -> r216: llegada dentro de un área de puerta del destino
+r103 -> r10c sin vuelta
+r103 -> r112 sin vuelta
+r103 -> r102 sin vuelta
+r103 -> r10a sin vuelta
+r103 -> r205 sin vuelta
