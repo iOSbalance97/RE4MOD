@@ -1,0 +1,525 @@
+{
+ "r100": [
+  {
+   "centro": [
+    -41171,
+    -42,
+    -17245
+   ],
+   "normal": [
+    -0.952,
+    0.305
+   ],
+   "ancho": 998,
+   "alto": 2075,
+   "conectada": false,
+   "tex": "r100_door_a.png"
+  },
+  {
+   "centro": [
+    -42788,
+    -42,
+    -28766
+   ],
+   "normal": [
+    0.315,
+    0.949
+   ],
+   "ancho": 987,
+   "alto": 2298,
+   "conectada": false,
+   "tex": "r100_door_c.png"
+  },
+  {
+   "centro": [
+    -43586,
+    8,
+    -19293
+   ],
+   "normal": [
+    0.953,
+    -0.304
+   ],
+   "ancho": 930,
+   "alto": 2012,
+   "conectada": true,
+   "tex": "st_103door_b.png"
+  }
+ ],
+ "r101": [
+  {
+   "centro": [
+    -42430,
+    4012,
+    -1921
+   ],
+   "normal": [
+    -0.312,
+    -0.95
+   ],
+   "ancho": 2485,
+   "alto": 2517,
+   "conectada": true,
+   "tex": "EO_door2.png"
+  },
+  {
+   "centro": [
+    -44018,
+    4012,
+    -18681
+   ],
+   "normal": [
+    -0.83,
+    0.558
+   ],
+   "ancho": 968,
+   "alto": 2361,
+   "conectada": true,
+   "tex": "EO_door.png"
+  },
+  {
+   "centro": [
+    -42704,
+    4012,
+    -14851
+   ],
+   "normal": [
+    -0.949,
+    0.316
+   ],
+   "ancho": 986,
+   "alto": 1995,
+   "conectada": true,
+   "tex": "EO_door.png"
+  },
+  {
+   "centro": [
+    -42419,
+    12,
+    -1925
+   ],
+   "normal": [
+    -0.312,
+    -0.95
+   ],
+   "ancho": 2485,
+   "alto": 2517,
+   "conectada": true,
+   "tex": "EO_door2.png"
+  }
+ ],
+ "r102": [
+  {
+   "centro": [
+    -41740,
+    4512,
+    -1943
+   ],
+   "normal": [
+    0.239,
+    0.971
+   ],
+   "ancho": 1198,
+   "alto": 2512,
+   "conectada": true,
+   "tex": "yg_two_door.png"
+  },
+  {
+   "centro": [
+    -42902,
+    4512,
+    -1555
+   ],
+   "normal": [
+    0.238,
+    0.971
+   ],
+   "ancho": 1245,
+   "alto": 2512,
+   "conectada": true,
+   "tex": "yg_two_door.png"
+  }
+ ],
+ "r103": [
+  {
+   "centro": [
+    -38125,
+    12,
+    20119
+   ],
+   "normal": [
+    0.312,
+    -0.95
+   ],
+   "ancho": 863,
+   "alto": 2350,
+   "conectada": true,
+   "tex": "EO_r103Door1.png"
+  },
+  {
+   "centro": [
+    -39444,
+    12,
+    11963
+   ],
+   "normal": [
+    0.305,
+    0.952
+   ],
+   "ancho": 2462,
+   "alto": 2500,
+   "conectada": true,
+   "tex": "EO_door2.png"
+  }
+ ],
+ "r104": [
+  {
+   "centro": [
+    -21287,
+    10,
+    28662
+   ],
+   "normal": [
+    -0.945,
+    0.327
+   ],
+   "ancho": 1007,
+   "alto": 2335,
+   "conectada": true,
+   "tex": "st_door_b.png"
+  }
+ ],
+ "r105": [
+  {
+   "centro": [
+    -20249,
+    1,
+    18052
+   ],
+   "normal": [
+    -0.29,
+    -0.957
+   ],
+   "ancho": 1147,
+   "alto": 2434,
+   "conectada": false,
+   "tex": "r105_door01.png"
+  },
+  {
+   "centro": [
+    -18239,
+    9,
+    28264
+   ],
+   "normal": [
+    -0.341,
+    -0.94
+   ],
+   "ancho": 1000,
+   "alto": 2328,
+   "conectada": false,
+   "tex": "r105_door04.png"
+  },
+  {
+   "centro": [
+    -21241,
+    -71,
+    28112
+   ],
+   "normal": [
+    0.965,
+    -0.263
+   ],
+   "ancho": 1286,
+   "alto": 2433,
+   "conectada": true,
+   "tex": "r105_door00.png"
+  },
+  {
+   "centro": [
+    -21983,
+    27,
+    15477
+   ],
+   "normal": [
+    0.312,
+    0.95
+   ],
+   "ancho": 2000,
+   "alto": 2300,
+   "conectada": true,
+   "tex": "r105_r10a_door00.png"
+  }
+ ],
+ "r106": [
+  {
+   "centro": [
+    -22598,
+    18,
+    9636
+   ],
+   "normal": [
+    -0.954,
+    0.301
+   ],
+   "ancho": 1001,
+   "alto": 2297,
+   "conectada": false,
+   "tex": "r106_door01.png"
+  },
+  {
+   "centro": [
+    -21049,
+    9,
+    5733
+   ],
+   "normal": [
+    0.311,
+    0.951
+   ],
+   "ancho": 1099,
+   "alto": 2351,
+   "conectada": false,
+   "tex": "r106_alfa_door03.png"
+  },
+  {
+   "centro": [
+    -22124,
+    12,
+    15063
+   ],
+   "normal": [
+    -0.352,
+    -0.936
+   ],
+   "ancho": 2061,
+   "alto": 2500,
+   "conectada": true,
+   "tex": "EO_door2.png"
+  }
+ ],
+ "r107": [],
+ "r108": [
+  {
+   "centro": [
+    -34992,
+    3517,
+    10087
+   ],
+   "normal": [
+    0.248,
+    0.969
+   ],
+   "ancho": 1857,
+   "alto": 2822,
+   "conectada": true,
+   "tex": "r108_door01.png"
+  },
+  {
+   "centro": [
+    -33841,
+    3546,
+    17157
+   ],
+   "normal": [
+    0.95,
+    -0.313
+   ],
+   "ancho": 1072,
+   "alto": 2357,
+   "conectada": false,
+   "tex": "r108_door02.png"
+  },
+  {
+   "centro": [
+    -25029,
+    3523,
+    8026
+   ],
+   "normal": [
+    -0.956,
+    0.294
+   ],
+   "ancho": 1121,
+   "alto": 2120,
+   "conectada": false,
+   "tex": "r108_door01_p.png"
+  },
+  {
+   "centro": [
+    -27595,
+    3529,
+    17490
+   ],
+   "normal": [
+    0.351,
+    0.936
+   ],
+   "ancho": 2012,
+   "alto": 2500,
+   "conectada": true,
+   "tex": "r108_door03b.png"
+  },
+  {
+   "centro": [
+    -23645,
+    3529,
+    12685
+   ],
+   "normal": [
+    -0.948,
+    0.317
+   ],
+   "ancho": 1101,
+   "alto": 2350,
+   "conectada": true,
+   "tex": "r108_door01.png"
+  }
+ ],
+ "r109": [
+  {
+   "centro": [
+    -27685,
+    3529,
+    17207
+   ],
+   "normal": [
+    -0.381,
+    -0.924
+   ],
+   "ancho": 2011,
+   "alto": 2500,
+   "conectada": true,
+   "tex": "EO_door2.png"
+  }
+ ],
+ "r111": [],
+ "r112": [
+  {
+   "centro": [
+    -36366,
+    4026,
+    -24587
+   ],
+   "normal": [
+    0.359,
+    0.933
+   ],
+   "ancho": 1198,
+   "alto": 2418,
+   "conectada": false,
+   "tex": "r112_door01.png"
+  },
+  {
+   "centro": [
+    -31059,
+    4025,
+    -25303
+   ],
+   "normal": [
+    -0.934,
+    0.357
+   ],
+   "ancho": 1733,
+   "alto": 2420,
+   "conectada": true,
+   "tex": "r112_door01.png"
+  }
+ ],
+ "r113": [
+  {
+   "centro": [
+    -26652,
+    4024,
+    -22738
+   ],
+   "normal": [
+    -0.323,
+    -0.946
+   ],
+   "ancho": 1303,
+   "alto": 2302,
+   "conectada": false,
+   "tex": "EO_r113Door01.png"
+  },
+  {
+   "centro": [
+    -28644,
+    4024,
+    -28794
+   ],
+   "normal": [
+    0.324,
+    0.946
+   ],
+   "ancho": 1303,
+   "alto": 2302,
+   "conectada": false,
+   "tex": "EO_r113Door01.png"
+  },
+  {
+   "centro": [
+    -42594,
+    4024,
+    -14654
+   ],
+   "normal": [
+    0.935,
+    -0.354
+   ],
+   "ancho": 1062,
+   "alto": 2350,
+   "conectada": true,
+   "tex": "EO_r113Door01.png"
+  }
+ ],
+ "r114": [
+  {
+   "centro": [
+    -40391,
+    4025,
+    -8814
+   ],
+   "normal": [
+    0.977,
+    -0.213
+   ],
+   "ancho": 1160,
+   "alto": 2350,
+   "conectada": true,
+   "tex": "r114_door06.png"
+  },
+  {
+   "centro": [
+    -30857,
+    4034,
+    -7175
+   ],
+   "normal": [
+    0.306,
+    0.952
+   ],
+   "ancho": 1989,
+   "alto": 2328,
+   "conectada": true,
+   "tex": "r114_door_2.png"
+  }
+ ],
+ "r115": [
+  {
+   "centro": [
+    -30991,
+    4004,
+    -7544
+   ],
+   "normal": [
+    -0.344,
+    -0.939
+   ],
+   "ancho": 2051,
+   "alto": 2500,
+   "conectada": true,
+   "tex": "EO_door2.png"
+  }
+ ]
+}

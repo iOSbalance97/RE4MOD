@@ -27,7 +27,7 @@ def parse(d):
 
 def load(dirn):
     mods = {}
-    for f in sorted(glob.glob(f'{dirn}/st1_*.rel')):
+    for f in sorted(glob.glob(f'{dirn}/' + os.environ.get('RELPREF', 'st1') + '_*.rel')):
         d = bytearray(open(f, 'rb').read()); mid, secs, rel = parse(d)
         mods[mid] = dict(file=f, d=d, secs=secs, rel=rel)
     return mods
