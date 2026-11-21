@@ -12,7 +12,7 @@ col = {}
 for rr, ids in MAPA.items():
     for s in ids: col[(1, s & 0xFF)] = ('obj', f'/home/claude/uc/re4/{rr}/col/colision.obj', rr)
 for n, (st, rid) in mundo.HUECO.items():
-    col[(st, rid)] = ('obj', f'/home/claude/uc/re4/{n}/col/colision.obj', n) if n.startswith('r1') else ('npz', f'/home/claude/gen/{n}/col.npz', n)
+    col[(st, rid)] = ('obj', f'{mundo.dir_sala(n)}/col/colision.obj', n) if mundo.es_malla(n) else ('npz', f'/home/claude/gen/{n}/col.npz', n)
 col[(1, 0x01)] = None; col[(1, 0x11)] = None          # pueblo (sin tocar)
 cache = {}
 def suelos(k):

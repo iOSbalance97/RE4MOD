@@ -41,7 +41,7 @@ def ep(key, slots, centro, n, ancho, y, fondo=1500.0):
     EP[key] = dict(slots=slots, area=dict(floor=float(y - 300.0), height=2600.0, pts=caja(c, u, n, ancho + 300.0, 50.0, f1)),
                    pos=(float(c[0] + n[0] * dl), float(y), float(c[1] + n[1] * dl)), ang=float(np.arctan2(n[0], n[1])))
 def fondo_suelo(rr, c, n, y):
-    Tc = floors(f'/home/claude/uc/re4/{rr}/col/colision.obj'); n = np.asarray(n, float) / np.linalg.norm(n); f = 0.0
+    Tc = floors(f'{mundo.dir_sala(rr)}/col/colision.obj'); n = np.asarray(n, float) / np.linalg.norm(n); f = 0.0
     for d in np.arange(300.0, 1501.0, 100.0):              # el mayor fondo con suelo (el umbral puede no tenerlo)
         q = (np.asarray(c, float) + n * d) / 1000.0; h = heights(Tc, q[0], q[1]) * 1000.0
         if len(h) and np.abs(h - y).min() < 400: f = d
@@ -49,7 +49,7 @@ def fondo_suelo(rr, c, n, y):
 libres = json.load(open('/home/claude/uc/puertas_libres.json'))
 def huecos_uc(rr): return [(1, s & 0xFF) for s in sorted(MAPA[rr], reverse=True)]     # r102: primero r113 (el vestíbulo normal)
 def lado_con_suelo(rr, c, n, y):
-    Tc = floors(f'/home/claude/uc/re4/{rr}/col/colision.obj'); n = np.asarray(n, float) / np.linalg.norm(n); ok = []
+    Tc = floors(f'{mundo.dir_sala(rr)}/col/colision.obj'); n = np.asarray(n, float) / np.linalg.norm(n); ok = []
     for s in (1, -1):
         q = (np.asarray(c, float) + s * n * 1500.0) / 1000.0; h = heights(Tc, q[0], q[1]) * 1000.0
         ok.append(len(h) > 0 and np.abs(h - y).min() < 400)
@@ -61,13 +61,13 @@ for rr, L in libres.items():
         ep(f'm:{rr}:{i}', huecos_uc(rr), c, nn, d['ancho'], d['centro'][1], fondo_suelo(rr, c, nn, d['centro'][1]))
 for k, v in mundo.VIRTUALES.items():
     ep(f'v:{k}', huecos_uc(v['sala']), (v['centro'][0], v['centro'][2]), v['normal'], v['ancho'], v['centro'][1])
-for sname in [s for s in mundo.HUECO if not s.startswith('r1')]:
+for sname in [s for s in mundo.HUECO if not mundo.es_malla(s)]:
     meta = json.load(open(f'/home/claude/gen/{sname}/meta.json'))
     for d in meta['puertas']:
         ep(f'g:{sname}:{d["id"]}', [mundo.HUECO[sname]], (d['centro'][0] * 1000, d['centro'][2] * 1000), d['normal'], d['ancho'] * 1000, d['centro'][1] * 1000)
 import pisable
 for rr, pts in mundo.AREAS.items():
-    P = pisable.Pisable(f'/home/claude/uc/re4/{rr}/col/colision.obj'); comp = int(np.argmax(P.tam))
+    P = pisable.Pisable(f'{mundo.dir_sala(rr)}/col/colision.obj'); comp = int(np.argmax(P.tam))
     for k, (x, z) in pts.items():
         p, v, dist = P.ajustar(x, z, comp)
         if dist > 2.0: print(f'  aviso: puerta {rr}:{k} movida {dist:.1f} m para quedar en la zona pisable principal')
@@ -99,7 +99,7 @@ print('puntos de puerta:', len(EP), '| sin enlazar:', ' '.join(sin_usar))
 
 def leer(st, rid):
     return RI.read_das(f'{ORIG}/St{st}/r{st}{rid:02x}.das')
-def montar_nueva(st, rid, base, llamas, lamparas):
+def montar_nueva(st, rid, base, llamas, lamparas, HORN=False):
     name = f'r{st}{rid:02x}'
     sig, snd_rec, snd, body, _ = leer(st, rid)
     entries, rel = RI.parse_body(body)
@@ -108,7 +108,7 @@ def montar_nueva(st, rid, base, llamas, lamparas):
     new = {'SMD': open(f'{base}/mod/sala.smd', 'rb').read(), 'SMX': open(f'{base}/mod/sala.smx', 'rb').read(),
            'SAT': open(f'{base}/col/sala.sat', 'rb').read(), 'EAT': open(f'{base}/col/sala.eat', 'rb').read(), 'AEV': aev,
            'CAM': CAM_VACIO}
-    amb, nl, nluz = uc_ambiente.ambiente(name, llamas, lamparas); new.update(amb)
+    amb, nl, nluz = uc_ambiente.ambiente(name, llamas, lamparas, horneada=HORN); new.update(amb)
     done = set(); out = []
     for t, d in entries:
         n = drs.tag_name(t)
@@ -124,14 +124,14 @@ def montar_nueva(st, rid, base, llamas, lamparas):
 
 informe = []
 for sname, (st, rid) in mundo.HUECO.items():
-    if sname.startswith('r1'):
-        base = f'/home/claude/uc/re4/{sname}'
-        lamparas = [(p[0], p[1] + 2400.0, p[2]) for k, p in ((k, EP[k]['pos']) for k in EP if k.startswith(f'a:{sname}:'))]
+    if mundo.es_malla(sname):
+        base = mundo.dir_sala(sname)
+        lamparas = [] if mundo.HORNEADA(sname) else [(p[0], p[1] + 2400.0, p[2]) for k, p in ((k, EP[k]['pos']) for k in EP if k.startswith(f'a:{sname}:'))]
         llamas = []
     else:
         base = f'/home/claude/gen/{sname}'; meta = json.load(open(f'{base}/meta.json'))
         llamas, lamparas = meta['llamas'], meta['lamparas']
-    name, nd, nl, nluz, nb, ob = montar_nueva(st, rid, base, llamas, lamparas)
+    name, nd, nl, nluz, nb, ob = montar_nueva(st, rid, base, llamas, lamparas, mundo.HORNEADA(sname))
     informe.append((name, sname, nd, nl, nluz, nb, ob))
     print(f'{name} <- {sname:13s} puertas {nd:2d} llamas {nl:2d} luces {nluz:2d}  {nb/1e6:.2f} MB (original {ob/1e6:.2f}){"  ¡MAYOR!" if nb > ob else ""}')
 # r120 (partida nueva): sus animaciones de textura (TEX, opcional) fuera para que no crezca por el AEV nuevo

@@ -13,7 +13,7 @@ col = {}
 for rr, ids in MAPA.items():
     for s in ids: col[(1, s & 0xFF)] = ('obj', f'/home/claude/uc/re4/{rr}/col/colision.obj', rr)
 for n, (st, rid) in mundo.HUECO.items():
-    col[(st, rid)] = ('obj', f'/home/claude/uc/re4/{n}/col/colision.obj', n) if n.startswith('r1') else ('npz', f'/home/claude/gen/{n}/col.npz', n)
+    col[(st, rid)] = ('obj', f'{mundo.dir_sala(n)}/col/colision.obj', n) if mundo.es_malla(n) else ('npz', f'/home/claude/gen/{n}/col.npz', n)
 def tris(k):
     t, p, n = col[k]
     if t == 'obj':
@@ -40,7 +40,7 @@ if len(sys.argv) > 2 and sys.argv[2] == '--gen':        # solo salas generadas, 
     import json
     salas = {}; llegadas = {}
     for n, k in mundo.HUECO.items():
-        if n.startswith('r1'): continue
+        if mundo.es_malla(n): continue
         m = json.load(open(f'/home/claude/gen/{n}/meta.json'))
         for d in m['puertas']:
             c = np.array(d['centro'])[[0, 2]]; nn = np.array(d['normal'])

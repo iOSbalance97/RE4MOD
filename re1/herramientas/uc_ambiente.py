@@ -47,7 +47,7 @@ def luz(base, tipo, id_, mask, pos, radio, col, inten, padre, no, flick=0):
         l[0x6C:0x70] = bytes(col); l[0x70] = flick & 0xFF
     return bytes(l)
 
-def ambiente(rid_orig, llamas, lamparas):
+def ambiente(rid_orig, llamas, lamparas, horneada=False):
     """rid_orig: nombre de la sala original de RE4 (rNNN) cuyo LIT sirve de base"""
     lits = sorted(glob.glob(f'{SCAN}/{rid_orig}/*_LIT.bin'))
     d = open(lits[0], 'rb').read()
@@ -57,6 +57,8 @@ def ambiente(rid_orig, llamas, lamparas):
     struct.pack_into('>2f', env, 0x0C, 4000.0, 30000.0)              # niebla: de 4 a 30 m
     env[0x14:0x18] = bytes((0, 0, 0, 0x80))                          # niebla negra
     env[0xFC:0x100] = bytes((0x30, 0x2C, 0x2C, 0x80))               # ambiente de personajes (se ve a Leon)
+    if horneada:                                                     # texturas con la luz ya pintada (fondos del REmake): que se vean tal cual
+        env[0:4] = bytes((0x80, 0x80, 0x80, 0x80)); struct.pack_into('>2f', env, 0x0C, 8000.0, 40000.0); llamas = []
     luces = []
     # luces de Leon de la sala original, más tenues
     leon = [l for l in cuts[0][1] if l[0x1C] == 1 and struct.unpack('>I', l[0x20:0x24])[0] == 0]

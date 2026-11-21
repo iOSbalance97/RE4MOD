@@ -5,10 +5,17 @@ Puntos de puerta:
   a:<rUC>:<letra>         sala UC de patio/cuevas/residencia/laboratorio (punto aproximado en metros de UC, se ajusta al suelo)
   v:<nombre>              puerta solo-AEV en una sala UC de la mansión (posición RE4 mm a mano)"""
 
+def es_malla(n):
+    """salas que vienen de una malla (UC o REmake), no del generador"""
+    return n.startswith('r1') or n.startswith('re_')
+def dir_sala(n):
+    return f'/home/claude/re1gc/re4/{n}' if n.startswith('re_') else f'/home/claude/uc/re4/{n}'
+HORNEADA = lambda n: n.startswith('re_')      # luz ya pintada en las texturas (fondos del REmake)
+
 # huecos de RE4: (fase, sala)
 HUECO = {
     # mansión generada (fase 1)
-    'te_bar': (1, 0x17), 'norte': (1, 0x18), 'arte': (1, 0x19), 'oscuro': (1, 0x1a), 'cementerio': (1, 0x1b),
+    're_r10f': (1, 0x17), 'norte': (1, 0x18), 'arte': (1, 0x19), 'oscuro': (1, 0x1a), 'cementerio': (1, 0x1b),
     'techado': (1, 0x1c), 'bano': (1, 0x1d), 'salon': (1, 0x1e), 'pasillo_c': (1, 0x1f),
     # fase 2
     'balcones': (2, 0x00), 'ciervo': (2, 0x01), 'dormitorio': (2, 0x02), 'ascensor': (2, 0x03), 'espejos': (2, 0x04),
@@ -21,6 +28,7 @@ HUECO = {
     'r139': (2, 0x23), 'r140': (2, 0x27), 'r142': (2, 0x25), 'r144': (2, 0x26),
 }
 NOMBRE = {
+    're_r10f': 'Bar del piano (REmake)',
     'r116': 'Patio: entrada con fuente', 'r117': 'Patio: sendero', 'r118': 'Jardín principal (fuente, ascensor al laboratorio)',
     'r119': 'Patio: camino a la piscina', 'r120': 'Cuevas: entrada', 'r121': 'Cuevas: pasaje de las rocas', 'r122': 'Cuevas: sala de la estatua',
     'r123': 'Residencia: pasillo de entrada', 'r125': 'Residencia: pasillo central', 'r126': 'Residencia: almacén',
@@ -31,6 +39,7 @@ NOMBRE = {
 }
 # salas UC de fuera de la mansión: puntos de puerta aproximados (x, z en metros de UC)
 AREAS = {
+    're_r10f': dict(S=(-3.0, -6.5), E=(4.5, -1.0)),
     'r116': dict(O=(-9.8, 3.5), N=(4.0, 8.6), S=(1.0, -7.6)),
     'r117': dict(A=(-10.5, -10.8), B=(1.0, -8.2)),
     'r118': dict(S=(0.0, -13.8), N=(0.0, 9.6), E=(7.5, 0.0), O=(-7.5, -0.5)),
@@ -60,8 +69,7 @@ VIRTUALES = {
 }
 ENLACES = [
     # mansión 1F oeste
-    ('m:r100:0', 'g:te_bar:comedor'), ('m:r100:1', 'g:norte:vestibulo'), ('g:te_bar:norte', 'g:norte:te'),
-    ('g:te_bar:sotano', 'g:ascensor:ascensor'),
+    ('m:r100:0', 'a:re_r10f:S'), ('m:r100:1', 'g:norte:vestibulo'), ('a:re_r10f:E', 'g:norte:te'),
     # mansión 1F este
     ('m:r105:0', 'g:bano:entrada'), ('m:r105:1', 'g:salon:entrada'), ('g:bano:salon', 'g:salon:bano'),
     ('m:r106:0', 'g:oscuro:entrada'), ('m:r106:1', 'g:arte:entrada'), ('g:oscuro:cementerio', 'g:cementerio:galeria'),
