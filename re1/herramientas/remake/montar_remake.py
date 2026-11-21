@@ -56,6 +56,34 @@ for f_ in (1, 2):
 nuevas = sorted(r for r, (f_, i) in HUECO.items() if i not in EN_TABLA[f_])
 print(f'{len(HUECO)} salas; {len(nuevas)} en ids nuevos (fuera de la tabla de la fase): {" ".join(nuevas)}')
 
+# ---------------- colocación del vestíbulo: r120 (intro original de RE4) salta a r100 en (-109450, -515, 820) mirando a 0
+ENT_H = np.array([0.0, 2030.0, 8000.0]); ANG_H = np.pi              # entrada principal del vestíbulo, mirando a la escalera
+J = np.array([-109450.0, -515.0, 820.0]); GIRO = -ANG_H
+_c, _s = np.cos(GIRO), np.sin(GIRO); RM = np.array([[_c, 0, _s], [0, 1, 0], [-_s, 0, _c]])
+def tp(sala, p):        # punto (mm) de la sala -> mundo del juego
+    p = np.asarray(p, float)
+    return RM @ (p - ENT_H) + J if sala == INICIO else p
+def tang(sala, a): return a + GIRO if sala == INICIO else a
+def txz(sala, x, z):
+    q = tp(sala, (x, 0.0, z)); return float(q[0]), float(q[2])
+def ty(sala, y): return float(y + (J[1] - ENT_H[1])) if sala == INICIO else float(y)
+def preparar_inicio():
+    base = f'{R1}/re4/re_{INICIO}'; dst = f'{R1}/re4/re_{INICIO}_ini'
+    if os.path.exists(f'{dst}/hecho'): return dst
+    os.makedirs(f'{dst}/col', exist_ok=True)
+    col = f'{R1}/salas/{INICIO}/colision.obj'
+    esp = ','.join(str(x) for x in list(ENT_H / 1000) + list(J) + [GIRO])
+    subprocess.run(['python3', '/home/claude/tools/re4room.py', f'{R1}/salas/{INICIO}/sala.obj', f'{dst}/mod', '--tex-max', '512', f'--colocar={esp}'], check=True, capture_output=True)
+    L = []
+    for l in open(col):
+        if l.startswith('v '):
+            v = np.array(l.split()[1:4], float) * 1000; v = tp(INICIO, v) / 1000; L.append(f'v {v[0]:.4f} {v[1]:.4f} {v[2]:.4f}\n')
+        else: L.append(l)
+    open(f'{dst}/col/c.obj', 'w').writelines(L)
+    subprocess.run(['python3', '/home/claude/tools/obj2sat.py', f'{dst}/col/c.obj', f'{dst}/col'], check=True, capture_output=True)
+    open(f'{dst}/hecho', 'w').write('ok'); return dst
+DIR_INICIO = preparar_inicio()
+
 # ---------------- puertas
 def hit_xz4(p, q):
     x, z = q
@@ -89,6 +117,10 @@ def area_de(quad, piso, sala=None):
         # cuadrilátero raro: caja alineada
         x0, z0 = P.min(0); x1, z1 = P.max(0); pts = [(x0, z0), (x1, z0), (x1, z1), (x0, z1)]
         if not hit_xz4(pts, tuple(c)): pts = pts[::-1]
+    if sala == INICIO:
+        pts = [txz(sala, x, z) for x, z in pts]
+        if not hit_xz4(pts, txz(sala, *c)): pts = pts[::-1]
+        piso = ty(sala, piso)
     return dict(floor=float(piso - 400.0), height=3200.0, pts=pts)
 def door_rec(no, area, dest, pos, ang):
     rr = bytearray(TPL)
@@ -122,7 +154,8 @@ for a in sorted(HUECO):
                         if abs(hh[k_] - y) < 1500: mejor = (xx, float(hh[k_]), zz); break
                 if mejor: break
             if mejor: print(f'  llegada {a}->{b} movida a suelo: {np.round(mejor)}'); x, y, z = mejor
-        AEVS.setdefault(a, []).append((area_de(d['quad'], piso, a), HUECO[b], (float(x), float(y), float(z)), float(ang), f'{a} -> {b}'))
+        q_ = tp(b, (x, y, z))
+        AEVS.setdefault(a, []).append((area_de(d['quad'], piso, a), HUECO[b], (float(q_[0]), float(q_[1]), float(q_[2])), float(tang(b, ang)), f'{a} -> {b}'))
         informe_p.append((a, b))
 print('puertas:', len(informe_p))
 
@@ -136,7 +169,7 @@ def montar(r):
     entries, rel = RI.parse_body(body)
     recs = [door_rec(k, *x[:4]) for k, x in enumerate(AEVS.get(r, []))]
     aev = b'AEV\0' + struct.pack('>HH8x', 0x104, len(recs)) + b''.join(recs)
-    base = f'{R1}/re4/re_{r}'
+    base = DIR_INICIO if r == INICIO else f'{R1}/re4/re_{r}'
     new = {'SMD': open(f'{base}/mod/sala.smd', 'rb').read(), 'SMX': open(f'{base}/mod/sala.smx', 'rb').read(),
            'SAT': open(f'{base}/col/sala.sat', 'rb').read(), 'EAT': open(f'{base}/col/sala.eat', 'rb').read(), 'AEV': aev,
            'CAM': CAM_VACIO}
@@ -162,30 +195,12 @@ with cf.ProcessPoolExecutor(max_workers=int(os.environ.get('HILOS', 4))) as ex:
         informe.append((r, name, nd, nb, nd_))
         print(f'{name} <- {r}  puertas {nd:2d}  descomprimido {nb/1e6:.2f} MB  fichero {nd_/1e6:.2f} MB', flush=True)
 
-# ---------------- r120: partida nueva -> puerta automática al vestíbulo
-llegada_inicio = None
-for e in G['r105']:
-    pass
-ent = [e['llegada'] for e in G['r105'] if e['dst'] == INICIO]
-ENTRADA = tuple(map(float, ent[0])) if ent else (0.0, 0.0, 0.0, 0.0)
-sig, snd_rec, snd, body, _ = RI.read_das(f'{ORIG}/St1/r120.das'); entries, rel = RI.parse_body(body)
-r = bytearray(TPL); r[4], r[5] = 1, 1
-struct.pack_into('>3f', r, 0x08, -100000.0, 200000.0, 0.0)
-pts = [(-900000, -900000), (900000, -900000), (900000, 900000), (-900000, 900000)]
-if not hit_xz4(pts, (0.0, 0.0)): pts = pts[::-1]
-for k, (x, z) in enumerate(pts): struct.pack_into('>2f', r, 0x14 + 8 * k, x, z)
-r[0x36] = 0; r[0x38] = 1
-struct.pack_into('>4f', r, 0x5C, *ENTRADA)
-r[0x6C], r[0x6D], r[0x6E], r[0x6F] = 1, HUECO[INICIO][1], 0, 0
-aev = b'AEV\0' + struct.pack('>HH8x', 0x104, 1) + bytes(r)
-entries = [[b'x' + t[1:], bytes(32)] if drs.tag_name(t) in ('FCV', 'SEQ', 'ITA', 'TEX') else
-           [t, CAM_VACIO if drs.tag_name(t) == 'CAM' else (aev if drs.tag_name(t) == 'AEV' else d)] for t, d in entries]
-nb = RI.pack_body(entries, rel); open(f'{OUT}/St1/r120.das', 'wb').write(RI.write_das(sig, snd_rec, snd, nb))
-print('r120: partida nueva -> vestíbulo', ENTRADA)
+# r120 queda original: película, intro en el coche y salto a r100 (el vestíbulo, colocado para recibirlo)
+ENTRADA = tuple(J.tolist())
 
 # ---------------- scripts fuera (Rel) y enemigos fuera (ESL)
 for pref, f_ in (('st1', 1), ('st2', 2)):
-    lst = sorted(EN_TABLA[f_] + ([0x20] if f_ == 1 else []))
+    lst = sorted(EN_TABLA[f_])
     tmp = f'/tmp/rel_{pref}'; shutil.rmtree(tmp, ignore_errors=True); os.makedirs(tmp)
     for f in os.listdir(f'{ORIG}/Rel'):
         if f.startswith(pref + '_'): shutil.copy(f'{ORIG}/Rel/{f}', tmp)
