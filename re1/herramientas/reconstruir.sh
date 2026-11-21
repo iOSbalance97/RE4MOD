@@ -11,7 +11,8 @@ for r in $SALAS; do
   case $r in
     r102) python3 $T/ucol2re4.py $r /home/claude/uc/re4/$r/col --colocar="$COL" --suelo-extra=-70000,-55000,30000,30000,0 --bloque 4000 --suelo-visible 3.9,7 > /home/claude/uc/re4/$r.col.log ;;
   esac
-  python3 $T/uc_envolvente.py $r
+  EX=""; [ $r = r102 ] && EX="--doble=4.2,5.9 --suelo-tex=yg_lug01.png"
+  python3 $T/uc_envolvente.py $r $EX
   tm=256; [ $r = r115 ] && tm=128
   python3 $T/re4room.py /home/claude/uc/m/$r/sala.obj /home/claude/uc/re4/$r/mod --decimar 0.4 --tex-max $tm --colocar="$COL" > /home/claude/uc/re4/$r.room.log
   head -1 /home/claude/uc/re4/$r.room.log

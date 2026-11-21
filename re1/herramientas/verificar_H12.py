@@ -49,7 +49,7 @@ for st in (1, 2):
         if 'LIT' in tags and 'ETS' in tags:
             cn, ver, mx, cuts = uc_ambiente.lit_parse(tags['LIT']); nets = struct.unpack('>H', tags['ETS'][:2])[0]
             tor = sum(1 for l in cuts[0][1] if l[0x1C] == 3)
-            if tor != nets: problemas.append(f'{os.path.basename(p)}: {tor} luces de antorcha y {nets} antorchas')
+            if tor > nets or (nets and not tor): problemas.append(f'{os.path.basename(p)}: {tor} luces de antorcha y {nets} antorchas')
         salas[(st, rid)] = recs
 print('salas montadas:', len(salas))
 # puertas

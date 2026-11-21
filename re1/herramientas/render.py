@@ -63,8 +63,13 @@ def draw(c,t,mn,vw):
     yy,xx=np.nonzero(ok); yy=yy[a];xx=xx[a]
     sub[yy,xx]=z[ok][a]; img[y0:y1+1,x0:x1+1][yy,xx]=col[a]
 
+import os
+CULL=os.environ.get('CULL')
 for fi,(tri,mn) in enumerate(zip(F,FM)):
     c=C[tri[:3]]
+    if CULL:
+        vw=V[tri[:3]]; nn=np.cross(vw[1]-vw[0],vw[2]-vw[0])
+        if np.dot(nn, vw.mean(0)-eye)>=0: continue
     if YMAX is not None and V[tri[:3],1].min()>YMAX: continue
     if (c[:,2]<near).all(): continue
     tt=T[tri[3:]] if len(T) else np.zeros((3,2))

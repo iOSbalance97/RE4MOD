@@ -77,6 +77,7 @@ for rr, pts in mundo.AREAS.items():
         EP[f'a:{rr}:{k}']['pos'] = (float(q[0] * 1000), float(q[1] * 1000), float(q[2] * 1000))
 # 3) registros AEV por hueco
 TPL = UM.TPL
+CAM_VACIO = open('/home/claude/tools/cam_vacio.bin', 'rb').read()   # 'EMPT': sin zonas de cámara (cámara libre de RE4)
 def door_rec(no, area, dest, pos, ang):
     rr = bytearray(TPL)
     rr[4], rr[5], rr[6], rr[7] = 1, 1, 0, 0
@@ -105,7 +106,8 @@ def montar_nueva(st, rid, base, llamas, lamparas):
     recs = [door_rec(i, *x[:4]) for i, x in enumerate(AEVS.get((st, rid), []))]
     aev = b'AEV\0' + struct.pack('>HH8x', 0x104, len(recs)) + b''.join(recs)
     new = {'SMD': open(f'{base}/mod/sala.smd', 'rb').read(), 'SMX': open(f'{base}/mod/sala.smx', 'rb').read(),
-           'SAT': open(f'{base}/col/sala.sat', 'rb').read(), 'EAT': open(f'{base}/col/sala.eat', 'rb').read(), 'AEV': aev}
+           'SAT': open(f'{base}/col/sala.sat', 'rb').read(), 'EAT': open(f'{base}/col/sala.eat', 'rb').read(), 'AEV': aev,
+           'CAM': CAM_VACIO}
     amb, nl, nluz = uc_ambiente.ambiente(name, llamas, lamparas); new.update(amb)
     done = set(); out = []
     for t, d in entries:
@@ -134,19 +136,19 @@ for sname, (st, rid) in mundo.HUECO.items():
     print(f'{name} <- {sname:13s} puertas {nd:2d} llamas {nl:2d} luces {nluz:2d}  {nb/1e6:.2f} MB (original {ob/1e6:.2f}){"  ¡MAYOR!" if nb > ob else ""}')
 # r120 (partida nueva): sus animaciones de textura (TEX, opcional) fuera para que no crezca por el AEV nuevo
 p = f'{OUT}/St1/r120.das'; sig, snd_rec, snd, body, _ = RI.read_das(p); entries, rel = RI.parse_body(body)
-entries = [[b'x' + t[1:], bytes(32)] if drs.tag_name(t) in ('FCV', 'SEQ', 'ITA', 'TEX') else [t, d] for t, d in entries]
+entries = [[b'x' + t[1:], bytes(32)] if drs.tag_name(t) in ('FCV', 'SEQ', 'ITA', 'TEX') else [t, CAM_VACIO if drs.tag_name(t) == 'CAM' else d] for t, d in entries]
 nb = RI.pack_body(entries, rel); open(p, 'wb').write(RI.write_das(sig, snd_rec, snd, nb))
 print(f'r120: {len(nb)} bytes (original {len(leer(1, 0x20)[3])})')
 # 4) puertas nuevas en las salas UC de la mansión (añadidas al AEV que ya escribió uc_montar2)
 for rr, ids in MAPA.items():
     for s in ids:
         extra = AEVS.get((1, s & 0xFF), [])
-        if not extra: continue
         p = f'{OUT}/St1/r{s:03x}.das'
         sig, snd_rec, snd, body, _ = RI.read_das(p); entries, rel = RI.parse_body(body)
         out = []
         for t, d in entries:
-            if drs.tag_name(t) == 'AEV':
+            if drs.tag_name(t) == 'CAM': d = CAM_VACIO
+            if drs.tag_name(t) == 'AEV' and extra:
                 n0 = struct.unpack('>H', d[6:8])[0]
                 recs = [door_rec(n0 + i, *x[:4]) for i, x in enumerate(extra)]
                 d = d[:4] + struct.pack('>HH8x', 0x104, n0 + len(recs)) + d[0x10:0x10 + n0 * 0x9C] + b''.join(recs)

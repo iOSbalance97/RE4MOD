@@ -53,10 +53,10 @@ def ambiente(rid_orig, llamas, lamparas):
     d = open(lits[0], 'rb').read()
     cn, ver, mx, cuts = lit_parse(d)
     env = bytearray(cuts[0][0])
-    env[0:4] = bytes((0x0A, 0x0A, 0x0C, 0x80))                     # ambiente del escenario: casi negro
-    struct.pack_into('>2f', env, 0x0C, 1500.0, 38000.0)              # niebla: de 1,5 a 38 m
+    env[0:4] = bytes((0x1A, 0x18, 0x1A, 0x80))                     # ambiente del escenario: oscuro, pero se intuye la sala
+    struct.pack_into('>2f', env, 0x0C, 4000.0, 30000.0)              # niebla: de 4 a 30 m
     env[0x14:0x18] = bytes((0, 0, 0, 0x80))                          # niebla negra
-    env[0xFC:0x100] = bytes((0x14, 0x14, 0x16, 0x80))               # ambiente de personajes: algo más (se ve a Leon)
+    env[0xFC:0x100] = bytes((0x30, 0x2C, 0x2C, 0x80))               # ambiente de personajes (se ve a Leon)
     luces = []
     # luces de Leon de la sala original, más tenues
     leon = [l for l in cuts[0][1] if l[0x1C] == 1 and struct.unpack('>I', l[0x20:0x24])[0] == 0]
@@ -75,9 +75,15 @@ def ambiente(rid_orig, llamas, lamparas):
         e = bytearray(0x28)
         struct.pack_into('>HH3f3f3f', e, 0, 0x14, i, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, p[0], p[1] - 300.0, p[2])
         ets += e
-        luces.append(luz(ANT, 2, 1, 0x57, (0.0, 300.0, 0.0), 6000.0, (0xF0, 0xA0, 0x58, 0x80), 1.1, 3, i, flick=0x12))
+    # luz del fuego: una por grupo de llamas (una araña o un candelabro = una luz), alcance corto
+    usadas = []
+    for i, p in enumerate(L):
+        if any(np.linalg.norm(np.subtract(p, L[j])) < 1500.0 for j in usadas): continue
+        usadas.append(i)
+        n_g = sum(1 for q in L if np.linalg.norm(np.subtract(p, q)) < 1500.0)
+        luces.append(luz(ANT, 2, 1, 0x57, (0.0, 300.0, 0.0), 3200.0 + 300.0 * min(n_g, 4), (0xE0, 0x98, 0x58, 0x80), 0.55 + 0.05 * min(n_g, 4), 3, i, flick=0x10))
     for p in reparto(lamparas, MAX_LAMPARAS) if len(lamparas) else []:
-        luces.append(luz(ANT, 2, 1, 0x57, tuple(p), 4500.0, (0xD8, 0xB4, 0x80, 0x80), 0.7, 0, 0, flick=0x05))
+        luces.append(luz(ANT, 2, 1, 0x57, tuple(p), 3500.0, (0xD0, 0xB8, 0x90, 0x80), 0.5, 0, 0, flick=0x04))
     luces = luces[:32]
     struct.pack_into('>I', env, 4, len(luces))
     corte = bytes(env) + b''.join(luces)

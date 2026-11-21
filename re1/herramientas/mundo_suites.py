@@ -76,7 +76,7 @@ S(nombre='oscuro', titulo='Pasillo oscuro, estudio del patio y galería grande',
 
 S(nombre='cementerio', titulo='Cementerio, cripta y pasillos de hormigón', estilo='jardin',
   celdas=[dict(id='cem', r=(0, 0, 16, 14), h=3.8, estilo='jardin', tex=dict(suelo='tierra')),
-          dict(id='baj', r=(6, 14, 10, 22), y=-4.0, h=7.8, estilo='cripta', techo=False, tex=dict()),
+          dict(id='baj', r=(6, 14, 10, 22), y=-4.0, h=7.8, estilo='cripta'),
           dict(id='cri', r=(2, 22, 14, 30), y=-4.0, h=3.6, estilo='cripta'),
           dict(id='hor', r=(14, 24, 24, 27), y=-4.0, h=3.0, estilo='sotano')],
   pasos=[('cem', 'N', 8.0, 4.0, 4.0), ('baj', 'S', 2.0, 4.0, 3.8), ('baj', 'N', 2.0, 4.0), ('cri', 'S', 6.0, 4.0), ('cri', 'E', 3.5, 2.0), ('hor', 'O', 1.5, 2.0)],
@@ -178,7 +178,7 @@ S(nombre='espejos', titulo='Pasillo de los espejos y sala de trofeos', estilo='r
   cuadros=[('pas', 'O', 3.5, 1.0, 2.0, 0.4, 'marmol_pared'), ('pas', 'O', 10.5, 1.0, 2.0, 0.4, 'marmol_pared'), ('tro', 'N', 4.5, 1.6, 1.2, 1.8, 'retrato')])
 
 S(nombre='altar', titulo='Escalera bajo el vestíbulo y tumba de Jessica', estilo='cripta',
-  celdas=[dict(id='esc', r=(0, 0, 3, 12), y=-6.0, h=9.0, techo=False), dict(id='pas', r=(0, 12, 3, 20), y=-6.0, h=3.2),
+  celdas=[dict(id='esc', r=(0, 0, 3, 12), y=-6.0, h=9.0), dict(id='pas', r=(0, 12, 3, 20), y=-6.0, h=3.2),
           dict(id='tum', r=(-5, 20, 8, 32), y=-6.0, h=6.0, estilo='cripta')],
   pasos=[('esc', 'N', 1.5, 3.0), ('pas', 'S', 1.5, 3.0), ('pas', 'N', 1.5, 3.0), ('tum', 'S', 6.5, 3.0)],
   escaleras=[((0.2, 0.0, 2.8, 11.8), -6.0, 0.0, 'S', 'cripta')],

@@ -49,7 +49,7 @@ def rast(T3, fn):
 # suelos visibles (|ny|>0.7) y todo lo no vertical (para techos)
 vis_fl = [[[] for _ in range(nz)] for _ in range(nx)]
 vis_any = np.full((nx, nz), -1e9); vis_low = np.full((nx, nz), 1e9)
-fl_idx = np.nonzero((np.abs(n[:, 1]) > 0.7) & (ar > 1e-5))[0]
+fl_idx = np.nonzero((n[:, 1] > 0.7) & (ar > 1e-5))[0]
 def f_fl(i, ii, jj, Y):
     for a, b, y in zip(ii, jj, Y): vis_fl[a][b].append((y, fl_idx[i]))
 rast(tri[fl_idx], f_fl)
@@ -112,9 +112,15 @@ for i in range(nx):
             if (not len(vh) or not ((vh > y - 0.8) & (vh < y + 2.0)).any()) and vis_any[i, j] > y + 1.5 and interior[i, j]:
                 falta[i, j] = True; yfalta[i, j] = y; break
 falta = ndimage.binary_opening(falta, iterations=1)      # nada de celdas sueltas
-def tex_suelo(x, z):
+fl_y = tri[fl_idx].mean(1)[:, 1]
+t_forzada = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--suelo-tex=')), None)
+def tex_suelo(x, z, y=None):
+    if t_forzada: return t_forzada
     if fl_tree is None: return t_suelo
-    d, k = fl_tree.query([x, z]); t = tex[fl_idx[k]]
+    ks = fl_tree.query_ball_point([x, z], 4.0)
+    ks = [k for k in ks if y is None or abs(fl_y[k] - y) < 0.5]
+    if not ks: return t_suelo
+    k = min(ks, key=lambda k: (fl_cent[k][0] - x) ** 2 + (fl_cent[k][2] - z) ** 2); t = tex[fl_idx[k]]
     return t if t and not re.search('door|glass|nob|picture|candle', t, re.I) else t_suelo
 for i in range(nx):
     j = 0
@@ -123,7 +129,7 @@ for i in range(nx):
         y = round(yfalta[i, j] / 0.05) * 0.05; j2 = j
         while j2 + 1 < nz and falta[i, j2 + 1] and abs(round(yfalta[i, j2 + 1] / 0.05) * 0.05 - y) < 1e-6 and j2 - j < 20: j2 += 1
         x0, x1, z0, z1 = cx(i), cx(i + 1), cz(j), cz(j2 + 1)
-        quads.append((tex_suelo((x0 + x1) / 2, (z0 + z1) / 2), [(x0, y, z0), (x0, y, z1), (x1, y, z1), (x1, y, z0)], 'y'))
+        quads.append((tex_suelo((x0 + x1) / 2, (z0 + z1) / 2, y), [(x0, y + 0.02, z0), (x0, y + 0.02, z1), (x1, y + 0.02, z1), (x1, y + 0.02, z0)], 'y'))
         j = j2 + 1
 # 3) paredes en el borde de la máscara (aristas entre celda dentro y fuera), 0,3 m por fuera
 OFF = 0.3
@@ -181,12 +187,25 @@ for i in range(nx):
         quads.append((t_techo, [(x0, y, z0), (x1, y, z0), (x1, y, z1), (x0, y, z1)], 'y'))   # mirando hacia abajo
         j = j2 + 1
 
-print(f'{r}: rejilla {nx}x{nz}, planta {mask.sum()*CEL*CEL:.0f} m2, suelo que falta {falta.sum()*CEL*CEL:.1f} m2, '
+doble = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--doble=')), None)
+dobles = []
+if doble:
+    y0d, y1d = map(float, doble.split(','))
+    cyv = tri[:, :, 1].mean(1)
+    sel = np.nonzero((np.abs(n[:, 1]) < 0.7) & (cyv > y0d) & (cyv < y1d) & (ar > 1e-6))[0]
+    dobles = sel
+print(f'{r}: dobles {len(dobles)} tri, rejilla {nx}x{nz}, planta {mask.sum()*CEL*CEL:.0f} m2, suelo que falta {falta.sum()*CEL*CEL:.1f} m2, '
       f'sin techo {sin_techo.sum()*CEL*CEL:.1f} m2, piezas {len(quads)} ({2*len(quads)} tri); texturas pared={t_pared} techo={t_techo} suelo={t_suelo}')
 np.save(f'/tmp/env_mask_{r}.npy', np.stack([mask, falta, sin_techo, mv, mc]))
 if informe: sys.exit()
 with open(path, 'a') as f:
     f.write('\n# envolvente (uc_envolvente.py)\n')
+    if len(dobles):
+        cur = None
+        for i in dobles:
+            if M[i] != cur: f.write(f'usemtl {M[i]}\n'); cur = M[i]
+            fv = F[i]
+            f.write('f ' + ' '.join(f'{fv[k]+1}/{fv[3+k]+1}' for k in (0, 2, 1)) + '\n')
     nvb = len(V); ntb = len(T)
     for k, (t, P, kind) in enumerate(quads):
         P = np.array(P)
