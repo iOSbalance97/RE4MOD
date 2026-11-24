@@ -72,8 +72,9 @@ def preparar_inicio():
     if os.path.exists(f'{dst}/hecho'): return dst
     os.makedirs(f'{dst}/col', exist_ok=True)
     col = f'{R1}/salas/{INICIO}/colision.obj'
+    obj_ = f'{R1}/salas_uc3/{INICIO}/sala.obj' if os.path.exists(f'{R1}/salas_uc3/{INICIO}/sala.obj') else f'{R1}/salas/{INICIO}/sala.obj'
     esp = ','.join(str(x) for x in list(ENT_H / 1000) + list(J) + [GIRO])
-    subprocess.run(['python3', '/home/claude/tools/re4room.py', f'{R1}/salas/{INICIO}/sala.obj', f'{dst}/mod', '--tex-max', '512', f'--colocar={esp}'], check=True, capture_output=True)
+    subprocess.run(['python3', '/home/claude/tools/re4room.py', obj_, f'{dst}/mod', '--tex-max', '1024' if 'salas_uc3' in obj_ else '512', f'--colocar={esp}'], check=True, capture_output=True)
     L = []
     for l in open(col):
         if l.startswith('v '):
@@ -157,6 +158,18 @@ for a in sorted(HUECO):
         q_ = tp(b, (x, y, z))
         AEVS.setdefault(a, []).append((area_de(d['quad'], piso, a), HUECO[b], (float(q_[0]), float(q_[1]), float(q_[2])), float(tang(b, ang)), f'{a} -> {b}'))
         informe_p.append((a, b))
+SALTOS = json.load(open(f'{R1}/work/saltos_internos.json'))
+for a, lst in SALTOS.items():
+    if a not in HUECO: continue
+    for quad, (x, y, z, ang), y0 in lst:
+        if y0 is None:
+            if a not in TFL: TFL[a] = floors(f'{R1}/re4/re_{a}/col/colision.obj')
+            c = np.array(quad, float).reshape(4, 2).mean(0); hs = heights(TFL[a], c[0] / 1000, c[1] / 1000) * 1000
+            y0 = float(hs.min()) if len(hs) else float(y)
+        ar = area_de(quad, y0, a); ar['height'] = 1500.0            # solo a la altura de ese lado
+        q_ = tp(a, (x, y, z))
+        AEVS.setdefault(a, []).append((ar, HUECO[a], (float(q_[0]), float(q_[1]), float(q_[2])), float(tang(a, ang)), f'{a} -> {a} (interno)'))
+        informe_p.append((a, a))
 print('puertas:', len(informe_p))
 
 # ---------------- montaje de cada sala
@@ -189,7 +202,8 @@ def montar(r):
 import concurrent.futures as cf
 informe = []
 with cf.ProcessPoolExecutor(max_workers=int(os.environ.get('HILOS', 4))) as ex:
-    fut = {ex.submit(montar, r): r for r in sorted(HUECO)}
+    SOLO = os.environ.get('SOLO', '').split(',') if os.environ.get('SOLO') else None
+    fut = {ex.submit(montar, r): r for r in sorted(HUECO) if not SOLO or r in SOLO}
     for fu in cf.as_completed(fut):
         r = fut[fu]; name, nd, nb, nd_ = fu.result()
         informe.append((r, name, nd, nb, nd_))
@@ -199,6 +213,7 @@ with cf.ProcessPoolExecutor(max_workers=int(os.environ.get('HILOS', 4))) as ex:
 ENTRADA = tuple(J.tolist())
 
 # ---------------- scripts fuera (Rel) y enemigos fuera (ESL)
+if SOLO: open(f'{OUT}/../FIN_MONTAJE', 'w').write('solo'); raise SystemExit
 for pref, f_ in (('st1', 1), ('st2', 2)):
     lst = sorted(EN_TABLA[f_])
     tmp = f'/tmp/rel_{pref}'; shutil.rmtree(tmp, ignore_errors=True); os.makedirs(tmp)

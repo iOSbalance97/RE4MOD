@@ -7,13 +7,13 @@ fov=float(sys.argv[5]) if len(sys.argv)>5 else 70; W,H=(int(sys.argv[6]),int(sys
 base=os.path.dirname(objp)
 V=[];T=[];F=[];FM=[];cur=None;mtlfile=None
 for l in open(objp):
-    if l.startswith('v '): V.append(l.split()[1:4])
+    if l.startswith('v '): V.append((l.split()[1:7]+['1','1','1'])[:6])
     elif l.startswith('vt '): T.append(l.split()[1:3])
     elif l.startswith('f '):
         p=[x.split('/') for x in l.split()[1:4]]; F.append([int(a[0])-1 for a in p]+[int(a[1])-1 for a in p]); FM.append(cur)
     elif l.startswith('usemtl'): cur=l.split()[1]
     elif l.startswith('mtllib'): mtlfile=l.split()[1]
-V=np.array(V,float);T=np.array(T,float);F=np.array(F);
+V=np.array(V,float);VC=V[:,3:6];V=V[:,:3];T=np.array(T,float);F=np.array(F);
 mats={};m=None
 for l in open(os.path.join(base,mtlfile)):
     if l.startswith('newmtl'): m=l.split()[1]; mats[m]=None
@@ -37,7 +37,7 @@ def clip(c,t):
         if ina!=inb:
             u=(near-a[0][2])/(b[0][2]-a[0][2]); out.append((a[0]+u*(b[0]-a[0]),a[1]+u*(b[1]-a[1])))
     return [(np.array([out[0][0],out[k][0],out[k+1][0]]),np.array([out[0][1],out[k][1],out[k+1][1]])) for k in range(1,len(out)-1)]
-def draw(c,t,mn,vw):
+def draw(c,t,mn,vw,vc=None):
     sx=W/2+f*c[:,0]/c[:,2]; sy=H/2-f*c[:,1]/c[:,2]
     x0,x1=int(max(0,np.floor(sx.min()))),int(min(W-1,np.ceil(sx.max()))); y0,y1=int(max(0,np.floor(sy.min()))),int(min(H-1,np.ceil(sy.max())))
     if x0>x1 or y0>y1: return
@@ -60,6 +60,8 @@ def draw(c,t,mn,vw):
     else:
         n=np.cross(vw[1]-vw[0],vw[2]-vw[0]); n=np.abs(n)/(np.linalg.norm(n)+1e-12)
         a=np.ones(ok.sum(),bool); col=np.tile(0.25+0.75*n,(ok.sum(),1))
+    if vc is not None:
+        k=(w0[ok][:,None]*vc[0]+w1[ok][:,None]*vc[1]+w2[ok][:,None]*vc[2]); col=col*k*float(os.environ.get('VCESC','1'))
     yy,xx=np.nonzero(ok); yy=yy[a];xx=xx[a]
     sub[yy,xx]=z[ok][a]; img[y0:y1+1,x0:x1+1][yy,xx]=col[a]
 
@@ -74,6 +76,6 @@ for fi,(tri,mn) in enumerate(zip(F,FM)):
     if (c[:,2]<near).all(): continue
     tt=T[tri[3:]] if len(T) else np.zeros((3,2))
     if (c[:,2]<near).any():
-        for cc,t2 in clip(c,tt): draw(cc,t2,mn,V[tri[:3]])
-    else: draw(c,tt,mn,V[tri[:3]])
+        for cc,t2 in clip(c,tt): draw(cc,t2,mn,V[tri[:3]],np.tile(VC[tri[:3]].mean(0),(3,1)))
+    else: draw(c,tt,mn,V[tri[:3]],VC[tri[:3]])
 Image.fromarray((np.clip(img,0,1)*255).astype(np.uint8)).save(outp); print('ok',outp)

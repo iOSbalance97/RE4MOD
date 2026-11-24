@@ -132,13 +132,14 @@ def prep_texture(path, tex_max):
 
 # ---------------------------------------------------------------- geometría
 
-def weld(V, T, faces):
-    """faces (m, 6) [v0 v1 v2 t0 t1 t2] -> P, UV, tris (soldado por posición + UV)."""
+def weld(V, T, faces, C=None):
+    """faces (m, 6) [v0 v1 v2 t0 t1 t2] -> P, UV, tris (soldado por posición + UV) [, colores por vértice]."""
     corners_p = V[faces[:, :3].ravel()]; corners_t = T[faces[:, 3:].ravel()]
     key = np.c_[np.round(corners_p / 1e-5), np.round(corners_t / 1e-5)].astype(np.int64)
     _, first, inv = np.unique(key, axis=0, return_index=True, return_inverse=True)
     tris = inv.ravel().reshape(-1, 3)
     good = (tris[:, 0] != tris[:, 1]) & (tris[:, 1] != tris[:, 2]) & (tris[:, 0] != tris[:, 2])
+    if C is not None: return corners_p[first], corners_t[first], tris[good], C[faces[:, :3].ravel()][first]
     return corners_p[first], corners_t[first], tris[good]
 
 
@@ -164,9 +165,14 @@ def build_bin(groups, origin, scale, alpha_tex, n_tex):
     ext = np.abs(allP).max() if len(allP) else 1
     shift = 0
     while shift < 15 and ext * (1 << (shift + 1)) < 32000: shift += 1
-    vtx = []; nrm = []; tex = []; parts = []
-    for tex_id, P, UV, N, tris in groups:
+    vtx = []; nrm = []; tex = []; parts = []; clr = []
+    con_color = any(len(g) > 5 and g[5] is not None for g in groups)
+    for g_ in groups:
+        tex_id, P, UV, N, tris = g_[:5]; Cg = g_[5] if len(g_) > 5 else None
         base = len(vtx)
+        if con_color:
+            cq = np.clip(np.round((Cg if Cg is not None else np.ones((len(P), 3))) * 255), 0, 255).astype(int)
+            clr += [(int(r) << 24) | (int(g) << 16) | (int(b) << 8) | 0xFF for r, g, b in cq]
         q = np.round((P * scale - origin) * (1 << shift)).astype(int)
         vtx += [(int(x), int(y), int(z), 0) for x, y, z in q]
         nq = np.clip(np.round(N * 64), -64, 63).astype(int)
@@ -179,10 +185,10 @@ def build_bin(groups, origin, scale, alpha_tex, n_tex):
             for k in range(0, len(st) - 2, 60000):
                 seg = st[k:k + 60002]
                 if k % 2: raise RuntimeError('tira partida en impar')
-                prims.append(meshbin.Prim(meshbin.OP_STRIP, [(v, v, 0, v) for v in seg]))
+                prims.append(meshbin.Prim(meshbin.OP_STRIP, [(v, v, v if con_color else 0, v) for v in seg]))
         for k in range(0, len(singles), 21000):
             chunk = singles[k:k + 21000]
-            prims.append(meshbin.Prim(meshbin.OP_TRIANGLES, [(v, v, 0, v) for t in chunk for v in t]))
+            prims.append(meshbin.Prim(meshbin.OP_TRIANGLES, [(v, v, v if con_color else 0, v) for t in chunk for v in t]))
         stream = sum(3 + 8 * len(p.verts) for p in prims)
         md = dict(MAT_DEFAULT)
         flags = 0
@@ -197,7 +203,7 @@ def build_bin(groups, origin, scale, alpha_tex, n_tex):
     # cabecera como la de los modelos de escenario del juego: versión antigua, sin pesos ni tablas
     m = meshbin.Mesh(version=meshbin.VERSION_OLD, flags=meshbin.FLAG_TEX_S16_CLR | meshbin.FLAG_NRM_S8, shift=shift,
                      n_tex=n_tex, weight_palette_num=0, weight_ext_num=0, x8=0,
-                     heads=[meshbin.Head(0, 0xFF, 0, 0, (0.0, 0.0, 0.0))], vtx=vtx, nrm=nrm, clr=[0xFFFFFFFF],
+                     heads=[meshbin.Head(0, 0xFF, 0, 0, (0.0, 0.0, 0.0))], vtx=vtx, nrm=nrm, clr=clr if con_color else [0xFFFFFFFF],
                      tex=tex, weights=[], parts=parts, blend_table=None, flip_table=None, shapes=None)
     return meshbin.serialise(m), shift
 
@@ -255,6 +261,7 @@ def main():
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     V, T, F, M, G, mats = objload.load(a.obj)
+    COL = objload.load.colores if (objload.load.colores != 1).any() else None
     base = os.path.dirname(a.obj)
     V = place(V, a.colocar, a.escala)
     texnames = sorted({mats[m] for m in set(M) if mats.get(m)})
@@ -303,25 +310,26 @@ def main():
         tn = mats.get(M[sel][0])
         if not tn:
             continue          # sin textura (la que falta): se omite
-        P, UV, tris = weld(V, T, F[sel])
-        if a.decimar and len(tris) > 1000:
+        if COL is not None: P, UV, tris, Cg = weld(V, T, F[sel], COL)
+        else: P, UV, tris = weld(V, T, F[sel]); Cg = None
+        if a.decimar and len(tris) > 1000 and Cg is None:
             area = np.linalg.norm(np.cross(P[tris[:, 1]] - P[tris[:, 0]], P[tris[:, 2]] - P[tris[:, 0]]), axis=1).sum() / 2
             if len(tris) / max(area, 1e-6) > a.densidad:
                 P, UV, tris = decimate.decimate(P, UV, tris, a.decimar)
-        groups.append((tex_id[tn], P, UV, tris))
+        groups.append((tex_id[tn], P, UV, tris, Cg))
         stats['tris_out'] += len(tris)
     # trocear por celdas XZ (cada celda = un BIN)
     allc = np.concatenate([g[1][g[3]].mean(1) for g in groups])
     lo = allc.min(0)
     cells = {}
-    for tid, P, UV, tris in groups:
+    for tid, P, UV, tris, Cg in groups:
         c = P[tris].mean(1)
         ij = np.floor((c[:, [0, 2]] - lo[[0, 2]]) / a.celda).astype(int)
         N = vertex_normals(P, tris)
         for key in {tuple(x) for x in ij}:
             s = (ij[:, 0] == key[0]) & (ij[:, 1] == key[1])
             tt = tris[s]; used = np.unique(tt); rm = -np.ones(len(P), int); rm[used] = np.arange(len(used))
-            cells.setdefault(key, []).append((tid, P[used], UV[used], N[used], rm[tt]))
+            cells.setdefault(key, []).append((tid, P[used], UV[used], N[used], rm[tt], None if Cg is None else Cg[used]))
     bins = []; works = []; report = []
     for key in sorted(cells):
         grp = cells[key]
