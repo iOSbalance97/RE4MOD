@@ -72,9 +72,9 @@ def preparar_inicio():
     if os.path.exists(f'{dst}/hecho'): return dst
     os.makedirs(f'{dst}/col', exist_ok=True)
     col = f'{R1}/salas/{INICIO}/colision.obj'
-    obj_ = f'{R1}/salas_uc3/{INICIO}/sala.obj' if os.path.exists(f'{R1}/salas_uc3/{INICIO}/sala.obj') else f'{R1}/salas/{INICIO}/sala.obj'
+    obj_ = f'{R1}/salas_uc5/{INICIO}/sala.obj' if os.path.exists(f'{R1}/salas_uc5/{INICIO}/sala.obj') else f'{R1}/salas/{INICIO}/sala.obj'
     esp = ','.join(str(x) for x in list(ENT_H / 1000) + list(J) + [GIRO])
-    subprocess.run(['python3', '/home/claude/tools/re4room.py', obj_, f'{dst}/mod', '--tex-max', '1024' if 'salas_uc3' in obj_ else '512', f'--colocar={esp}'], check=True, capture_output=True)
+    subprocess.run(['python3', '/home/claude/tools/re4room.py', obj_, f'{dst}/mod', '--tex-max', '1024', f'--colocar={esp}'], check=True, capture_output=True)
     L = []
     for l in open(col):
         if l.startswith('v '):
