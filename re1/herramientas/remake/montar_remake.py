@@ -183,20 +183,24 @@ def montar(r):
     recs = [door_rec(k, *x[:4]) for k, x in enumerate(AEVS.get(r, []))]
     aev = b'AEV\0' + struct.pack('>HH8x', 0x104, len(recs)) + b''.join(recs)
     base = DIR_INICIO if r == INICIO else f'{R1}/re4/re_{r}'
-    new = {'SMD': open(f'{base}/mod/sala.smd', 'rb').read(), 'SMX': open(f'{base}/mod/sala.smx', 'rb').read(),
+    bmod = base
+    if r != INICIO and os.path.exists(f'{R1}/re4/re_{r}_uc/mod/sala.smd') and os.environ.get('SIN_UC') is None: bmod = f'{R1}/re4/re_{r}_uc'
+    elif r != INICIO and os.path.exists(f'{R1}/re4/re_{r}_s4/mod/sala.smd') and os.environ.get('SIN_S4') is None: bmod = f'{R1}/re4/re_{r}_s4'
+    new = {'SMD': open(f'{bmod}/mod/sala.smd', 'rb').read(), 'SMX': open(f'{bmod}/mod/sala.smx', 'rb').read(),
            'SAT': open(f'{base}/col/sala.sat', 'rb').read(), 'EAT': open(f'{base}/col/sala.eat', 'rb').read(), 'AEV': aev,
            'CAM': CAM_VACIO}
     lamp = []
-    if r == INICIO and os.path.exists(f'{R1}/salas_uc5/{INICIO}/luces.json'):
-        fu = json.load(open(f'{R1}/salas_uc5/{INICIO}/luces.json'))['fuentes']; grupos_l = []
+    fl = f'{R1}/salas_uc5/{r}/luces.json' if (r == INICIO or bmod.endswith('_uc')) else f'{R1}/salas4/{r}/luces.json'
+    if os.path.exists(fl) and (r == INICIO or bmod != base):
+        fu = json.load(open(fl))['fuentes']; grupos_l = []
         for p in fu:
             for g in grupos_l:
                 if np.linalg.norm(np.mean(g, 0) - np.array(p)) < 1.3: g.append(p); break
             else: grupos_l.append([p])
-        lamp = [tuple(tp(INICIO, np.mean(g, 0) * 1000)) for g in grupos_l]
+        lamp = [tuple(tp(r, np.mean(g, 0) * 1000)) for g in grupos_l]
     llam = []
-    if r == INICIO and os.path.exists(f'{R1}/salas_uc5/{INICIO}/luces.json'):
-        llam = [tuple(tp(INICIO, np.array(p) * 1000)) for p in json.load(open(f'{R1}/salas_uc5/{INICIO}/luces.json')).get('llamas', [])]
+    if os.path.exists(fl) and (r == INICIO or bmod != base):
+        llam = [tuple(tp(r, np.array(p) * 1000)) for p in json.load(open(fl)).get('llamas', [])]
     amb, nl, nluz = uc_ambiente.ambiente('r22b', llam, lamp, horneada=True); new.update(amb)
     done = set(); out = []
     for t, d in entries:

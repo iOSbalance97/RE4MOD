@@ -170,7 +170,7 @@ for tri, mm, a_, nn in zip(Tu2, FM, au2, nu2):
     k_ = int(min(60, max(1, a_ / 0.01)))
     w = rng.dirichlet([1, 1, 1], k_); S.append(w @ tri); SM += [mm] * k_; SN.append(np.repeat(nn[None], k_, 0))
 S = np.concatenate(S); SN = np.concatenate(SN); trS = cKDTree(S)
-DLIM = float(os.environ.get('DFALTA', 0.22))
+DLIM = float(os.environ.get('DFALTA', 99))
 nv0 = len(V); nvt0 = len(VT); add_v = []; add_t = []; add_f = []; add_m = []
 _flw = Tc[nc[:, 1] > 0.7]; _rgw = np.random.default_rng(9)
 _wpw = (_rgw.dirichlet([1, 1, 1], (len(_flw), 6))[..., None] * _flw[:, None]).sum(2).reshape(-1, 3) + [0, 1.0, 0]
@@ -203,11 +203,46 @@ for tri_i in trisd:
     b0 = nv0 + len(add_v); bt = nvt0 + len(add_t)
     for p in tri: add_v.append(p); add_t.append([p[ejes[0]] / m_, p[ejes[1]] / m_])
     add_f.append([b0, b0 + 1, b0 + 2, bt, bt + 1, bt + 2]); add_m.append(mm)
+# filtro por piezas: fuera las sueltas en mitad del suelo (cajas de objetos del REmake: candelabros, estatuas)
+# y las altas (UC ya tiene lo de arriba; lo del REmake ahí son cortinas/columnas duplicadas y desplazadas)
+if add_f:
+    from scipy.sparse.csgraph import connected_components as _cc
+    import scipy.sparse as _sp
+    _T = np.array(add_v).reshape(-1, 3, 3); _c = _T.mean(1)
+    _pr = cKDTree(_c).query_pairs(0.6, output_type='ndarray'); _n = len(_c)
+    _A = _sp.coo_matrix((np.ones(len(_pr)), (_pr[:, 0], _pr[:, 1])), shape=(_n, _n)) if len(_pr) else _sp.coo_matrix((_n, _n))
+    _k, _lab = _cc(_A, directed=False)
+    _paredes = Tc[np.abs(nc[:, 1]) < 0.3]
+    _pw = (np.random.default_rng(4).dirichlet([1, 1, 1], (len(_paredes), 10))[..., None] * _paredes[:, None]).sum(2).reshape(-1, 3) if len(_paredes) else np.zeros((1, 3)) + 1e6
+    _trp = cKDTree(_pw); _trU = cKDTree(S)
+    _flw2 = Tc[nc[:, 1] > 0.7]
+    _pf = (np.random.default_rng(6).dirichlet([1, 1, 1], (len(_flw2), 10))[..., None] * _flw2[:, None]).sum(2).reshape(-1, 3)
+    _trf = cKDTree(_pf[:, [0, 2]])
+    quedan = np.zeros(_n, bool); quitadas = 0
+    for _i in range(_k):
+        sel_ = _lab == _i; P_ = _T[sel_].reshape(-1, 3); cc_ = P_.mean(0)
+        # altura sobre el suelo pisable que tiene debajo
+        _, jf = _trf.query(cc_[[0, 2]], k=min(30, len(_pf)))
+        ys_ = _pf[np.atleast_1d(jf), 1]; ys_ = ys_[ys_ <= P_[:, 1].min() + 0.3]
+        alto = (P_[:, 1].min() - ys_.max()) if len(ys_) else 99
+        pegada = _trp.query(P_)[0].min() < 0.35
+        if alto > 2.5 or not pegada: quitadas += 1; continue
+        quedan[sel_] = True
+    sel_tri = np.nonzero(quedan)[0]
+    add_v = [add_v[3 * t + j] for t in sel_tri for j in range(3)]; add_t = [add_t[3 * t + j] for t in sel_tri for j in range(3)]
+    add_m = [add_m[t] for t in sel_tri]
+    add_f = [[nv0 + 3 * q, nv0 + 3 * q + 1, nv0 + 3 * q + 2, nvt0 + 3 * q, nvt0 + 3 * q + 1, nvt0 + 3 * q + 2] for q in range(len(sel_tri))]
+    print(f'  piezas del REmake: {quitadas} grupos quitados (sueltos o altos), {len(add_f)} triángulos quedan')
 print(f'piezas del REmake añadidas donde UC no tiene nada: {len(add_f)} triángulos')
+if add_f:
+    with open(f'{out}/_piezas.obj', 'w') as fp:
+        for p in add_v: fp.write(f'v {p[0]:.4f} {p[1]:.4f} {p[2]:.4f}\n')
+        for k_ in range(len(add_f)): fp.write(f'f {3*k_+1} {3*k_+2} {3*k_+3}\n')
 if add_f:
     V = np.concatenate([V, np.array(add_v)]); VT = np.concatenate([VT, np.array(add_t)])
     F = np.concatenate([F, np.array(add_f)]); FM = np.concatenate([FM, np.array(add_m, dtype=object)])
 
+exec(open('/home/claude/re1gc/work/_extras.py').read())
 # ---------------- subdividir triángulos grandes (la luz se guarda por vértice)
 LMAX = float(os.environ.get('LMAX', 0.9))
 Vl = list(V); Tl = list(VT); nuevasF = []; nuevasM = []
@@ -372,10 +407,10 @@ L = np.where(vis[:, None], alfa * np.clip(Lb, 0.02, 1.6) + (1 - alfa) * Lv, Lv)
 Lt = L.reshape(len(F), NS, 3).mean(1)
 # suavizado entre triángulos vecinos (sombras unidas): media ponderada por distancia en 0,8 m con normal parecida
 _cen = P3.mean(1); _nf = np.cross(P3[:, 1] - P3[:, 0], P3[:, 2] - P3[:, 0]); _nf /= np.linalg.norm(_nf, axis=1, keepdims=True) + 1e-12
-_trc = cKDTree(_cen); _d, _j = _trc.query(_cen, k=12, distance_upper_bound=0.8)
+_trc = cKDTree(_cen); _d, _j = _trc.query(_cen, k=int(os.environ.get('SUAVE_K', 12)), distance_upper_bound=float(os.environ.get('SUAVE_R', 0.8)))
 _Ls = np.zeros_like(Lt)
 for _i in range(len(F)):
-    m_ = np.isfinite(_d[_i]); jj = _j[_i][m_]; w_ = np.exp(-(_d[_i][m_] / 0.45) ** 2) * np.clip(_nf[jj] @ _nf[_i], 0, 1) ** 2 + 1e-6
+    m_ = np.isfinite(_d[_i]); jj = _j[_i][m_]; w_ = np.exp(-(_d[_i][m_] / float(os.environ.get('SUAVE_S', 0.45))) ** 2) * np.clip(_nf[jj] @ _nf[_i], 0, 1) ** 2 + 1e-6
     _Ls[_i] = (Lt[jj] * w_[:, None]).sum(0) / w_.sum()
 Lt = _Ls
 print(f'  luz por triángulo: vistos {vis.reshape(len(F), NS).mean()*100:.0f} %')
@@ -402,6 +437,15 @@ _wz = (_rgz.dirichlet([1, 1, 1], (len(_flz), 8))[..., None] * _flz[:, None]).sum
 _dz, _ = cKDTree(_wz).query(P3.mean(1))
 LEJOS = float(os.environ.get('LEJOS', 3.4))
 lejano = _dz > LEJOS
+if os.environ.get('ATLAS_PAREDES'):
+    # paredes y techos grandes también al atlas (luz continua); lo nítido se queda en puertas, muebles, barandillas y suelos
+    _area_tex = {}
+    for _mm, _a in zip(FM, af): _area_tex[_mm] = _area_tex.get(_mm, 0) + _a
+    _grande = np.array([_area_tex.get(_mm, 0) > float(os.environ.get('AREA_PARED', 6.0)) for _mm in FM])
+    _yfl = cKDTree(_flz[:, :, [0, 2]].reshape(-1, 2)).query(P3.mean(1)[:, [0, 2]])[1]
+    _hfl = P3.mean(1)[:, 1] - _flz.reshape(-1, 3)[_yfl, 1]
+    _techo = (nf[:, 1] < -0.7) & (_hfl > 1.2)            # cara de abajo de un suelo (caras dobles) no es techo
+    lejano |= _grande & ((np.abs(nf[:, 1]) < 0.35) | _techo)
 enat = ~con_alfa & (af > 1e-7) & lejano
 print(f'  atlas (lejano, sombra continua): {lejano.mean()*100:.0f} % de triángulos; cerca y nítido: {(~lejano).mean()*100:.0f} %')
 D = float(np.clip(np.sqrt(NPAG * PAG * PAG * 0.72 / max(af[enat].sum(), 1)), 12, 90))
@@ -585,11 +629,11 @@ mapa = {}; vivos = {}
 for tf in area_tex:
     nivs = sorted(n for (t, n) in uso if t == tf); pesos = [uso[(tf, n)] for n in nivs]
     k = min(cupo[tf], len(nivs))
-    cent = list(np.quantile(nivs, np.linspace(0, 1, k + 2)[1:-1])) if k > 1 else [float(np.average(nivs, weights=pesos))]
+    cent = list(np.quantile(nivs, np.linspace(0, 1, k + 2)[1:-1])) if k > 1 else [float(np.average(nivs, weights=pesos)) if np.sum(pesos) > 0 else float(np.mean(nivs))]
     for _ in range(10):
         grupos_ = [[] for _ in cent]
         for n, w in zip(nivs, pesos): grupos_[int(np.argmin([abs(n - c) for c in cent]))].append((n, w))
-        cent = [float(np.average([n for n, _ in g], weights=[w for _, w in g])) if g else c for g, c in zip(grupos_, cent)]
+        cent = [float(np.average([n for n, _ in g], weights=[w for _, w in g])) if g and sum(w for _, w in g) > 0 else (float(np.mean([n for n, _ in g])) if g else c) for g, c in zip(grupos_, cent)]
     for n in nivs:
         c = int(round(cent[int(np.argmin([abs(n - c) for c in cent]))]))
         mapa[(tf, n)] = (tf, c); vivos[(tf, c)] = vivos.get((tf, c), 0) + uso[(tf, n)]
@@ -636,3 +680,24 @@ with open(f'{out}/sala.obj', 'w') as f:
 shutil.copy(f'/home/claude/re1gc/salas/{r}/colision.obj', f'{out}/colision.obj')
 json.dump(dict(origen=ucobj, alin=A), open(f'{out}/meta_uc.json', 'w'))
 print('ok', out)
+
+# luces de los objetos de UC (velas, candelabros, lámparas colocadas), más fiables que los nombres de textura
+_u = os.path.basename(os.path.dirname(ucobj))
+_lj = json.load(open('/home/claude/uc/luces.json')) if os.path.exists('/home/claude/uc/luces.json') else {}
+if _u in _lj:
+    _h = np.array([19.4, 0, 15.0]); _p = np.array([-47609, 12, 7084]) / 1000; _rot = -1.253
+    _c, _s = np.cos(_rot), np.sin(_rot); _R = np.array([[_c, 0, _s], [0, 1, 0], [-_s, 0, _c]])
+    _inv = lambda Q: ((np.asarray(Q) / 1000 - _p) @ _R + _h) @ R.T * s + t if len(Q) else np.zeros((0, 3))
+    _ll = _inv(_lj[_u]['llamas']); _lp = _inv(_lj[_u]['lamparas'])
+    _g = []
+    for q in _ll:
+        for g_ in _g:
+            if np.linalg.norm(np.mean(g_, 0) - q) < 0.4: g_.append(q); break
+        else: _g.append([q])
+    _llamas_obj = [np.mean(g_, 0).tolist() for g_ in _g]
+    _fu = [list(map(float, q)) for q in _lp]
+    # las fuentes por textura que no estén junto a una vela, a media altura o más, también como lámparas
+    json.dump(dict(fuentes=_fu, llamas=_llamas_obj), open(f'{out}/luces.json', 'w'))
+    print(f'luces de objetos de UC: {len(_llamas_obj)} llamas, {len(_fu)} lámparas')
+if os.path.exists(f'/home/claude/re1gc/work/luces_fijas_{r}.json'):
+    shutil.copy(f'/home/claude/re1gc/work/luces_fijas_{r}.json', f'{out}/luces.json'); print('luces: posiciones revisadas a mano')

@@ -1,0 +1,8 @@
+{"columnas": [
+  {"x": 6.29, "z": -2.0, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
+  {"x": 6.29, "z": 2.0, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
+  {"x": -6.29, "z": -2.0, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
+  {"x": -6.29, "z": 2.0, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
+  {"x": 1.9, "z": 6.74, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
+  {"x": -1.9, "z": 6.74, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"}
+]}
