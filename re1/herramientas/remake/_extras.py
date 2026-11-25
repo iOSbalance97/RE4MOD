@@ -35,6 +35,34 @@ if _mr:
     for base_, h in _ex.balaustres_escalera(Tc, nc, Pr, _hay):
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE, lados=8)
         _anade(Vp, Tp, Fp, mm_r); nb_ += 1
+# segunda pasada: balaustres justo debajo de cualquier pasamanos que no tenga nada debajo (ni tarjetas con alfa)
+if _mr:
+    _okt = np.array([not _re2.search(r'handrail|tesuri', str(mats.get(m_) or m_), _re2.I) for m_ in _SMa])
+    _S3 = S[_okt]; _T3 = cKDTree(_S3[:, [0, 2]])
+    def _hay_todo(x, y0, y1, z, rad=0.09):
+        for j in _T3.query_ball_point([x, z], rad):
+            if y0 <= _S3[j, 1] <= y1: return True
+        return False
+    _ya = [b_ for b_, _ in []]
+    _puestos = cKDTree(np.array([[0, 1e6, 0]]))
+    _celdas = {}
+    for p in Pr:
+        k = (int(np.floor(p[0] / 0.17)), int(np.floor(p[2] / 0.17)))
+        if k not in _celdas or p[1] < _celdas[k][1]: _celdas[k] = p
+    _nuevos = []
+    for k, p in _celdas.items():
+        x, z = (k[0] + 0.5) * 0.17, (k[1] + 0.5) * 0.17
+        ytop = p[1] - 0.04
+        h = _heights(_TF, x, z); h = h[(h < ytop - 0.5) & (h > ytop - 1.3)]
+        if not len(h): continue
+        yb = float(h.max()); hh = ytop - yb
+        if _hay_todo(x, yb + 0.2 * hh, yb + 0.8 * hh, z): continue
+        if any(np.hypot(x - q[0], z - q[2]) < 0.15 and abs(yb - q[1]) < 0.5 for q, _ in _nuevos): continue
+        _nuevos.append(((x, yb, z), hh))
+    for base_, h in _nuevos:
+        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE, lados=8)
+        _anade(Vp, Tp, Fp, mm_r)
+    print(f'balaustres bajo pasamanos vacíos: {len(_nuevos)}')
 print(f'balaustres añadidos: {nb_}')
 _cfg = f'/home/claude/re1gc/work/extras_{r}.json'
 if os.path.exists(_cfg):
@@ -51,8 +79,27 @@ if os.path.exists(_cfg):
     for q in cfg.get('quitar', []):
         lo = np.array(q['min']); hi = np.array(q['max'])
         cen_ = V[F[:, :3]].mean(1); fuera = ~np.all((cen_ >= lo) & (cen_ <= hi), 1)
+        if q.get('mat'): fuera |= np.array([not _re2.search(q['mat'], str(mats.get(m_) or m_), _re2.I) for m_ in FM])
         print(f"  quitados {np.sum(~fuera)} triángulos de UC en {q.get('que', '')}")
         F = F[fuera]; FM = FM[fuera]
 if _ext_f:
     V = np.concatenate([V] + _ext_v); VT = np.concatenate([VT] + _ext_t)
     F = np.concatenate([F, np.array(_ext_f)]); FM = np.concatenate([FM, np.array(_ext_m, dtype=object)])
+
+# pasamanos de UC que cruzan por mitad de un suelo pisable del REmake (UC tiene hueco de escalera donde el REmake tiene rellano)
+_mrail = np.array([bool(_re2.search(r'handrail|tesuri', str(mats.get(m_) or m_), _re2.I)) for m_ in FM])
+if _mrail.any():
+    _cen = V[F[:, :3]].mean(1); _quita = np.zeros(len(F), bool)
+    def _suelo_bajo(x, z, y):
+        h = _heights(_TF, x, z); h = h[(h < y - 0.25) & (h > y - 1.5)]
+        return float(h.max()) if len(h) else None
+    _dirs = [(np.cos(t) * rr, np.sin(t) * rr) for rr in (0.0, 0.35, 0.7) for t in np.linspace(0, 2 * np.pi, 8, endpoint=False)]
+    for i in np.nonzero(_mrail)[0]:
+        x, y, z = _cen[i]
+        vals = [_suelo_bajo(x + dx, z + dz, y) for dx, dz in _dirs]
+        hay = [v for v in vals if v is not None]
+        if not hay: _quita[i] = True; continue            # barra en el aire: nada pisable a la altura de la cadera cerca
+        h0 = vals[0]
+        if h0 is not None and all(v is not None and abs(v - h0) < 0.08 for v in vals[:17]): _quita[i] = True   # en mitad de un suelo
+    print(f'pasamanos sobre suelo pisable quitados: {_quita.sum()} triángulos')
+    F = F[~_quita]; FM = FM[~_quita]

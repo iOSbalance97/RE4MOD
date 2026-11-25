@@ -1,6 +1,7 @@
 """Alinea una sala de UC (modelo 3D real) con la misma sala del REmake (malla detallada, mm).
 Busca giro en Y (y espejo si hace falta), escala y traslación por ICP. Escribe la transformación en json.
 uso: alinear_uc.py uc_sala.obj st rNNN salida.json"""
+import os
 import sys, json
 import numpy as np
 from scipy.spatial import cKDTree
@@ -39,7 +40,7 @@ def icp(A, B, R, s, t, it=40):
         R = rot(-ang, False) @ R0_esp
         Pr2 = P @ R.T
         s = float(np.sum((Q - mq) * (Pr2 - Pr2.mean(0))) / np.sum((Pr2 - Pr2.mean(0)) ** 2))
-        s = float(np.clip(s, 0.7, 1.4))
+        s = float(np.clip(s, 0.7, 1.4)) if not os.environ.get("ESCALA") else float(os.environ["ESCALA"])
         t = mq - s * Pr2.mean(0)
     X = (A @ R.T) * s + t; d, _ = tree.query(X)
     return R, s, t, float(np.median(d)), float(np.mean(d < 0.15))

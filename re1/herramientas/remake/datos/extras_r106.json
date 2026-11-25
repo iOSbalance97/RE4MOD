@@ -1,8 +1,82 @@
-{"columnas": [
-  {"x": 6.29, "z": -2.0, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
-  {"x": 6.29, "z": 2.0, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
-  {"x": -6.29, "z": -2.0, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
-  {"x": -6.29, "z": 2.0, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
-  {"x": 1.9, "z": 6.74, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"},
-  {"x": -1.9, "z": 6.74, "y0": null, "y1": 10.6, "r": 0.2, "textura": "yg_wood04.png"}
-]}
+{
+ "columnas": [
+  {
+   "x": 6.29,
+   "z": -2.0,
+   "y0": null,
+   "y1": 10.6,
+   "r": 0.2,
+   "textura": "yg_wood04.png"
+  },
+  {
+   "x": 6.29,
+   "z": 2.0,
+   "y0": null,
+   "y1": 10.6,
+   "r": 0.2,
+   "textura": "yg_wood04.png"
+  },
+  {
+   "x": -6.29,
+   "z": -2.0,
+   "y0": null,
+   "y1": 10.6,
+   "r": 0.2,
+   "textura": "yg_wood04.png"
+  },
+  {
+   "x": -6.29,
+   "z": 2.0,
+   "y0": null,
+   "y1": 10.6,
+   "r": 0.2,
+   "textura": "yg_wood04.png"
+  },
+  {
+   "x": 1.9,
+   "z": 6.74,
+   "y0": null,
+   "y1": 10.6,
+   "r": 0.2,
+   "textura": "yg_wood04.png"
+  },
+  {
+   "x": -1.9,
+   "z": 6.74,
+   "y0": null,
+   "y1": 10.6,
+   "r": 0.2,
+   "textura": "yg_wood04.png"
+  }
+ ],
+ "quitar": [
+  {
+   "que": "capiteles UC ventana +x",
+   "min": [
+    1.45,
+    6.6,
+    6.2
+   ],
+   "max": [
+    2.4,
+    10.7,
+    7.3
+   ],
+   "mat": "stone"
+  },
+  {
+   "que": "capiteles UC ventana -x",
+   "min": [
+    -2.4,
+    6.6,
+    6.2
+   ],
+   "max": [
+    -1.45,
+    10.7,
+    7.3
+   ],
+   "mat": "stone"
+  }
+ ]
+}
