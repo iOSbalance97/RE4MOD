@@ -3,7 +3,7 @@ import sys, glob, os, re
 import numpy as np
 from PIL import Image
 for p in glob.glob(os.path.join(sys.argv[1], '*.png')):
-    if not re.search(r'glass|garasu|window|mado', os.path.basename(p), re.I): continue
+    if not re.search(r'glass|garasu', os.path.basename(p), re.I): continue
     im = Image.open(p); modo = im.mode; a = np.asarray(im.convert('RGBA'), np.float32) / 255
     rgb = a[..., :3]; L = rgb @ np.array([0.3, 0.59, 0.11], np.float32)
     cielo = (rgb[..., 2] > rgb[..., 0] + 0.02) & (L > 0.25)

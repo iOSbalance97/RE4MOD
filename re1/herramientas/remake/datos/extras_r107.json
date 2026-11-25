@@ -1,2 +1,30 @@
-{"estatuas": [{"x": -0.45, "z": 0.25, "y0": 1.5, "alto": 1.15, "giro": -1.5708, "textura": "marmol_blanco.png"}],
- "quitar": [{"que": "estatua incompleta de UC", "min": [-1.2, 1.45, -0.5], "max": [0.3, 3.0, 1.0], "mat": "OBJ18"}]}
+{
+ "estatuas": [
+  {
+   "x": -0.45,
+   "z": 0.25,
+   "y0": 1.5,
+   "alto": 1.1,
+   "giro": -1.5708,
+   "textura": "marmol_s0.png",
+   "tipo": "busto",
+   "sombreado": "marmol_s{}.png"
+  }
+ ],
+ "quitar": [
+  {
+   "que": "estatua incompleta de UC",
+   "min": [
+    -1.2,
+    1.45,
+    -0.5
+   ],
+   "max": [
+    0.3,
+    3.0,
+    1.0
+   ],
+   "mat": "OBJ18"
+  }
+ ]
+}

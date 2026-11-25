@@ -70,33 +70,51 @@ if _mr and not os.environ.get('BARANDILLA_RAMPAS'):
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE, lados=8)
         _anade(Vp, Tp, Fp, mm_r)
     print(f'balaustres bajo pasamanos vacíos: {len(_nuevos)}')
-# escaleras: la escalera de UC no sigue a la del REmake -> barandilla propia en los bordes de las rampas
-if os.environ.get('BARANDILLA_RAMPAS') and _mr:
+# barandilla por lógica: en los bordes del suelo pisable con caída real, sin pared, sin suelo al lado a la misma altura
+# y sin barandilla de UC ya puesta. Nunca en mitad del paso.
+if os.environ.get('BARANDILLA_CAIDAS'):
     _wall = np.nonzero(np.abs(nc[:, 1]) < 0.3)[0]
-    _Wp = []
-    for i in _wall:
-        w = np.random.default_rng(i).dirichlet([1, 1, 1], 12); _Wp.append(w @ Tc[i])
-    _Wt = cKDTree(np.concatenate(_Wp)) if _Wp else None
-    def _es_pared(x, y, z): return _Wt is not None and len(_Wt.query_ball_point([x, y, z], 0.2)) > 0
-    _vig, _bal, _pos = _ex.barandilla_rampas(Tc, nc, _es_pared, alturas=lambda x, z: _heights(_TF, x, z))
-    # quitar el pasamanos/balaustres de UC sobre o junto a las rampas
-    _ramp = (nc[:, 1] > 0.45) & (nc[:, 1] < 0.97)
-    _Rp = np.concatenate([np.random.default_rng(i).dirichlet([1, 1, 1], 20) @ Tc[i] for i in np.nonzero(_ramp)[0]])
-    _Rt = cKDTree(_Rp[:, [0, 2]])
-    _cen2 = V[F[:, :3]].mean(1); _rm = np.zeros(len(F), bool)
-    for i in np.nonzero(np.array([bool(_re2.search(r'handrail|tesuri', str(mats.get(m_) or m_), _re2.I)) for m_ in FM]))[0]:
-        x, y, z = _cen2[i]
-        for j in _Rt.query_ball_point([x, z], 1.5):
-            if -0.3 < y - _Rp[j, 1] < 1.6: _rm[i] = True; break
-    F = F[~_rm]; FM = FM[~_rm]
-    _mm_v = next((m_ for m_, t_ in mats.items() if t_ and 'wood04' in t_), mm_r)
-    for a_, b_ in _vig:
-        Vp, Tp, Fp = _ex.viga(a_, b_); _anade(Vp, Tp, Fp, _mm_v)
-    for base_, h in _bal:
-        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, lados=4); _anade(Vp, Tp, Fp, _mm_v)
-    for p_ in _pos:
-        Vp, Tp, Fp = _ex.torneado(p_, 1.12, _ex.PERFIL_COLUMNA, escala_r=0.075, lados=6); _anade(Vp, Tp, Fp, _mm_v)
-    print(f'escaleras: quitados {_rm.sum()} triángulos de UC; puestos {len(_vig)} tramos, {len(_bal)} balaustres, {len(_pos)} postes')
+    _Wt = cKDTree(np.concatenate([np.random.default_rng(i).dirichlet([1, 1, 1], 12) @ Tc[i] for i in _wall])) if len(_wall) else None
+    def _es_pared(x, y, z): return _Wt is not None and len(_Wt.query_ball_point([x, y, z], 0.18)) > 0
+    _mrl = np.array([bool(_re2.search(r'handrail|tesuri', str(mats.get(m_) or m_), _re2.I)) for m_ in _SMa])
+    _noalfa = np.array([not _tiene_alfa(m_) for m_ in _SMa]); _Sna = S[_noalfa]
+    _Ht = cKDTree(_Sna[:, [0, 2]])
+    def _ya_hay(x, y, z):          # algo macizo (no tarjetas con transparencia, que el juego no pinta bien) a la altura de los balaustres
+        for j in _Ht.query_ball_point([x, z], 0.22):
+            if y + 0.25 <= _Sna[j, 1] <= y + 0.8: return True
+        return False
+    _piso = np.nonzero(nc[:, 1] > 0.45)[0]; _pts = []
+    for i in _piso:
+        _tt = Tc[i]; cen = _tt.mean(0)
+        for a_, b_ in ((_tt[0], _tt[1]), (_tt[1], _tt[2]), (_tt[2], _tt[0])):
+            L = np.linalg.norm((b_ - a_)[[0, 2]])
+            if L < 0.15: continue
+            m = (a_ + b_) / 2; fuera = m - cen; fuera[1] = 0; fuera /= np.linalg.norm(fuera) + 1e-9
+            d = (b_ - a_) / L
+            perp = np.array([-d[2], 0, d[0]]);  perp = perp if perp @ fuera > 0 else -perp
+            for s_ in np.arange(0.1, L, 0.2):
+                p = a_ + (b_ - a_) * (s_ / L) + [0, 0, 0]
+                p = p - perp * 0.05
+                q = p + perp * 0.18; hs = _heights(_TF, q[0], q[2])
+                if len(hs) and np.abs(hs - p[1]).min() < 0.35: continue          # suelo al otro lado: no es borde
+                if not len(hs) or hs.max() > p[1] - 0.8: continue                    # sin caída real
+                if _es_pared(*(p + perp * 0.1 + [0, 0.6, 0])): continue
+                if _ya_hay(*p): continue
+                _pts.append((tuple(np.round(p, 3)), tuple(perp)))
+    # quitar repetidos y unir en tramos
+    _u = []
+    for p, n_ in _pts:
+        if not any(np.hypot(p[0] - q[0], p[2] - q[2]) < 0.12 and abs(p[1] - q[1]) < 0.3 for q, _ in _u): _u.append((p, n_))
+    _mm_v = next((m_ for m_, t_ in mats.items() if t_ and 'wood04' in t_), mm_r if _mr else None)
+    nb2 = 0; nv = 0
+    if _mm_v and _u:
+        P_ = np.array([p for p, _ in _u]); arb = cKDTree(P_)
+        for k, p in enumerate(P_):
+            Vp, Tp, Fp = _ex.torneado(tuple(p), 0.93, _ex.PERFIL_BALAUSTRE_LIGERO, lados=4); _anade(Vp, Tp, Fp, _mm_v); nb2 += 1
+            for j in arb.query_ball_point(p, 0.3):
+                if j > k and abs(P_[j][1] - p[1]) < 0.5:
+                    Vp, Tp, Fp = _ex.viga(P_[k] + [0, 0.95, 0], P_[j] + [0, 0.95, 0]); _anade(Vp, Tp, Fp, _mm_v); nv += 1
+    print(f'barandilla por caída: {nb2} balaustres, {nv} tramos de pasamanos')
 print(f'balaustres añadidos: {nb_}')
 _cfg = f'/home/claude/re1gc/work/extras_{r}.json'
 if os.path.exists(_cfg):
@@ -113,8 +131,21 @@ if os.path.exists(_cfg):
         mm = next((m_ for m_, t_ in mats.items() if t_ == es['textura']), None)
         if not mm and os.path.exists(os.path.join(base, es['textura'])): mm = es['textura'][:-4]; mats[mm] = es['textura']
         if not mm: print('  textura de estatua no encontrada', es['textura']); continue
-        Vp, Tp, Fp = _ex.estatua((es['x'], es['y0'], es['z']), es.get('alto', 1.15), es.get('giro', 0.0))
-        _anade(Vp, Tp, Fp, mm); print('  estatua añadida en', es['x'], es['z'])
+        Vp, Tp, Fp = (_ex.estatua_busto if es.get('tipo') == 'busto' else _ex.estatua)((es['x'], es['y0'], es['z']), es.get('alto', 1.15), es.get('giro', 0.0))
+        if es.get('sombreado'):
+            # sombreado horneado: 4 tonos según la luz de los focos (de arriba y de frente)
+            g_ = es.get('giro', 0.0); ld = np.array([0.35 * np.cos(g_) + 0.55 * np.sin(g_), 1.0, -0.35 * np.sin(g_) + 0.55 * np.cos(g_)]); ld /= np.linalg.norm(ld)
+            nn_ = np.cross(Vp[Fp[:, 1]] - Vp[Fp[:, 0]], Vp[Fp[:, 2]] - Vp[Fp[:, 0]]); nn_ /= np.linalg.norm(nn_, axis=1, keepdims=True) + 1e-12
+            cen_ = Vp[Fp].mean(1); cen0 = Vp.mean(0)
+            nn_ *= np.sign(((cen_ - cen0) * nn_).sum(1, keepdims=True) + 1e-9)          # normales hacia fuera
+            k_ = np.clip(3 - np.floor((nn_ @ ld + 0.2) / 1.2 * 4), 0, 3).astype(int)
+            for kk in range(4):
+                sel_ = k_ == kk
+                if not sel_.any(): continue
+                tx_ = es['sombreado'].format(kk); mk = tx_[:-4]; mats[mk] = tx_
+                _anade(Vp, Tp, Fp[sel_], mk)
+        else: _anade(Vp, Tp, Fp, mm)
+        print('  estatua añadida en', es['x'], es['z'])
     # quitar lo de UC que estorbe (cajas a eliminar)
     for q in cfg.get('quitar', []):
         lo = np.array(q['min']); hi = np.array(q['max'])
@@ -155,3 +186,25 @@ if _mrail.any():
             if all(len(o_) and np.abs(o_ - hh_.max()).min() < 0.05 for o_ in ok_): _quita[i] = True
     print(f'pasamanos sobre suelo pisable quitados: {_quita.sum()} triángulos')
     F = F[~_quita]; FM = FM[~_quita]
+# paredes de UC en mitad del paso del REmake (UC tiene otro trazado): suelo pisable a la misma altura a los dos lados
+if os.environ.get('QUITAR_PAREDES_PASO'):
+    _P3 = V[F[:, :3]]; _nn = np.cross(_P3[:, 1] - _P3[:, 0], _P3[:, 2] - _P3[:, 0]); _aa = np.linalg.norm(_nn, axis=1); _nn /= _aa[:, None] + 1e-12
+    _vert = np.nonzero((np.abs(_nn[:, 1]) < 0.3) & (_aa > 1e-6))[0]; _qp = np.zeros(len(F), bool)
+    _cw = np.nonzero(np.abs(nc[:, 1]) < 0.3)[0]
+    _CWt = cKDTree(np.concatenate([np.random.default_rng(i).dirichlet([1, 1, 1], 30) @ Tc[i] for i in _cw])[:, [0, 2]]) if len(_cw) else None
+    for i in _vert:
+        c_ = _P3[i].mean(0); h_ = _heights(_TF, c_[0], c_[2]); h_ = h_[h_ <= c_[1] + 0.05]
+        if not len(h_): continue
+        y0_ = h_.max()
+        if c_[1] - y0_ > 2.4 or _P3[i][:, 1].min() - y0_ > 0.4: continue
+        if _CWt is not None and _CWt.query_ball_point(c_[[0, 2]], 0.4): continue      # el REmake tiene pared ahí: se queda
+        dd = _nn[i].copy(); dd[1] = 0; dd /= np.linalg.norm(dd) + 1e-9
+        ok_ = True
+        for sgn in (1, -1):
+            for off in (0.3, 0.6):
+                q_ = c_ + dd * sgn * off; hh_ = _heights(_TF, q_[0], q_[2])
+                if not len(hh_) or np.abs(hh_ - y0_).min() > 0.05: ok_ = False; break
+            if not ok_: break
+        _qp[i] = ok_
+    print(f'paredes de UC en mitad del paso quitadas: {_qp.sum()} triángulos')
+    F = F[~_qp]; FM = FM[~_qp]

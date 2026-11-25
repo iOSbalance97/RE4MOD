@@ -28,7 +28,7 @@ def add(pts):
     b = len(tri_v); tri_v.extend(pts); tri_f.append([b, b + 1, b + 2])
 for t in To[~suelo]: add(list(t))
 # suelos: rejilla de 0.25 m, se conserva la celda si el modelo tiene suelo a esa altura
-G = 0.25; quitadas = puestas = 0
+G = 0.25; quitadas = puestas = 0; celdas_si = {}; celdas_no = set()
 for t in To[suelo]:
     lo = t[:, [0, 2]].min(0); hi = t[:, [0, 2]].max(0); y = t[:, 1].mean()
     for x in np.arange(np.floor(lo[0] / G) * G, hi[0], G):
@@ -44,8 +44,21 @@ for t in To[suelo]:
             idx = arbol.query_ball_point(c, G * 0.75)
             if any(abs(P[j, 1] - y) < 0.25 for j in idx):
                 add([[x, y, z], [x, y, z + G], [x + G, y, z + G]]); add([[x, y, z], [x + G, y, z + G], [x + G, y, z]]); puestas += 1
-            else: quitadas += 1
-print(f'{otra}: celdas de suelo conservadas {puestas}, quitadas (hueco entre plantas) {quitadas}')
+                celdas_si[(int(round(x / G)), int(round(z / G)))] = y
+            else: quitadas += 1; celdas_no.add((int(round(x / G)), int(round(z / G))))
+# paredes invisibles en el borde del hueco: no se puede andar por el aire
+paredes = 0
+for (i, j), y in celdas_si.items():
+    for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        if (i + di, j + dj) in celdas_no:
+            x0, z0 = i * G, j * G
+            if di == 1: p, q = (x0 + G, z0), (x0 + G, z0 + G)
+            elif di == -1: p, q = (x0, z0), (x0, z0 + G)
+            elif dj == 1: p, q = (x0, z0 + G), (x0 + G, z0 + G)
+            else: p, q = (x0, z0), (x0 + G, z0)
+            a_, b_ = [p[0], y, p[1]], [q[0], y, q[1]]; c_ = [q[0], y + 2.5, q[1]]; d_ = [p[0], y + 2.5, p[1]]
+            add([a_, b_, c_]); add([a_, c_, d_]); add([a_, c_, b_]); add([a_, d_, c_]); paredes += 1
+print(f'{otra}: celdas de suelo conservadas {puestas}, quitadas (hueco entre plantas) {quitadas}, paredes de borde {paredes}')
 out = f'{R1}/salas/{base}/colision_fusion.obj'
 with open(out, 'w') as f:
     for v in Vb: f.write(f'v {v[0]:.4f} {v[1]:.4f} {v[2]:.4f}\n')

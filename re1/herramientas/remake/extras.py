@@ -184,3 +184,59 @@ def estatua(base, alto=1.15, giro=0.0):
     V = np.concatenate(Vs); T = np.concatenate(Ts); F = np.concatenate(Fs)
     V = _rot_eje(V, (0, 1, 0), giro, np.zeros(3)) + [bx, by, bz]
     return V, T, F
+
+def torneado2(base, alto, perfil, lados=16, ondas=0, amp=0.0, esc=(1.0, 1.0)):
+    """como torneado, con pliegues (ondas en el radio) y sección elíptica"""
+    V = []; T = []; F = []
+    ang = np.linspace(0, 2 * np.pi, lados + 1)
+    for h, rr in perfil:
+        for a in ang:
+            r_ = rr * (1 + amp * np.sin(ondas * a) * (1 - h)) if ondas else rr
+            V.append([base[0] + np.cos(a) * r_ * esc[0], base[1] + h * alto, base[2] + np.sin(a) * r_ * esc[1]])
+            T.append([a / (2 * np.pi), h])
+    n = lados + 1
+    for i in range(len(perfil) - 1):
+        for j in range(lados):
+            a, b, c, d = i * n + j, i * n + j + 1, (i + 1) * n + j + 1, (i + 1) * n + j
+            F.append([a, c, b]); F.append([a, d, c])
+    return np.array(V), np.array(T), np.array(F)
+
+def esfera(c, r, lados=12, esc=(1, 1, 1)):
+    pf = [(k / 8, np.sin(np.pi * k / 8) * r) for k in range(9)]
+    V, T, F = torneado((0, 0, 0), 2 * r, pf, lados=lados)
+    V = V - [0, r, 0]; V = V * esc + c
+    return V, T, F
+
+def estatua_busto(base, alto=1.1, giro=0.0):
+    """busto femenino clásico de cintura para arriba con un cántaro grande al hombro derecho (como la del REmake)"""
+    s = alto / 1.1; P = []
+    # caderas cubiertas por una tela con pliegues
+    P.append(torneado2((0, 0, 0), 0.40 * s, [(0, 0.205), (0.15, 0.21), (0.45, 0.19), (0.75, 0.155), (1.0, 0.125)], lados=24, ondas=9, amp=0.07, esc=(1.0, 0.78)))
+    # vuelta de la tela en la cintura
+    P.append(torneado2((0, 0.36 * s, 0), 0.06 * s, [(0, 0.13), (0.5, 0.135), (1.0, 0.118)], lados=20, ondas=7, amp=0.05, esc=(1.0, 0.78)))
+    # torso desnudo
+    P.append(torneado2((0, 0.40 * s, 0), 0.34 * s, [(0, 0.118), (0.25, 0.112), (0.55, 0.128), (0.8, 0.14), (0.92, 0.135), (1.0, 0.07)], lados=20, esc=(1.12, 0.68)))
+    # pecho
+    for sx in (-1, 1): P.append(esfera((sx * 0.058 * s, 0.62 * s, 0.065 * s), 0.052 * s, esc=(1, 0.9, 0.8)))
+    # hombros
+    for sx in (-1, 1): P.append(esfera((sx * 0.135 * s, 0.70 * s, 0), 0.055 * s))
+    # cuello y cabeza inclinada hacia el cántaro, con moño
+    P.append(tubo((0, 0.72 * s, 0), (0.015 * s, 0.81 * s, 0.01 * s), 0.042 * s, 0.038 * s))
+    P.append(esfera((0.025 * s, 0.88 * s, 0.015 * s), 0.075 * s, esc=(0.9, 1.1, 1.0)))
+    P.append(esfera((0.035 * s, 0.93 * s, -0.045 * s), 0.045 * s))
+    P.append(esfera((0.025 * s, 0.845 * s, 0.07 * s), 0.018 * s))        # nariz/barbilla
+    # brazo derecho levantado sujetando el cántaro
+    P.append(tubo((0.14 * s, 0.70 * s, 0), (0.22 * s, 0.86 * s, -0.02 * s), 0.044 * s, 0.036 * s))
+    P.append(esfera((0.22 * s, 0.86 * s, -0.02 * s), 0.037 * s))
+    P.append(tubo((0.22 * s, 0.86 * s, -0.02 * s), (0.17 * s, 1.02 * s, -0.05 * s), 0.036 * s, 0.028 * s))
+    # brazo izquierdo hacia abajo, la mano en la cadera
+    P.append(tubo((-0.14 * s, 0.70 * s, 0), (-0.19 * s, 0.52 * s, 0.01 * s), 0.044 * s, 0.037 * s))
+    P.append(esfera((-0.19 * s, 0.52 * s, 0.01 * s), 0.037 * s))
+    P.append(tubo((-0.19 * s, 0.52 * s, 0.01 * s), (-0.15 * s, 0.38 * s, 0.07 * s), 0.037 * s, 0.03 * s))
+    # cántaro grande y redondo sobre el hombro derecho
+    V, T, F = torneado((0, 0, 0), 0.34 * s, [(0, 0.045), (0.06, 0.09), (0.3, 0.15), (0.55, 0.155), (0.78, 0.11), (0.88, 0.05), (0.95, 0.045), (1.0, 0.06)], lados=18)
+    V = _rot_eje(V, (0, 0, 1), -1.15, np.zeros(3)) + [0.06 * s, 0.93 * s, -0.08 * s]; P.append((V, T, F))
+    Vs = []; Ts = []; Fs = []; b0 = 0
+    for V, T, F in P: Vs.append(V); Ts.append(T); Fs.append(F + b0); b0 += len(V)
+    V = np.concatenate(Vs); T = np.concatenate(Ts); F = np.concatenate(Fs)
+    return _rot_eje(V, (0, 1, 0), giro, np.zeros(3)) + list(base), T, F

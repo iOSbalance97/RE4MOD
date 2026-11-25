@@ -18,6 +18,7 @@ G = json.load(open(f'{R1}/work/puertas_remake.json'))
 FUSION = {'r202': 'r105'}
 for _a in list(G):
     for _d in G[_a]:
+        _d['_de'] = _a; _d['_a'] = _d['dst']          # salas originales del REmake (para emparejar ida y vuelta)
         if _d['dst'] in FUSION: _d['dst'] = FUSION[_d['dst']]
 for _o, _b in FUSION.items():
     G[_b] = G[_b] + [d for d in G.pop(_o, []) if d['dst'] != _b]
@@ -147,6 +148,8 @@ for a in sorted(HUECO):
         c = np.array(d['quad'], float).reshape(4, 2).mean(0)
         # altura del suelo junto a esta puerta: la llegada de la puerta de vuelta (b -> a) más cercana
         vuelta = [e for e in G[b] if e['dst'] == a]
+        _exacta = [e for e in vuelta if e.get('_de') == d.get('_a') and e.get('_a') == d.get('_de')]
+        if _exacta: vuelta = _exacta
         e = min(vuelta, key=lambda e: np.hypot(e['llegada'][0] - c[0], e['llegada'][2] - c[1]))
         piso = e['llegada'][1]
         x, y, z, ang = d['llegada']
