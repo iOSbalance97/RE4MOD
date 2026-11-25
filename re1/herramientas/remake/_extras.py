@@ -47,10 +47,16 @@ if _mr and not os.environ.get('BARANDILLA_RAMPAS'):
     _ya = [b_ for b_, _ in []]
     _puestos = cKDTree(np.array([[0, 1e6, 0]]))
     _celdas = {}
-    for p in Pr:
+    # puntos de toda la superficie del pasamanos (las vigas largas solo tienen vértices en los extremos)
+    _Pr_s = [Pr]
+    for i_ in np.nonzero(np.isin(FM, _mr))[0]:
+        t3 = V[F[i_, :3]]; L_ = np.linalg.norm(t3 - np.roll(t3, 1, 0), axis=1).max()
+        k_ = int(min(60, max(3, L_ / 0.05)))
+        _Pr_s.append(np.random.default_rng(i_).dirichlet([1, 1, 1], k_) @ t3)
+    for p in np.concatenate(_Pr_s):
         k = (int(np.floor(p[0] / 0.17)), int(np.floor(p[2] / 0.17)))
         if k not in _celdas or p[1] < _celdas[k][1]: _celdas[k] = p
-    _nuevos = []
+    _nuevos = []; _por = {'sin suelo': 0, 'ya hay': 0, 'cerca de otro': 0}
     for k, p in _celdas.items():
         x, z = (k[0] + 0.5) * 0.17, (k[1] + 0.5) * 0.17
         ytop = p[1] - 0.04
@@ -60,16 +66,16 @@ if _mr and not os.environ.get('BARANDILLA_RAMPAS'):
                 h = _heights(_TF, x + rr_ * np.cos(t_), z + rr_ * np.sin(t_)); h = h[(h < ytop - 0.45) & (h > ytop - 1.35)]
                 if len(h): cand.append(float(h.max()))
             if cand: break
-        if not cand: continue
+        if not cand: _por['sin suelo'] += 1; continue
         yb = max(cand); hh = ytop - yb
         if any(np.hypot(x - q[0], z - q[2]) < 0.13 and abs(yb - q[1]) < 0.6 for q in _bases1): continue
-        if _hay_todo(x, yb + 0.2 * hh, yb + 0.8 * hh, z): continue
-        if any(np.hypot(x - q[0], z - q[2]) < 0.15 and abs(yb - q[1]) < 0.5 for q, _ in _nuevos): continue
+        if _hay_todo(x, yb + 0.35 * hh, yb + 0.8 * hh, z): _por['ya hay'] += 1; continue
+        if any(np.hypot(x - q[0], z - q[2]) < 0.15 and abs(yb - q[1]) < 0.5 for q, _ in _nuevos): _por['cerca de otro'] += 1; continue
         _nuevos.append(((x, yb, z), hh))
     for base_, h in _nuevos:
-        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE, lados=8)
+        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, lados=6)
         _anade(Vp, Tp, Fp, mm_r)
-    print(f'balaustres bajo pasamanos vacíos: {len(_nuevos)}')
+    print(f'balaustres bajo pasamanos vacíos: {len(_nuevos)} (celdas {len(_celdas)}, descartes {_por})')
 # barandilla por lógica: en los bordes del suelo pisable con caída real, sin pared, sin suelo al lado a la misma altura
 # y sin barandilla de UC ya puesta. Nunca en mitad del paso.
 if os.environ.get('BARANDILLA_CAIDAS'):
@@ -289,7 +295,7 @@ if os.path.exists(f'/home/claude/re1gc/work/extras_{r}.json') and json.load(open
     if _u2 and _mmv2:
         P2_ = np.array(_u2); arb2 = cKDTree(P2_)
         for k, p in enumerate(P2_):
-            Vp, Tp, Fp = _ex.torneado(tuple(p), 0.93, _ex.PERFIL_BALAUSTRE, lados=6); _anade(Vp, Tp, Fp, _mmv2)
+            Vp, Tp, Fp = _ex.torneado(tuple(p), 0.93, _ex.PERFIL_BALAUSTRE_LIGERO, lados=6); _anade(Vp, Tp, Fp, _mmv2)
             for j in arb2.query_ball_point(p, 0.27):
                 if j > k and abs(P2_[j][1] - p[1]) < 0.35:
                     Vp, Tp, Fp = _ex.viga(P2_[k] + [0, 0.95, 0], P2_[j] + [0, 0.95, 0], ancho=0.1, alto=0.08); _anade(Vp, Tp, Fp, _mmv2); nv2 += 1

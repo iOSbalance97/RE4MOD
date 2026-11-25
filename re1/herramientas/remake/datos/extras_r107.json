@@ -21,7 +21,7 @@
    "x": -0.45,
    "y0": 1.5,
    "z": 0.25,
-   "giro": -1.5708,
+   "giro": 1.5708,
    "escala": 1.0,
    "texturas": {
     "figura": "estatua_nina_figura.png",

@@ -46,6 +46,18 @@ for t in To[suelo]:
                 add([[x, y, z], [x, y, z + G], [x + G, y, z + G]]); add([[x, y, z], [x + G, y, z + G], [x + G, y, z]]); puestas += 1
                 celdas_si[(int(round(x / G)), int(round(z / G)))] = y
             else: quitadas += 1; celdas_no.add((int(round(x / G)), int(round(z / G))))
+# solo es hueco la zona grande conectada; trozos sueltos sin suelo de UC (bajo alfombras, objetos) vuelven a ser suelo
+from scipy import ndimage as _nd
+if celdas_no:
+    ks = np.array(list(celdas_no)); o_ = ks.min(0) - 3; M0_ = np.zeros(ks.max(0) - o_ + 4, bool); M0_[tuple((ks - o_).T)] = True
+    M_ = _nd.binary_opening(M0_, structure=np.ones((3, 3)), iterations=1)       # franjas estrechas (< ~0.75 m) no son hueco
+    lab_, n_ = _nd.label(M_); tam_ = np.r_[0, _nd.sum(M_, lab_, range(1, n_ + 1))]
+    yy_ = float(np.median(To[suelo][:, :, 1]))
+    for (i, j) in list(celdas_no):
+        if tam_[lab_[i - o_[0], j - o_[1]]] < 32:
+            celdas_no.discard((i, j)); x, z = i * G, j * G
+            add([[x, yy_, z], [x, yy_, z + G], [x + G, yy_, z + G]]); add([[x, yy_, z], [x + G, yy_, z + G], [x + G, yy_, z]]); celdas_si[(i, j)] = yy_
+    print(f'zonas de hueco: {n_}, grandes: {int((tam_ >= 32).sum())}')
 # paredes invisibles en el borde del hueco: no se puede andar por el aire
 paredes = 0
 for (i, j), y in celdas_si.items():
