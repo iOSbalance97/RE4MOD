@@ -186,7 +186,15 @@ def montar(r):
     new = {'SMD': open(f'{base}/mod/sala.smd', 'rb').read(), 'SMX': open(f'{base}/mod/sala.smx', 'rb').read(),
            'SAT': open(f'{base}/col/sala.sat', 'rb').read(), 'EAT': open(f'{base}/col/sala.eat', 'rb').read(), 'AEV': aev,
            'CAM': CAM_VACIO}
-    amb, nl, nluz = uc_ambiente.ambiente('r22b', [], [], horneada=True); new.update(amb)
+    lamp = []
+    if r == INICIO and os.path.exists(f'{R1}/salas_uc5/{INICIO}/luces.json'):
+        fu = json.load(open(f'{R1}/salas_uc5/{INICIO}/luces.json'))['fuentes']; grupos_l = []
+        for p in fu:
+            for g in grupos_l:
+                if np.linalg.norm(np.mean(g, 0) - np.array(p)) < 1.3: g.append(p); break
+            else: grupos_l.append([p])
+        lamp = [tuple(tp(INICIO, np.mean(g, 0) * 1000)) for g in grupos_l]
+    amb, nl, nluz = uc_ambiente.ambiente('r22b', [], lamp, horneada=True); new.update(amb)
     done = set(); out = []
     for t, d in entries:
         n = drs.tag_name(t)

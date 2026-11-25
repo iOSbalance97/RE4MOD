@@ -24,6 +24,20 @@ mats = {}; m = None
 for l in open(os.path.join(base, mtl)):
     if l.startswith('newmtl'): m = l.split()[1]; mats[m] = None
     elif l.startswith('map_Kd'): mats[m] = l.split(None, 1)[1].strip()
+# ---------------- fuentes de luz de UC (lámparas, faroles, llamas de velas y arañas): por el nombre de su textura
+import re as _re
+_lt = np.array([bool(_re.search(r'light|lantan|flame|lamp', str(mats.get(mm) or ''), _re.I)) for mm in FM])
+_fuentes = []
+if _lt.any():
+    _c = V[F[_lt, :3]].mean(1)
+    for p in _c:
+        for g in _fuentes:
+            if np.linalg.norm(np.mean(g, 0) - p) < 0.7: g.append(p); break
+        else: _fuentes.append([p])
+_fuentes = [np.mean(g, 0).tolist() for g in _fuentes if len(g) >= 2]
+os.makedirs(out, exist_ok=True)
+json.dump(dict(fuentes=_fuentes), open(f'{out}/luces.json', 'w'))
+print(f'fuentes de luz encontradas: {len(_fuentes)}')
 # ---------------- aligerar la geometría de UC (piezas muy densas: tallas, balaustres) para que quepa en la memoria de sala
 if float(os.environ.get('DECIMAR', 0)) > 0:
     sys.path.insert(0, '/home/claude/tools'); import decimate
@@ -376,7 +390,7 @@ P3 = V[F[:, :3]]; nf = np.cross(P3[:, 1] - P3[:, 0], P3[:, 2] - P3[:, 0]); af = 
 _flz = Tc[nc[:, 1] > 0.7]; _rgz = np.random.default_rng(11)
 _wz = (_rgz.dirichlet([1, 1, 1], (len(_flz), 8))[..., None] * _flz[:, None]).sum(2).reshape(-1, 3)
 _dz, _ = cKDTree(_wz).query(P3.mean(1))
-LEJOS = float(os.environ.get('LEJOS', 2.6))
+LEJOS = float(os.environ.get('LEJOS', 3.4))
 lejano = _dz > LEJOS
 enat = ~con_alfa & (af > 1e-7) & lejano
 print(f'  atlas (lejano, sombra continua): {lejano.mean()*100:.0f} % de triángulos; cerca y nítido: {(~lejano).mean()*100:.0f} %')
