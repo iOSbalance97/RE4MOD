@@ -58,7 +58,7 @@ def ambiente(rid_orig, llamas, lamparas, horneada=False):
     env[0x14:0x18] = bytes((0, 0, 0, 0x80))                          # niebla negra
     env[0xFC:0x100] = bytes((0x3C, 0x38, 0x36, 0x80))               # ambiente de personajes (se ve a Leon)
     if horneada:                                                     # texturas con la luz ya pintada (fondos del REmake): que se vean tal cual
-        env[0:4] = bytes((0x70, 0x6E, 0x6C, 0x80)); struct.pack_into('>2f', env, 0x0C, 3500.0, 20000.0)
+        env[0:4] = bytes((0x60, 0x5E, 0x5C, 0x80)); struct.pack_into('>2f', env, 0x0C, 3500.0, 20000.0)
     luces = []
     # luces de Leon de la sala original, más tenues
     leon = [l for l in cuts[0][1] if l[0x1C] == 1 and struct.unpack('>I', l[0x20:0x24])[0] == 0]

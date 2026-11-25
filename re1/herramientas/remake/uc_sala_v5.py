@@ -538,7 +538,7 @@ lumf = lambda x: x @ np.array([0.3, 0.59, 0.11], np.float32)
 Lb = lumf(Lb)[:, None] * (1 + (Lb / np.maximum(lumf(Lb)[:, None], 1e-3) - 1) * 0.5)
 alfa = np.clip(peso / (np.percentile(peso[vis], 30) + 1e-6), 0, 1)[:, None] if vis.any() else np.zeros((len(peso), 1))
 L = np.where(vis[:, None], alfa * np.clip(Lb, 0.02, 1.6) + (1 - alfa) * Lv, Lv)
-final = np.clip(alb * L, 0, 1)
+final = np.clip(alb * L * float(os.environ.get('BRILLO', 1.0)), 0, 1)
 print(f'  píxeles vistos por alguna cámara: {vis.mean()*100:.0f} %')
 paginas = []
 for pg in range(npag):
@@ -605,7 +605,7 @@ with open(f'{out}/sala.mtl', 'w') as fm:
         lado = int(os.environ.get('TEXG', 512)) if area_tex[tf] / tot > 0.02 else int(os.environ.get('TEXP', 256))
         if max(im.size) > lado: im = im.resize((min(lado, im.size[0]), min(lado, im.size[1])), Image.LANCZOS)
         a_ = np.asarray(im, float); fac = NIV[nv_] * tinte_sala
-        a_[..., :3] = np.clip(a_[..., :3] * fac, 0, 255)
+        a_[..., :3] = np.clip(a_[..., :3] * fac * float(os.environ.get('BRILLO', 1.0)), 0, 255)
         Image.fromarray(a_.astype(np.uint8), 'RGBA').save(f'{out}/{nm}.png')
         fm.write(f'newmtl {nm}\nKd 1 1 1\nmap_Kd {nm}.png\n'); nombre_mat[(tf, nv_)] = nm
 with open(f'{out}/sala.obj', 'w') as f:
