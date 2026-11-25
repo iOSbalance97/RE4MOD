@@ -1,16 +1,4 @@
 {
- "estatuas": [
-  {
-   "x": -0.45,
-   "z": 0.25,
-   "y0": 1.5,
-   "alto": 1.1,
-   "giro": -1.5708,
-   "textura": "marmol_s0.png",
-   "tipo": "busto",
-   "sombreado": "marmol_s{}.png"
-  }
- ],
  "quitar": [
   {
    "que": "estatua incompleta de UC",
@@ -26,5 +14,22 @@
    ],
    "mat": "OBJ18"
   }
+ ],
+ "modelos": [
+  {
+   "obj": "/home/claude/re1gc/modelos/estatua_nina/figura.obj",
+   "x": -0.45,
+   "y0": 1.5,
+   "z": 0.25,
+   "giro": -1.5708,
+   "escala": 1.0,
+   "texturas": {
+    "figura": "estatua_nina_figura.png",
+    "mapa": "estatua_nina_mapa.png"
+   }
+  }
+ ],
+ "cerrar": [
+  "r103OBJ10|r103OBJ11"
  ]
 }

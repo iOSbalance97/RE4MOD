@@ -127,6 +127,60 @@ if os.path.exists(_cfg):
         Vp, Tp, Fp = _ex.torneado((col['x'], y0, col['z']), col['y1'] - y0, _ex.PERFIL_COLUMNA, escala_r=col['r'], lados=14, uv_vueltas=1, uv_alto=1.5)
         _anade(Vp, Tp, Fp, mm)
     print(f"columnas añadidas: {len(cfg.get('columnas', []))}")
+    for aj in cfg.get('ajustar', []):          # encajar una pieza en una caja (p. ej. una hoja de puerta en su marco)
+        lo = np.array(aj['min']); hi = np.array(aj['max']); dlo = np.array(aj['a_min']); dhi = np.array(aj['a_max'])
+        cen_ = V[F[:, :3]].mean(1)
+        sel_ = np.all((cen_ >= lo) & (cen_ <= hi), 1) & np.array([bool(_re2.search(aj['mat'], str(mats.get(m_) or m_), _re2.I)) for m_ in FM])
+        idx_ = np.unique(F[sel_, :3]); P_ = V[idx_]; plo = P_.min(0); phi = P_.max(0)
+        V = V.copy(); V[idx_] = dlo + (P_ - plo) / np.maximum(phi - plo, 1e-6) * (dhi - dlo)
+        print(f"  ajustada {aj.get('que', '')}: {sel_.sum()} triángulos")
+    for rx_ in cfg.get('cerrar', []):          # telas abiertas (UC solo modeló la cara que ve su cámara): envolvente convexa por pieza
+        from scipy.spatial import ConvexHull
+        import scipy.sparse as _sp
+        from scipy.sparse.csgraph import connected_components as _cc
+        sel_ = np.nonzero(np.array([bool(_re2.search(rx_, str(mats.get(m_) or m_), _re2.I)) for m_ in FM]))[0]
+        if not len(sel_): continue
+        Fs_ = F[sel_, :3]; _, inv_ = np.unique(np.round(V[Fs_.ravel()] * 200).astype(np.int64), axis=0, return_inverse=True); inv_ = inv_.reshape(-1, 3)
+        nvv = inv_.max() + 1; A_ = _sp.coo_matrix((np.ones(len(inv_) * 2), (np.r_[inv_[:, 0], inv_[:, 1]], np.r_[inv_[:, 1], inv_[:, 2]])), shape=(nvv, nvv))
+        ncc_, lab_ = _cc(A_, directed=False); tl_ = lab_[inv_[:, 0]]
+        quitar_ = np.zeros(len(F), bool); hechas = 0
+        for k_ in range(ncc_):
+            tt_ = sel_[tl_ == k_]
+            if len(tt_) < 6: continue
+            pts_ = V[F[tt_, :3].ravel()]
+            if np.ptp(pts_, 0).min() < 0.05: continue
+            try: H_ = ConvexHull(pts_)
+            except Exception: continue
+            hv = pts_[H_.vertices]; mp_ = {v: i for i, v in enumerate(H_.vertices)}
+            tris = np.array([[mp_[a_] for a_ in sx] for sx in H_.simplices])
+            # orientar hacia fuera
+            cc_ = hv.mean(0); n_ = np.cross(hv[tris[:, 1]] - hv[tris[:, 0]], hv[tris[:, 2]] - hv[tris[:, 0]])
+            flip = ((hv[tris].mean(1) - cc_) * n_).sum(1) < 0; tris[flip] = tris[flip][:, ::-1]
+            Vt_ = hv[tris.ravel()]; nn2 = np.repeat(np.cross(Vt_[1::3] - Vt_[0::3], Vt_[2::3] - Vt_[0::3]), 3, 0)
+            ax_ = np.abs(nn2).argmax(1)
+            uvt = np.where(ax_[:, None] == 1, Vt_[:, [0, 2]], np.where(ax_[:, None] == 0, Vt_[:, [2, 1]], Vt_[:, [0, 1]])) / 1.2
+            _anade(Vt_, uvt, np.arange(len(Vt_)).reshape(-1, 3), FM[tt_[0]]); quitar_[tt_] = True; hechas += 1
+        F = F[~quitar_]; FM = FM[~quitar_]
+        print(f'  telas cerradas ({rx_}): {hechas}')
+    for md in cfg.get('modelos', []):          # modelo .obj propio (p. ej. estatua hecha desde fotos), con sus texturas ya en la carpeta de la sala
+        Vm_ = []; VTm_ = []; Fm_ = []; Mm_ = []; cur_ = None
+        for l_ in open(md['obj']):
+            if l_.startswith('v '): Vm_.append([float(x) for x in l_.split()[1:4]])
+            elif l_.startswith('vt '): VTm_.append([float(x) for x in l_.split()[1:3]])
+            elif l_.startswith('usemtl'): cur_ = l_.split()[1]
+            elif l_.startswith('f '):
+                q_ = [x.split('/') for x in l_.split()[1:4]]; Fm_.append([int(a_[0]) - 1 for a_ in q_] + [int(a_[1]) - 1 for a_ in q_]); Mm_.append(cur_)
+        Vm_ = np.array(Vm_) * md.get('escala', 1.0); VTm_ = np.array(VTm_); Fm_ = np.array(Fm_)
+        g_ = md.get('giro', 0.0); c_, s_ = np.cos(g_), np.sin(g_)
+        Vm_ = Vm_ @ np.array([[c_, 0, -s_], [0, 1, 0], [s_, 0, c_]]) + [md['x'], md['y0'], md['z']]
+        for mat_, tex_ in md['texturas'].items():
+            sel_ = np.array([m_ == mat_ for m_ in Mm_])
+            if not sel_.any(): continue
+            mk_ = tex_[:-4]; mats[mk_] = tex_
+            # cada triángulo con sus propios vértices de UV
+            Fs_ = Fm_[sel_]; Vv_ = Vm_[Fs_[:, :3].ravel()]; Tt_ = VTm_[Fs_[:, 3:].ravel()]
+            _anade(Vv_, Tt_, np.arange(len(Vv_)).reshape(-1, 3), mk_)
+        print(f"  modelo {os.path.basename(md['obj'])} añadido en", md['x'], md['z'])
     for es in cfg.get('estatuas', []):
         mm = next((m_ for m_, t_ in mats.items() if t_ == es['textura']), None)
         if not mm and os.path.exists(os.path.join(base, es['textura'])): mm = es['textura'][:-4]; mats[mm] = es['textura']
@@ -208,3 +262,35 @@ if os.environ.get('QUITAR_PAREDES_PASO'):
         _qp[i] = ok_
     print(f'paredes de UC en mitad del paso quitadas: {_qp.sum()} triángulos')
     F = F[~_qp]; FM = FM[~_qp]
+# barandillas en zonas marcadas a mano (config 'barandillas_zonas': [xmin, xmax, zmin, zmax]): en cada borde con caída o hueco
+if os.path.exists(f'/home/claude/re1gc/work/extras_{r}.json') and json.load(open(f'/home/claude/re1gc/work/extras_{r}.json')).get('barandillas_zonas'):
+    _zonas = json.load(open(f'/home/claude/re1gc/work/extras_{r}.json'))['barandillas_zonas']
+    _wall2 = np.nonzero(np.abs(nc[:, 1]) < 0.3)[0]
+    _W2 = cKDTree(np.concatenate([np.random.default_rng(i).dirichlet([1, 1, 1], 12) @ Tc[i] for i in _wall2])) if len(_wall2) else None
+    _G = 0.1; _pz = []
+    def _hmax(x, z):
+        h = _heights(_TF, x, z); return float(h.max()) if len(h) else None
+    for x0, x1, z0, z1 in _zonas:
+        for x in np.arange(x0, x1 + 1e-6, _G):
+            for z in np.arange(z0, z1 + 1e-6, _G):
+                h = _hmax(x, z)
+                if h is None: continue
+                for dx, dz in ((_G, 0), (-_G, 0), (0, _G), (0, -_G)):
+                    h2 = _hmax(x + dx, z + dz)
+                    if h2 is None or h - h2 > 0.6:
+                        p = (x + dx * 0.4, h, z + dz * 0.4)
+                        if _W2 is not None and _W2.query_ball_point([p[0], h + 0.6, p[2]], 0.15): continue
+                        _pz.append(p)
+    _u2 = []
+    for p in _pz:
+        if not any(np.hypot(p[0] - q[0], p[2] - q[2]) < 0.17 and abs(p[1] - q[1]) < 0.4 for q in _u2): _u2.append(p)
+    _mmv2 = next((m_ for m_, t_ in mats.items() if t_ and 'handrail01' in t_), None) or next((m_ for m_, t_ in mats.items() if t_ and 'wood04' in t_), None)
+    nv2 = 0
+    if _u2 and _mmv2:
+        P2_ = np.array(_u2); arb2 = cKDTree(P2_)
+        for k, p in enumerate(P2_):
+            Vp, Tp, Fp = _ex.torneado(tuple(p), 0.93, _ex.PERFIL_BALAUSTRE, lados=6); _anade(Vp, Tp, Fp, _mmv2)
+            for j in arb2.query_ball_point(p, 0.27):
+                if j > k and abs(P2_[j][1] - p[1]) < 0.35:
+                    Vp, Tp, Fp = _ex.viga(P2_[k] + [0, 0.95, 0], P2_[j] + [0, 0.95, 0], ancho=0.1, alto=0.08); _anade(Vp, Tp, Fp, _mmv2); nv2 += 1
+    print(f'barandillas en zonas marcadas: {len(_u2)} balaustres, {nv2} tramos')
