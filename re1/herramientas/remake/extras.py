@@ -5,6 +5,7 @@ from scipy.spatial import cKDTree
 
 PERFIL_BALAUSTRE = [(0.00, 0.040), (0.06, 0.045), (0.10, 0.030), (0.16, 0.028), (0.30, 0.055), (0.42, 0.058),
                     (0.55, 0.030), (0.70, 0.026), (0.82, 0.034), (0.90, 0.044), (0.95, 0.040), (1.00, 0.040)]
+PERFIL_BALAUSTRE_LIGERO = [(0.00, 0.042), (0.12, 0.030), (0.40, 0.058), (0.75, 0.026), (1.00, 0.040)]
 PERFIL_COLUMNA = [(0.00, 1.25), (0.04, 1.25), (0.05, 1.10), (0.09, 1.10), (0.10, 1.00), (0.12, 0.95), (0.85, 0.85),
                   (0.88, 0.95), (0.90, 0.95), (0.92, 1.05), (0.96, 1.20), (1.00, 1.25)]
 
@@ -86,3 +87,100 @@ def balaustres_escalera(Tc, nc, P_riel, hay_algo, paso=0.16):
             if hay_algo(q[0], q[1] + 0.15 * h, q[1] + 0.85 * h, q[2]): continue
             out.append(((q[0], q[1], q[2]), h))
     return out
+
+def viga(a, b, ancho=0.09, alto=0.07):
+    """caja alargada de a a b (pasamanos), con UV a lo largo"""
+    a = np.asarray(a, float); b = np.asarray(b, float); d = b - a; L = np.linalg.norm(d)
+    if L < 1e-6: return np.zeros((0, 3)), np.zeros((0, 2)), np.zeros((0, 3), int)
+    u = d / L; lado = np.cross(u, [0, 1, 0]); lado /= np.linalg.norm(lado) + 1e-12; arriba = np.cross(lado, u)
+    esq = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    V = []; T = []; F = []
+    for k, (sx, sy) in enumerate(esq):
+        for p, t in ((a, 0.0), (b, L)):
+            V.append(p + lado * sx * ancho / 2 + arriba * sy * alto / 2); T.append([t, k * 0.25])
+    for k in range(4):
+        i0, i1 = 2 * k, 2 * ((k + 1) % 4)
+        F.append([i0, i0 + 1, i1 + 1]); F.append([i0, i1 + 1, i1])
+    F += [[0, 2, 4], [0, 4, 6], [1, 5, 3], [1, 7, 5]]
+    return np.array(V), np.array(T), np.array(F)
+
+def barandilla_rampas(Tc, nc, es_pared, paso=0.20, alto=0.95, radio_llano=1.5, alturas=None):
+    """barandilla completa (tramos de pasamanos + balaustres + postes) en los bordes libres de las rampas de la colisión.
+    es_pared(x, y, z) -> True si hay pared de colisión ahí (borde contra pared: sin barandilla)"""
+    from collections import defaultdict
+    ramp = set(np.nonzero((nc[:, 1] > 0.45) & (nc[:, 1] < 0.97))[0])
+    piso = np.nonzero(nc[:, 1] > 0.45)[0]
+    key = lambda p: tuple(np.round(p, 3)); cuenta = defaultdict(list)
+    for i in piso:
+        t = Tc[i]
+        for a, b in ((0, 1), (1, 2), (2, 0)): cuenta[tuple(sorted((key(t[a]), key(t[b]))))].append(i)
+    vigas = []; bal = []; postes = []
+    rc = cKDTree(np.concatenate([Tc[i] for i in ramp])[:, [0, 2]]) if ramp else None
+    for (pa, pb), ts in cuenta.items():
+        if len(ts) != 1: continue
+        a, b = np.array(pa), np.array(pb)
+        if ts[0] not in ramp:
+            # descansillo llano junto a una rampa: también lleva barandilla en sus bordes libres
+            if rc is None or rc.query(((a + b) / 2)[[0, 2]])[0] > radio_llano: continue
+        L = np.linalg.norm((b - a)[[0, 2]])
+        if L < 0.3: continue
+        cen = Tc[ts[0]].mean(0); m = (a + b) / 2
+        dentro = cen - m; dentro[1] = 0; dentro /= np.linalg.norm(dentro) + 1e-9
+        if es_pared(*(m - dentro * 0.15 + [0, 0.5, 0])): continue
+        if alturas is not None:
+            n_peg = 0
+            for q in (a, m, b, a * 0.75 + b * 0.25, a * 0.25 + b * 0.75):
+                fuera = q - dentro * 0.1; hs = alturas(fuera[0], fuera[2])
+                if len(hs) and np.abs(hs - q[1]).min() < 0.15: n_peg += 1
+            if n_peg >= 4: continue      # al otro lado hay suelo a su altura (unión rampa-suelo): no es un borde libre
+        a2 = a + dentro * 0.06; b2 = b + dentro * 0.06
+        vigas.append((a2 + [0, alto, 0], b2 + [0, alto, 0]))
+        for s in np.arange(paso / 2, L, paso):
+            p = a2 + (b2 - a2) * (s / L); bal.append((tuple(p), alto - 0.035))
+        postes += [tuple(a2), tuple(b2)]
+    # postes: quitar repetidos
+    uniq = []
+    for p in postes:
+        if not any(np.linalg.norm(np.subtract(p, q)) < 0.1 for q in uniq): uniq.append(p)
+    return vigas, bal, uniq
+
+def _rot_eje(V, eje, ang, centro):
+    eje = np.asarray(eje, float); eje /= np.linalg.norm(eje)
+    K = np.array([[0, -eje[2], eje[1]], [eje[2], 0, -eje[0]], [-eje[1], eje[0], 0]])
+    R = np.eye(3) + np.sin(ang) * K + (1 - np.cos(ang)) * K @ K
+    return (V - centro) @ R.T + centro
+
+def tubo(a, b, r0, r1, lados=10):
+    """cilindro cónico de a a b"""
+    a = np.asarray(a, float); b = np.asarray(b, float); L = np.linalg.norm(b - a)
+    V, T, F = torneado((0, 0, 0), L, [(0.0, r0 * 0.6), (0.05, r0), (0.95, r1), (1.0, r1 * 0.6)], lados=lados)
+    d = (b - a) / L; y = np.array([0, 1.0, 0]); ax = np.cross(y, d)
+    if np.linalg.norm(ax) > 1e-6: V = _rot_eje(V, ax, np.arccos(np.clip(d @ y, -1, 1)), np.zeros(3))
+    elif d[1] < 0: V = V * [1, -1, 1]
+    return V + a, T, F
+
+def estatua(base, alto=1.15, giro=0.0):
+    """figura clásica de mármol con un cántaro al hombro, de piezas torneadas (base = centro de la peana, arriba)"""
+    s = alto / 1.15; piezas = []
+    bx, by, bz = base
+    def add(p): piezas.append(p)
+    # túnica (de los pies a la cintura), algo aplanada
+    V, T, F = torneado((0, 0, 0), 0.62 * s, [(0, 0.20), (0.05, 0.21), (0.35, 0.17), (0.7, 0.14), (1.0, 0.12)], lados=16); V[:, 2] *= 0.75; add((V, T, F))
+    # torso
+    V, T, F = torneado((0, 0.60 * s, 0), 0.34 * s, [(0, 0.12), (0.3, 0.125), (0.6, 0.135), (0.85, 0.14), (1.0, 0.07)], lados=16); V[:, 2] *= 0.7; add((V, T, F))
+    # cuello y cabeza
+    add(tubo((0, 0.92 * s, 0), (0, 1.0 * s, 0.01), 0.045 * s, 0.04 * s))
+    V, T, F = torneado((0, 0.98 * s, 0.01), 0.18 * s, [(0, 0.03), (0.15, 0.065), (0.45, 0.08), (0.75, 0.072), (0.95, 0.04), (1.0, 0.0)], lados=14); add((V, T, F))
+    # brazos: el derecho sube a sujetar el cántaro, el izquierdo baja
+    add(tubo((0.15 * s, 0.90 * s, 0), (0.22 * s, 1.08 * s, 0.02), 0.042 * s, 0.035 * s))
+    add(tubo((0.22 * s, 1.08 * s, 0.02), (0.16 * s, 1.22 * s, 0.0), 0.035 * s, 0.03 * s))
+    add(tubo((-0.15 * s, 0.90 * s, 0), (-0.19 * s, 0.68 * s, 0.03), 0.042 * s, 0.036 * s))
+    add(tubo((-0.19 * s, 0.68 * s, 0.03), (-0.13 * s, 0.50 * s, 0.08), 0.036 * s, 0.03 * s))
+    # cántaro sobre el hombro derecho, inclinado
+    V, T, F = torneado((0, 0, 0), 0.30 * s, [(0, 0.04), (0.08, 0.07), (0.35, 0.11), (0.6, 0.10), (0.8, 0.05), (0.9, 0.04), (1.0, 0.06)], lados=14)
+    V = _rot_eje(V, (0, 0, 1), -0.9, np.zeros(3)) + [0.16 * s, 1.02 * s, 0.0]; add((V, T, F))
+    Vs = []; Ts = []; Fs = []; b0 = 0
+    for V, T, F in piezas: Vs.append(V); Ts.append(T); Fs.append(F + b0); b0 += len(V)
+    V = np.concatenate(Vs); T = np.concatenate(Ts); F = np.concatenate(Fs)
+    V = _rot_eje(V, (0, 1, 0), giro, np.zeros(3)) + [bx, by, bz]
+    return V, T, F

@@ -14,11 +14,18 @@ from uc_montar2_mapa import TPL
 OUT = sys.argv[1]; ORIG = '/home/claude/disc/ext1/files'; R1 = '/home/claude/re1gc'
 for d in ('St1', 'St2', 'Rel', 'etc'): os.makedirs(f'{OUT}/{d}', exist_ok=True)
 G = json.load(open(f'{R1}/work/puertas_remake.json'))
+# salas del REmake que en el juego son una sola (comedor de dos plantas: se tira la estatua al piso de abajo)
+FUSION = {'r202': 'r105'}
+for _a in list(G):
+    for _d in G[_a]:
+        if _d['dst'] in FUSION: _d['dst'] = FUSION[_d['dst']]
+for _o, _b in FUSION.items():
+    G[_b] = G[_b] + [d for d in G.pop(_o, []) if d['dst'] != _b]
 ST = {}
 for st in range(1, 6):
     for f in sorted(os.listdir(f'{R1}/files/st{st}')):
         if f.endswith('.dat'): ST[f[:4]] = st
-listas = {r for r in ST if os.path.exists(f'{R1}/re4/re_{r}/v2') and os.path.exists(f'{R1}/re4/re_{r}/col/sala.sat')}
+listas = {r for r in ST if os.path.exists(f'{R1}/re4/re_{r}/v2') and os.path.exists(f'{R1}/re4/re_{r}/col/sala.sat')} - set(FUSION)
 faltan = sorted(set(ST) - listas)
 if faltan: print('sin convertir (fuera del montaje):', ' '.join(faltan))
 
@@ -159,6 +166,7 @@ for a in sorted(HUECO):
         AEVS.setdefault(a, []).append((area_de(d['quad'], piso, a), HUECO[b], (float(q_[0]), float(q_[1]), float(q_[2])), float(tang(b, ang)), f'{a} -> {b}'))
         informe_p.append((a, b))
 SALTOS = json.load(open(f'{R1}/work/saltos_internos.json'))
+for _o, _b in FUSION.items(): SALTOS[_b] = SALTOS.get(_b, []) + SALTOS.pop(_o, [])
 for a, lst in SALTOS.items():
     if a not in HUECO: continue
     for quad, (x, y, z, ang), y0 in lst:

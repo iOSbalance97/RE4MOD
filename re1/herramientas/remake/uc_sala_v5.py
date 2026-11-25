@@ -71,7 +71,7 @@ def _cargar_col(p):
         if l.startswith('v '): Vc.append([float(x) for x in l.split()[1:4]])
         elif l.startswith('f '): Fc.append([int(x.split('/')[0]) - 1 for x in l.split()[1:4]])
     return np.array(Vc), np.array(Fc)
-Vc, Fc = _cargar_col(f'/home/claude/re1gc/salas/{r}/colision.obj')
+Vc, Fc = _cargar_col(f'/home/claude/re1gc/salas/{r}/colision_fusion.obj' if os.path.exists(f'/home/claude/re1gc/salas/{r}/colision_fusion.obj') else f'/home/claude/re1gc/salas/{r}/colision.obj')
 Tc = Vc[Fc]; nc = np.cross(Tc[:, 1] - Tc[:, 0], Tc[:, 2] - Tc[:, 0]); ac = np.linalg.norm(nc, axis=1); nc /= ac[:, None] + 1e-12
 Tu = V[F[:, :3]]; nu = np.cross(Tu[:, 1] - Tu[:, 0], Tu[:, 2] - Tu[:, 0]); au = np.linalg.norm(nu, axis=1) / 2; nu /= 2 * au[:, None] + 1e-12
 UVu = VT[F[:, 3:]]
@@ -647,8 +647,13 @@ with open(f'{out}/sala.mtl', 'w') as fm:
         try: im = Image.open(os.path.join(base, tf)).convert('RGBA')
         except Exception: continue
         lado = int(os.environ.get('TEXG', 512)) if area_tex[tf] / tot > 0.02 else int(os.environ.get('TEXP', 256))
-        if max(im.size) > lado: im = im.resize((min(lado, im.size[0]), min(lado, im.size[1])), Image.LANCZOS)
+        _mej = os.environ.get('MEJORAR') and _re.search(os.environ['MEJORAR'], os.path.basename(tf), _re.I)
+        if _mej:
+            from PIL import ImageFilter
+            if max(im.size) < 512: im = im.resize((im.size[0] * 4, im.size[1] * 4), Image.LANCZOS).filter(ImageFilter.UnsharpMask(2, 90, 2))
+        elif max(im.size) > lado: im = im.resize((min(lado, im.size[0]), min(lado, im.size[1])), Image.LANCZOS)
         a_ = np.asarray(im, float); fac = NIV[nv_] * tinte_sala
+        if _mej: fac = np.maximum(fac, float(os.environ.get('NIVEL_MIN_MEJ', 0.55)))
         a_[..., :3] = np.clip(a_[..., :3] * fac * float(os.environ.get('BRILLO', 1.0)), 0, 255)
         Image.fromarray(a_.astype(np.uint8), 'RGBA').save(f'{out}/{nm}.png')
         fm.write(f'newmtl {nm}\nKd 1 1 1\nmap_Kd {nm}.png\n'); nombre_mat[(tf, nv_)] = nm
