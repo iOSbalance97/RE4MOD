@@ -35,8 +35,18 @@ if _lt.any():
             if np.linalg.norm(np.mean(g, 0) - p) < 0.7: g.append(p); break
         else: _fuentes.append([p])
 _fuentes = [np.mean(g, 0).tolist() for g in _fuentes if len(g) >= 2]
+# llamas: triángulos con textura de llama (velas y arañas), agrupadas a 25 cm
+_fl = np.array([bool(_re.search(r'flame', str(mats.get(mm) or ''), _re.I)) for mm in FM])
+_llamas = []
+if _fl.any():
+    for p in V[F[_fl, :3]].mean(1):
+        for g in _llamas:
+            if np.linalg.norm(np.mean(g, 0) - p) < 0.25: g.append(p); break
+        else: _llamas.append([p])
+_llamas = [np.mean(g, 0).tolist() for g in _llamas]
 os.makedirs(out, exist_ok=True)
-json.dump(dict(fuentes=_fuentes), open(f'{out}/luces.json', 'w'))
+json.dump(dict(fuentes=_fuentes, llamas=_llamas), open(f'{out}/luces.json', 'w'))
+print(f'llamas (velas): {len(_llamas)}')
 print(f'fuentes de luz encontradas: {len(_fuentes)}')
 # ---------------- aligerar la geometría de UC (piezas muy densas: tallas, balaustres) para que quepa en la memoria de sala
 if float(os.environ.get('DECIMAR', 0)) > 0:

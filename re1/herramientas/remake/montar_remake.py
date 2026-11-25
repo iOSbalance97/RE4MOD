@@ -194,7 +194,10 @@ def montar(r):
                 if np.linalg.norm(np.mean(g, 0) - np.array(p)) < 1.3: g.append(p); break
             else: grupos_l.append([p])
         lamp = [tuple(tp(INICIO, np.mean(g, 0) * 1000)) for g in grupos_l]
-    amb, nl, nluz = uc_ambiente.ambiente('r22b', [], lamp, horneada=True); new.update(amb)
+    llam = []
+    if r == INICIO and os.path.exists(f'{R1}/salas_uc5/{INICIO}/luces.json'):
+        llam = [tuple(tp(INICIO, np.array(p) * 1000)) for p in json.load(open(f'{R1}/salas_uc5/{INICIO}/luces.json')).get('llamas', [])]
+    amb, nl, nluz = uc_ambiente.ambiente('r22b', llam, lamp, horneada=True); new.update(amb)
     done = set(); out = []
     for t, d in entries:
         n = drs.tag_name(t)

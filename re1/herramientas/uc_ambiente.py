@@ -58,7 +58,7 @@ def ambiente(rid_orig, llamas, lamparas, horneada=False):
     env[0x14:0x18] = bytes((0, 0, 0, 0x80))                          # niebla negra
     env[0xFC:0x100] = bytes((0x3C, 0x38, 0x36, 0x80))               # ambiente de personajes (se ve a Leon)
     if horneada:                                                     # texturas con la luz ya pintada (fondos del REmake): que se vean tal cual
-        env[0:4] = bytes((0x80, 0x80, 0x80, 0x80)); struct.pack_into('>2f', env, 0x0C, 5000.0, 26000.0); llamas = []
+        env[0:4] = bytes((0x70, 0x6E, 0x6C, 0x80)); struct.pack_into('>2f', env, 0x0C, 3500.0, 20000.0)
     luces = []
     # luces de Leon de la sala original, más tenues
     leon = [l for l in cuts[0][1] if l[0x1C] == 1 and struct.unpack('>I', l[0x20:0x24])[0] == 0]
@@ -84,9 +84,9 @@ def ambiente(rid_orig, llamas, lamparas, horneada=False):
         usadas.append(i)
         n_g = sum(1 for q in L if np.linalg.norm(np.subtract(p, q)) < 1500.0)
         luces.append(luz(ANT, 2, 1, 0x57, (0.0, 300.0, 0.0), 3200.0 + 300.0 * min(n_g, 4), (0xE0, 0x98, 0x58, 0x80), 0.55 + 0.05 * min(n_g, 4), 3, i, flick=0x10))
-    for p in reparto(lamparas, 20 if horneada else MAX_LAMPARAS) if len(lamparas) else []:
+    for p in reparto(lamparas, (24 - min(len(llamas), 10) // 2) if horneada else MAX_LAMPARAS) if len(lamparas) else []:
         if horneada:      # luz tenue y cálida en cada lámpara, farol o candelabro (la sala ya lleva su luz pintada)
-            luces.append(luz(ANT, 2, 1, 0x57, tuple(p), 2600.0, (0xF0, 0xB8, 0x78, 0x80), 0.28, 0, 0, flick=0x04))
+            luces.append(luz(ANT, 2, 1, 0x57, tuple(p), 3600.0, (0xFF, 0xC0, 0x80, 0x80), 0.65, 0, 0, flick=0x04))
         else:
             luces.append(luz(ANT, 2, 1, 0x57, tuple(p), 3500.0, (0xD0, 0xB8, 0x90, 0x80), 0.5, 0, 0, flick=0x04))
     luces = luces[:32]
