@@ -201,10 +201,28 @@ if os.path.exists(_cfg):
         G2 = 0.1; nsb = 0
         for cj in sb_['cajas']:
             xs2 = np.arange(cj[0], cj[1], G2); zs2 = np.arange(cj[2], cj[3], G2); Mk2 = np.zeros((len(xs2), len(zs2)), bool)
-            for ii, x_ in enumerate(xs2):
-                for jj, z_ in enumerate(zs2):
-                    h_ = _heights(_TF, x_ + G2 / 2, z_ + G2 / 2); Mk2[ii, jj] = len(h_) > 0 and np.abs(h_ - sb_['y']).min() < sb_.get('tol', 0.15)
-            Mk2 = _nd2.binary_dilation(Mk2, iterations=int(sb_.get('dilatar', 0.4) / G2))
+            if sb_.get('solo_pisable', True):          # solo dentro de un triángulo de suelo de la colisión (mirando arriba) a esa altura
+                _cfp = f'/home/claude/re1gc/salas/{r}/colision.obj'; _Vp = []; _Fp = []
+                for l_ in open(_cfp):
+                    if l_.startswith('v '): _Vp.append([float(x) for x in l_.split()[1:4]])
+                    elif l_.startswith('f '): _Fp.append([int(x.split('/')[0]) - 1 for x in l_.split()[1:4]])
+                _Pp = np.array(_Vp)[np.array(_Fp)]; _np = np.cross(_Pp[:, 1] - _Pp[:, 0], _Pp[:, 2] - _Pp[:, 0])
+                _np /= np.linalg.norm(_np, axis=1, keepdims=True) + 1e-12
+                _Pp = _Pp[(_np[:, 1] > 0.95) & (np.abs(_Pp[:, :, 1].mean(1) - sb_['y']) < sb_.get('tol', 0.15))]
+                X_, Z_ = np.meshgrid(xs2 + G2 / 2, zs2 + G2 / 2, indexing='ij'); Q_ = np.stack([X_.ravel(), Z_.ravel()], 1)
+                ins_ = np.zeros(len(Q_), bool)
+                for t_ in _Pp:
+                    a_, b_, c_ = t_[:, [0, 2]]; v0 = c_ - a_; v1 = b_ - a_; v2 = Q_ - a_
+                    d00 = v0 @ v0; d01 = v0 @ v1; d11 = v1 @ v1; den = d00 * d11 - d01 * d01
+                    if abs(den) < 1e-12: continue
+                    d20 = v2 @ v0; d21 = v2 @ v1; u_ = (d11 * d20 - d01 * d21) / den; w_ = (d00 * d21 - d01 * d20) / den
+                    ins_ |= (u_ >= -1e-3) & (w_ >= -1e-3) & (u_ + w_ <= 1 + 1e-3)
+                Mk2 = ins_.reshape(len(xs2), len(zs2))
+            else:
+                for ii, x_ in enumerate(xs2):
+                    for jj, z_ in enumerate(zs2):
+                        h_ = _heights(_TF, x_ + G2 / 2, z_ + G2 / 2); Mk2[ii, jj] = len(h_) > 0 and np.abs(h_ - sb_['y']).min() < sb_.get('tol', 0.15)
+            if int(round(sb_.get('dilatar', 0.4) / G2)) >= 1: Mk2 = _nd2.binary_dilation(Mk2, iterations=int(round(sb_.get('dilatar', 0.4) / G2)))     # iterations=0 en scipy dilata hasta llenarlo todo
             yb_ = sb_['y'] - sb_.get('bajo', 0.03)
             for ii in range(len(xs2)):
                 jj = 0
