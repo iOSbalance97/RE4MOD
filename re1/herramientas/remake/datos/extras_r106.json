@@ -47,6 +47,22 @@
    "y1": 10.6,
    "r": 0.2,
    "textura": "yg_wood04.png"
+  },
+  {
+   "x": 1.9,
+   "z": -6.64,
+   "y0": null,
+   "y1": 9.4,
+   "r": 0.19,
+   "textura": "yg_stone06.png"
+  },
+  {
+   "x": -1.9,
+   "z": -6.64,
+   "y0": null,
+   "y1": 9.4,
+   "r": 0.19,
+   "textura": "yg_stone06.png"
   }
  ],
  "quitar": [
@@ -77,6 +93,34 @@
     7.3
    ],
    "mat": "stone"
+  },
+  {
+   "que": "columna deforme junto al cuadro (+x)",
+   "min": [
+    1.68,
+    5.95,
+    -6.8
+   ],
+   "max": [
+    2.12,
+    9.4,
+    -6.48
+   ],
+   "mat": "stone06|pag_"
+  },
+  {
+   "que": "columna deforme junto al cuadro (-x)",
+   "min": [
+    -2.12,
+    5.95,
+    -6.8
+   ],
+   "max": [
+    -1.68,
+    9.4,
+    -6.48
+   ],
+   "mat": "stone06|pag_"
   }
  ],
  "sin_balaustres": [
@@ -100,6 +144,14 @@
    2.9,
    6.2,
    6.0
+  ],
+  [
+   -1.6,
+   1.6,
+   -5.05,
+   -0.5,
+   0.5,
+   5.9
   ]
  ]
 }

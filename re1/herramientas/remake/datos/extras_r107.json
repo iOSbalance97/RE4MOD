@@ -13,6 +13,20 @@
     1.0
    ],
    "mat": "OBJ18"
+  },
+  {
+   "que": "marcos dorados que asoman por las s\u00e1banas",
+   "min": [
+    4.0,
+    -0.3,
+    -3.8
+   ],
+   "max": [
+    8.7,
+    3.0,
+    0.3
+   ],
+   "mat": "GAKU1[2-6]"
   }
  ],
  "modelos": [
@@ -24,11 +38,33 @@
    "giro": -1.5708,
    "escala": 1.0,
    "texturas": {
-    "marmol_t0": "emily_marmol_t0.png",
-    "marmol_t1": "emily_marmol_t1.png",
-    "marmol_t2": "emily_marmol_t2.png",
-    "marmol_t3": "emily_marmol_t3.png",
-    "marmol_t4": "emily_marmol_t4.png"
+    "marmol_t0": "emily_piedra_t0.png",
+    "marmol_t1": "emily_piedra_t1.png",
+    "marmol_t2": "emily_piedra_t2.png",
+    "marmol_t3": "emily_piedra_t3.png",
+    "marmol_t4": "emily_piedra_t4.png"
+   }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/pasillo107/objetos.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "cuadro12": "EO_r103GAKU12.png",
+    "cuadro13": "EO_r103GAKU13.png",
+    "cuadro14": "EO_r103GAKU14.png",
+    "madera": "EO_r103OBJ5.png",
+    "sabana_t0": "cas_sabana_t0.png",
+    "sabana_t1": "cas_sabana_t1.png",
+    "sabana_t2": "cas_sabana_t2.png",
+    "sabana_t3": "cas_sabana_t3.png",
+    "sabana2_t0": "cas_sabana2_t0.png",
+    "sabana2_t1": "cas_sabana2_t1.png",
+    "sabana2_t2": "cas_sabana2_t2.png",
+    "sabana2_t3": "cas_sabana2_t3.png"
    }
   }
  ],
@@ -57,7 +93,8 @@
    "y_suelo": 0.0,
    "y_techo": 2.95,
    "zocalo_h": 0.95,
-   "escala": 1.4
+   "escala": 1.4,
+   "margen_pared": 0.35
   }
  ],
  "retexturizar": [
@@ -82,7 +119,36 @@
    "zocalo": 0.95,
    "cornisa": 0.25,
    "escala": 1.4,
-   "excluir": "GAKU|OBJ|isu|table|mado_ue|danro|emily|Door|door|KERTEN|cas_"
+   "excluir": "GAKU|OBJ|isu|table|mado_ue|danro|emily|Door|door|KERTEN|cas_",
+   "techo_colision": true,
+   "techo_caja": true,
+   "paredes_colision": true
+  }
+ ],
+ "ajustar": [
+  {
+   "que": "doble puerta metida en su marco",
+   "min": [
+    -4.7,
+    -0.2,
+    -1.2
+   ],
+   "max": [
+    -4.15,
+    2.7,
+    1.6
+   ],
+   "mat": "EO_door2|EO_two_doaplate",
+   "a_min": [
+    -4.71,
+    -0.02,
+    -1.0
+   ],
+   "a_max": [
+    -4.32,
+    2.48,
+    1.47
+   ]
   }
  ]
 }

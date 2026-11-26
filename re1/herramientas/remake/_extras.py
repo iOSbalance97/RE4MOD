@@ -148,6 +148,44 @@ if os.path.exists(_cfg):
         Vp, Tp, Fp = _ex.torneado((col['x'], y0, col['z']), col['y1'] - y0, _ex.PERFIL_COLUMNA, escala_r=col['r'], lados=14, uv_vueltas=1, uv_alto=1.5)
         _anade(Vp, Tp, Fp, mm)
     print(f"columnas añadidas: {len(cfg.get('columnas', []))}")
+    for br_ in cfg.get('brazos', []):           # lámparas de pared que UC dejó flotando: brazo de metal hasta la pared
+        import scipy.sparse as _sp
+        from scipy.sparse.csgraph import connected_components as _cc
+        sel_ = np.nonzero(np.array([bool(_re2.search(br_['mat'], str(m_) + ' ' + str(mats.get(m_) or ''))) for m_ in FM]))[0]
+        if not len(sel_): print('  brazos: material no encontrado', br_['mat']); continue
+        mm_b = next((m_ for m_ in set(FM) if _re2.search(br_['metal'], str(m_) + ' ' + str(mats.get(m_) or ''))), FM[sel_[0]])
+        Fs_ = F[sel_, :3]; _, inv_ = np.unique(np.round(V[Fs_.ravel()] * 100).astype(np.int64), axis=0, return_inverse=True); inv_ = inv_.reshape(-1, 3)
+        nvv = inv_.max() + 1; A_ = _sp.coo_matrix((np.ones(len(inv_) * 2), (np.r_[inv_[:, 0], inv_[:, 1]], np.r_[inv_[:, 1], inv_[:, 2]])), shape=(nvv, nvv))
+        ncc, lab_ = _cc(A_, directed=False); labf = lab_[inv_[:, 0]]
+        _ok = np.array([not _re2.search(br_['mat'] + '|' + br_.get('ignorar', '^$'), str(m_) + ' ' + str(mats.get(m_) or '')) for m_ in _SMa])
+        _Sb = S[_ok]; _Tb = cKDTree(_Sb[:, [0, 2]]); hechos = 0
+        # agrupar piezas cercanas (una lámpara puede ser varias piezas sueltas)
+        cents = [V[Fs_[labf == c]].reshape(-1, 3) for c in range(ncc)]
+        grupos = []
+        for P_ in cents:
+            c_ = P_.mean(0)
+            for g in grupos:
+                if np.hypot(*(g['c'][[0, 2]] - c_[[0, 2]])) < br_.get('agrupar', 0.35) and abs(g['c'][1] - c_[1]) < 0.6: g['P'] = np.r_[g['P'], P_]; g['c'] = g['P'].mean(0); break
+            else: grupos.append(dict(P=P_, c=c_))
+        for g in grupos:
+            P_ = g['P']; lo_ = P_.min(0); hi_ = P_.max(0); cx, cz = (lo_[0] + hi_[0]) / 2, (lo_[2] + hi_[2]) / 2
+            yb = hi_[1] - br_.get('baja', 0.0); ya = yb + br_.get('sube', 0.12)
+            r_ = max(hi_[0] - lo_[0], hi_[2] - lo_[2]) / 2
+            mejor = None
+            for j in _Tb.query_ball_point([cx, cz], r_ + br_.get('alcance', 0.8)):
+                q = _Sb[j]
+                if not (ya - 0.25 <= q[1] <= ya + 0.25): continue
+                dd = np.hypot(q[0] - cx, q[2] - cz)
+                if dd < r_ * 0.6: continue
+                if mejor is None or dd < mejor[0]: mejor = (dd, q)
+            if mejor is None: continue
+            w = np.array([mejor[1][0], ya, mejor[1][2]]); arr = np.array([cx, ya, cz]); dirw = (w - arr) / (np.linalg.norm(w - arr) + 1e-9)
+            w = w + dirw * 0.03
+            Vp, Tp, Fp = _ex.tubo(arr + [0, 0.0, 0], w, br_.get('r', 0.022), br_.get('r', 0.022) * 1.3, lados=8); _anade(Vp, Tp, Fp, mm_b)
+            Vp, Tp, Fp = _ex.tubo(np.array([cx, yb - 0.02, cz]), arr + [0, 0.02, 0], br_.get('r', 0.022) * 0.9, br_.get('r', 0.022), lados=8); _anade(Vp, Tp, Fp, mm_b)
+            Vp, Tp, Fp = _ex.tubo(w - dirw * 0.035, w + dirw * 0.01, 0.06, 0.07, lados=10); _anade(Vp, Tp, Fp, mm_b)          # roseta en la pared
+            hechos += 1
+        print(f"  brazos de {br_['mat']}: {hechos} de {len(grupos)} lámparas")
     for aj in cfg.get('ajustar', []):          # encajar una pieza en una caja (p. ej. una hoja de puerta en su marco)
         lo = np.array(aj['min']); hi = np.array(aj['max']); dlo = np.array(aj['a_min']); dhi = np.array(aj['a_max'])
         cen_ = V[F[:, :3]].mean(1)
@@ -215,7 +253,8 @@ if os.path.exists(_cfg):
             for jj, z_ in enumerate(zs_):
                 h_ = _heights(_TF, x_, z_); Mk[ii, jj] = len(h_) > 0 and np.abs(h_ - rc['y_suelo']).min() < 0.3
         Mk = _nd.binary_fill_holes(_nd.binary_closing(Mk, iterations=2))
-        dentro_box = lambda x_, z_: lo[0] + 0.02 < x_ < hi[0] - 0.02 and lo[2] + 0.02 < z_ < hi[2] - 0.02
+        _mp = rc.get('margen_pared', -0.02)
+        dentro_box = lambda x_, z_: lo[0] - _mp < x_ < hi[0] + _mp and lo[2] - _mp < z_ < hi[2] + _mp
         y0 = rc['y_suelo']; zh = y0 + rc.get('zocalo_h', 0.9)
         for cont in _ms.find_contours(np.pad(Mk.astype(float), 1), 0.5):
             cont = _ms.approximate_polygon(cont - 1, tolerance=1.2)
@@ -227,12 +266,13 @@ if os.path.exists(_cfg):
                 _quad(p0, p1, zh + 0.08, rc['y_techo'], rc['pared'], L_); ns_[2] += 1
         # suelo y techo: filas de la silueta dentro de la caja
         for ii, x_ in enumerate(xs_):
-            if not (lo[0] <= x_ < hi[0]): continue
+            _mt = max(_mp, 0.0)
+            if not (lo[0] - _mt <= x_ < hi[0] + _mt): continue
             jj = 0
             while jj < len(zs_):
-                if Mk[ii, jj] and lo[2] <= zs_[jj] < hi[2]:
+                if Mk[ii, jj] and lo[2] - _mt <= zs_[jj] < hi[2] + _mt:
                     j0 = jj
-                    while jj < len(zs_) and Mk[ii, jj] and zs_[jj] < hi[2]: jj += 1
+                    while jj < len(zs_) and Mk[ii, jj] and zs_[jj] < hi[2] + _mt: jj += 1
                     za, zb = zs_[j0], zs_[jj - 1] + G_; xa, xb = x_, x_ + G_
                     for yy, tex, inv in ((y0, rc['suelo'], False), (rc['y_techo'], rc['techo'], True)):
                         q = np.array([[xa, yy, za], [xb, yy, za], [xb, yy, zb], [xa, yy, zb]])
@@ -252,8 +292,9 @@ if os.path.exists(_cfg):
         for i in idx_:
             t3 = P3_[i]; n_ = nn_[i]; yc = cen_[i, 1]
             if any(np.all((cen_[i] >= np.array(d_['min'])) & (cen_[i] <= np.array(d_['max']))) and abs(n_[d_['eje']]) > 0.8 for d_ in rz.get('descartar', [])): continue
-            if n_[1] > 0.7: tex = rz['suelo']
-            elif n_[1] < -0.7: tex = rz['techo']
+            if n_[1] > 0.7 and yc < rz['y_suelo'] + 0.3: tex = rz['suelo']
+            elif n_[1] < -0.7 and yc > rz['y_techo'] - 0.5: tex = rz['techo']
+            elif abs(n_[1]) > 0.7: tex = rz.get('moldura', rz['pared'])          # repisas y cornisas: madera, nunca la tela girada
             elif yc < rz['y_suelo'] + rz.get('zocalo', 0.25): tex = rz.get('moldura', rz['pared'])
             elif yc > rz['y_techo'] - rz.get('cornisa', 0.25): tex = rz.get('moldura', rz['pared'])
             else: tex = rz['pared']
@@ -268,6 +309,31 @@ if os.path.exists(_cfg):
                 if np.all((c_ >= lo) & (c_ <= hi)):
                     q3 = t3.copy(); q3[:, 1] = rz['y_techo']; q3 = q3[::-1]
                     _anade(q3, q3[:, [0, 2]] / rz.get('escala', 1.2), np.array([[0, 1, 2]]), _mk(rz['techo'])); nt_ += 1
+            if rz.get('paredes_colision'):          # paredes desde el contorno pisable, un poco por detrás: tapan los huecos de UC
+                from scipy import ndimage as _nd
+                from skimage import measure as _ms
+                G_ = 0.05; mg = 0.6; xs_ = np.arange(lo[0] - mg, hi[0] + mg, G_); zs_ = np.arange(lo[2] - mg, hi[2] + mg, G_)
+                Mk = np.zeros((len(xs_), len(zs_)), bool)
+                for ii, x_ in enumerate(xs_):
+                    for jj, z_ in enumerate(zs_):
+                        h_ = _heights(_TF, x_, z_); Mk[ii, jj] = len(h_) > 0 and np.abs(h_ - rz['y_suelo']).min() < 0.3
+                Mk = _nd.binary_fill_holes(_nd.binary_closing(Mk, iterations=2)); Mk = _nd.binary_dilation(Mk, iterations=1)
+                npw = 0; E_ = rz.get('escala', 1.2)
+                for cont in _ms.find_contours(np.pad(Mk.astype(float), 1), 0.5):
+                    cont = _ms.approximate_polygon(cont - 1, tolerance=1.2)
+                    pts = np.stack([xs_[0] + cont[:, 0] * G_, zs_[0] + cont[:, 1] * G_], 1)
+                    for p0, p1 in zip(pts[:-1], pts[1:]):
+                        m_ = (p0 + p1) / 2; L_ = np.linalg.norm(p1 - p0)
+                        if L_ < 0.04 or not (lo[0] - 0.1 < m_[0] < hi[0] + 0.1 and lo[2] - 0.1 < m_[1] < hi[2] + 0.1): continue
+                        for (ya_, yb_, tx_) in ((rz['y_suelo'], rz['y_suelo'] + rz.get('zocalo', 0.25), rz.get('moldura', rz['pared'])), (rz['y_suelo'] + rz.get('zocalo', 0.25), rz['y_techo'], rz['pared'])):
+                            q = np.array([[p0[0], ya_, p0[1]], [p1[0], ya_, p1[1]], [p1[0], yb_, p1[1]], [p0[0], yb_, p0[1]]])
+                            uv = np.array([[0, ya_], [L_, ya_], [L_, yb_], [0, yb_]]) / E_
+                            _anade(q, uv, np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]), _mk(tx_))
+                        npw += 1
+                print(f'  paredes de respaldo: {npw}')
+            if rz.get('techo_caja'):
+                q3 = np.array([[lo[0], rz['y_techo'], lo[2]], [hi[0], rz['y_techo'], lo[2]], [hi[0], rz['y_techo'], hi[2]], [lo[0], rz['y_techo'], hi[2]]])
+                _anade(q3, q3[:, [0, 2]] / rz.get('escala', 1.2), np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]), _mk(rz['techo'])); nt_ += 4
             print(f'  techo añadido: {nt_} triángulos')
         print(f"  retexturizado {rz.get('que', '')}: {len(idx_)} triángulos")
     for md in cfg.get('modelos', []):          # modelo .obj propio (p. ej. estatua hecha desde fotos), con sus texturas ya en la carpeta de la sala
@@ -420,7 +486,7 @@ if os.environ.get('BALAUSTRES_TOTAL'):
     F = F[~_lam]; FM = FM[~_lam]
     _Pm = np.concatenate(_Pm) if _Pm else np.zeros((0, 3))
     # lo macizo que no sea pasamanos ni lámina (para no meter balaustres dentro de paneles, paredes, postes)
-    _sol = np.array([not _tiene_alfa(m_) and not _re2.search(r'wood16', str(mats.get(m_) or m_), _re2.I) for m_ in _SMa]); _Ss = S[_sol]; _Ts = cKDTree(_Ss[:, [0, 2]])
+    _sol = np.array([not _tiene_alfa(m_) and not _re2.search(r'wood16' + ('|' + os.environ['NO_MACIZO'] if os.environ.get('NO_MACIZO') else ''), str(mats.get(m_) or m_), _re2.I) for m_ in _SMa]); _Ss = S[_sol]; _Ts = cKDTree(_Ss[:, [0, 2]])
     def _suelo_cerca(x, z, ytop):
         best = None
         for rr_ in (0.0, 0.15, 0.3, 0.45):
@@ -447,26 +513,59 @@ if os.environ.get('BALAUSTRES_TOTAL'):
         if k not in _grid or p[1] > _grid[k][1]: _grid[k] = p
     _top = np.array(list(_grid.values())) if _grid else np.zeros((0, 3))
     _bal = []; _mot = dict(celdas=len(_top), sin_suelo=0, altura=0, macizo=0, repetido=0)
-    _arb_b = None
+    _arb_b = None; _dbg = []
     for p in sorted(_top, key=lambda q: (q[0], q[2])):
         ytop = p[1] - 0.045
         yb = _suelo_cerca(p[0], p[2], ytop)
-        if yb is None: _mot['sin_suelo'] += 1; continue
+        if yb is None: _mot['sin_suelo'] += 1; _dbg.append((list(map(float, p)), 'sin_suelo')); continue
         h = ytop - yb
-        if h < 0.45 or h > 1.25: _mot['altura'] += 1; continue
-        if _macizo_debajo(p[0], yb + 0.25 * h, yb + 0.75 * h, p[2]): _mot['macizo'] += 1; continue
+        if h < 0.45 or h > 1.25: _mot['altura'] += 1; _dbg.append((list(map(float, p)), 'altura')); continue
+        if _macizo_debajo(p[0], yb + 0.25 * h, yb + 0.75 * h, p[2]): _mot['macizo'] += 1; _dbg.append((list(map(float, p)), 'macizo')); continue
         if any(np.hypot(p[0] - q[0], p[2] - q[2]) < 0.14 and abs(yb - q[1]) < 0.45 for q, _ in _bal): _mot['repetido'] += 1; continue
         _bal.append(((p[0], yb, p[2]), h))
     for zb in cfg_zonas_sin if 'cfg_zonas_sin' in dir() else []: pass
     _sin = json.load(open(f'/home/claude/re1gc/work/extras_{r}.json')).get('sin_balaustres', []) if os.path.exists(f'/home/claude/re1gc/work/extras_{r}.json') else []
     _antes = len(_bal)
-    _bal = [(b_, h_) for b_, h_ in _bal if not any(z_[0] <= b_[0] <= z_[1] and z_[2] <= b_[2] <= z_[3] and b_[1] >= z_[4] for z_ in _sin)]
+    _bal = [(b_, h_) for b_, h_ in _bal if not any(z_[0] <= b_[0] <= z_[1] and z_[2] <= b_[2] <= z_[3] and b_[1] >= z_[4] and (len(z_) < 6 or b_[1] <= z_[5]) for z_ in _sin)]
     print(f'  zonas con barandilla tallada (sin balaustres nuevos): quitados {_antes - len(_bal)}')
     _mm_b = next((m_ for m_ in set(FM) if 'handrail01' in str(mats.get(m_) or m_)), None) or mm_r
+    # pasamanos horizontales que se quedan cortos antes de la pared: alargarlos hasta ella con sus balaustres
+    if os.environ.get('PASAMANOS_A_PARED') and len(_top):
+        _tt = cKDTree(_top[:, [0, 2]]); _ends = []
+        for i_, p in enumerate(_top):
+            nb = [j for j in _tt.query_ball_point(p[[0, 2]], 0.35) if j != i_]
+            if len(nb) < 3 or np.abs(_top[nb, 1] - p[1]).max() > 0.08: continue          # solo tramos horizontales
+            if p[1] < max(_top[j, 1] for j in nb) - 0.03: continue                           # la viga alta
+            d_ = _top[nb][:, [0, 2]] - p[[0, 2]]; m_ = d_.mean(0)
+            if np.linalg.norm(m_) > 0.12: _ends.append((p, -m_ / np.linalg.norm(m_)))
+        _Sw = _Ss[(_Ss[:, 1] > 0)]; _Tw = cKDTree(_Sw[:, [0, 2]]); _hechos = []; _ext_n = 0
+        for p, dv in _ends:
+            if any(np.hypot(*(p[[0, 2]] - q)) < 0.4 for q in _hechos): continue
+            # dirección recta del eje (x o z) si está cerca
+            if abs(dv[0]) > 0.9: dv = np.array([np.sign(dv[0]), 0.0])
+            elif abs(dv[1]) > 0.9: dv = np.array([0.0, np.sign(dv[1])])
+            else: continue
+            ytop = p[1] - 0.045; hit = None
+            for s_ in np.arange(0.04, 0.62, 0.02):
+                q = p[[0, 2]] + dv * s_
+                if sum(1 for j in _Tw.query_ball_point(q, 0.05) if ytop - 0.9 <= _Sw[j, 1] <= ytop + 0.05) >= 2: hit = s_; break
+            if hit is None or hit < 0.08: continue
+            yb = _suelo_cerca(p[0], p[2], ytop)
+            if yb is None: continue
+            _hechos.append(p[[0, 2]])
+            a3 = np.array([p[0], ytop + 0.02, p[2]]); b3 = np.array([p[0] + dv[0] * (hit + 0.02), ytop + 0.02, p[2] + dv[1] * (hit + 0.02)])
+            Vp, Tp, Fp = _ex.viga(a3, b3, ancho=0.1, alto=0.08); _anade(Vp, Tp, Fp, _mm_b)
+            Vp, Tp, Fp = _ex.viga(a3 * [1, 0, 1] + [0, yb + 0.06, 0], b3 * [1, 0, 1] + [0, yb + 0.06, 0], ancho=0.12, alto=0.1); _anade(Vp, Tp, Fp, _mm_b)
+            for s_ in np.arange(0.12, hit - 0.03, 0.14):
+                _bal.append(((p[0] + dv[0] * s_, yb, p[2] + dv[1] * s_), ytop - yb))
+            _ext_n += 1
+            print(f'  pasamanos alargado hasta la pared en {np.round(p, 2)} hacia {dv}: {hit:.2f} m')
+        print(f'  pasamanos alargados: {_ext_n}')
     for base_, h in _bal:
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.65, lados=6)
         _anade(Vp, Tp, Fp, _mm_b)
     print(f'balaustres bajo los pasamanos: {len(_bal)} {_mot}')
+    json.dump(dict(desc=_dbg, bal=[list(map(float, b_)) + [float(h_)] for b_, h_ in _bal]), open(f'/tmp/bal_dbg_{r}.json', 'w'))
 # ---------------- meter en la malla todas las piezas añadidas (siempre al final)
 if _ext_f:
     V = np.concatenate([V] + _ext_v); VT = np.concatenate([VT] + _ext_t)

@@ -104,6 +104,7 @@ def quad(pts, mm, ejes):
     nuevas_f.append([b0, b0 + 2, b0 + 3, bt, bt + 2, bt + 3]); nuevas_m.append(mm)
 # suelo
 huecos = {}
+_HC = [[float(v) for v in c_.split(',')] for c_ in os.environ.get('HUECO_CAJAS', '').split(';') if c_]
 for tri, n_ in zip(Tc, nc):
     if n_[1] < 0.97: continue                    # rampas de escalera de la colisión: no (UC tiene los peldaños)
     x0, z0 = tri[:, [0, 2]].min(0); x1, z1 = tri[:, [0, 2]].max(0)
@@ -116,7 +117,8 @@ for tri, n_ in zip(Tc, nc):
             if w0 < 0 or w1 < 0 or 1 - w0 - w1 < 0: continue
             y = w0 * a[1] + w1 * b[1] + (1 - w0 - w1) * c[1]
             hs = alt.get((i, j), [])
-            if any(-0.8 < h - y < 0.35 for h, _ in hs): continue
+            _hb = -0.2 if any(c_[0] <= x <= c_[1] and c_[2] <= z <= c_[3] and c_[4] <= y <= c_[5] for c_ in _HC) else -0.8     # cajas donde lo de debajo es un techo
+            if any(_hb < h - y < 0.35 for h, _ in hs): continue
             # material: el suelo de UC más cercano a esa altura
             huecos[(i, j, round(y, 2))] = y
 if huecos:
