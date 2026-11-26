@@ -17,19 +17,62 @@
  ],
  "modelos": [
   {
-   "obj": "/home/claude/re1gc/modelos/estatua_nina/figura.obj",
+   "obj": "/home/claude/re1gc/modelos/emily/figura.obj",
    "x": -0.45,
    "y0": 1.5,
    "z": 0.25,
-   "giro": 1.5708,
+   "giro": -1.5708,
    "escala": 1.0,
    "texturas": {
-    "figura": "estatua_nina_figura.png",
-    "mapa": "estatua_nina_mapa.png"
+    "marmol_t0": "emily_marmol_t0.png",
+    "marmol_t1": "emily_marmol_t1.png",
+    "marmol_t2": "emily_marmol_t2.png",
+    "marmol_t3": "emily_marmol_t3.png",
+    "marmol_t4": "emily_marmol_t4.png"
    }
   }
  ],
  "cerrar": [
   "r103OBJ10|r103OBJ11"
+ ],
+ "retexturizar": [
+  {
+   "que": "pasillo del fondo (como el REmake: alfombra y damasco azul)",
+   "min": [
+    1.5,
+    -0.2,
+    -5.0
+   ],
+   "max": [
+    4.4,
+    3.3,
+    -2.45
+   ],
+   "suelo": "EO_r103yuka3.png",
+   "pared": "EO_r103KABE8.png",
+   "moldura": "EO_r103KABE9.png",
+   "techo": "EO_r103TENJO2.png",
+   "y_suelo": 0.0,
+   "y_techo": 2.95,
+   "zocalo": 0.22,
+   "cornisa": 0.3,
+   "excluir": "OBJ10|OBJ11|GAKU|estatua|door|Door",
+   "techo_colision": true,
+   "descartar": [
+    {
+     "min": [
+      3.85,
+      -0.1,
+      -4.7
+     ],
+     "max": [
+      4.4,
+      3.4,
+      -2.55
+     ],
+     "eje": 0
+    }
+   ]
+  }
  ]
 }

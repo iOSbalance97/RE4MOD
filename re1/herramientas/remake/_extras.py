@@ -33,14 +33,20 @@ if _mr:
     Pr = V[F[selr, :3]].reshape(-1, 3)
     mm_r = max(_mr, key=lambda m_: (FM == m_).sum())
     _bases1 = []
-    for base_, h in ([] if os.environ.get('BARANDILLA_RAMPAS') else _ex.balaustres_escalera(Tc, nc, Pr, _hay)):
-        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE, lados=8)
+    _Tall = cKDTree(S[:, [0, 2]])
+    def _hay_all(x, y0, y1, z):
+        return any(y0 <= S[j, 1] <= y1 for j in _Tall.query_ball_point([x, z], 0.14))
+    _alf1 = np.array([_tiene_alfa(m_) for m_ in _SMa]); _Sa1 = S[_alf1]; _Ta1 = cKDTree(_Sa1[:, [0, 2]]) if len(_Sa1) else None
+    def _lamina_cerca(x, y0, y1, z):
+        return _Ta1 is not None and any(y0 <= _Sa1[j, 1] <= y1 for j in _Ta1.query_ball_point([x, z], 0.3))
+    for base_, h in ([] if os.environ.get('BARANDILLA_RAMPAS') else [bh for bh in _ex.balaustres_escalera(Tc, nc, Pr, _hay_all)
+                                                                     if not _lamina_cerca(bh[0][0], bh[0][1] + 0.2 * bh[1], bh[0][1] + 0.8 * bh[1], bh[0][2])]):
+        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.7, lados=6)
         _anade(Vp, Tp, Fp, mm_r); nb_ += 1; _bases1.append(base_)
 # segunda pasada: balaustres justo debajo de cualquier pasamanos que no tenga nada debajo (ni tarjetas con alfa)
 if _mr and not os.environ.get('BARANDILLA_RAMPAS'):
-    _okt = np.array([not _re2.search(r'handrail|tesuri', str(mats.get(m_) or m_), _re2.I) for m_ in _SMa])
-    _S3 = S[_okt]; _T3 = cKDTree(_S3[:, [0, 2]])
-    def _hay_todo(x, y0, y1, z, rad=0.09):
+    _S3 = S; _T3 = cKDTree(_S3[:, [0, 2]])                       # todo cuenta, también las láminas de balaustres de UC
+    def _hay_todo(x, y0, y1, z, rad=0.14):
         for j in _T3.query_ball_point([x, z], rad):
             if y0 <= _S3[j, 1] <= y1: return True
         return False
@@ -61,7 +67,7 @@ if _mr and not os.environ.get('BARANDILLA_RAMPAS'):
         x, z = (k[0] + 0.5) * 0.17, (k[1] + 0.5) * 0.17
         ytop = p[1] - 0.04
         cand = []
-        for rr_ in (0.0, 0.18, 0.35):
+        for rr_ in (0.0, 0.18, 0.35, 0.5, 0.65):
             for t_ in (np.linspace(0, 2 * np.pi, 8, endpoint=False) if rr_ else [0.0]):
                 h = _heights(_TF, x + rr_ * np.cos(t_), z + rr_ * np.sin(t_)); h = h[(h < ytop - 0.45) & (h > ytop - 1.35)]
                 if len(h): cand.append(float(h.max()))
@@ -72,8 +78,17 @@ if _mr and not os.environ.get('BARANDILLA_RAMPAS'):
         if _hay_todo(x, yb + 0.35 * hh, yb + 0.8 * hh, z): _por['ya hay'] += 1; continue
         if any(np.hypot(x - q[0], z - q[2]) < 0.15 and abs(yb - q[1]) < 0.5 for q, _ in _nuevos): _por['cerca de otro'] += 1; continue
         _nuevos.append(((x, yb, z), hh))
+    # control de fila doble: distancia de cada balaustre nuevo a la lámina de UC más cercana (a media altura)
+    _alf = np.array([_tiene_alfa(m_) for m_ in _SMa]); _Sa = S[_alf]
+    if len(_Sa) and _nuevos:
+        _Ta = cKDTree(_Sa[:, [0, 2]]); _dd = []
+        for (x_, yb_, z_), hh_ in _nuevos:
+            ii = [j for j in _Ta.query_ball_point([x_, z_], 0.6) if yb_ + 0.2 * hh_ <= _Sa[j, 1] <= yb_ + 0.8 * hh_]
+            _dd.append(min(np.hypot(_Sa[ii, 0] - x_, _Sa[ii, 2] - z_)) if ii else 9)
+        _dd = np.array(_dd); print(f'  distancia a lámina de UC: <0.3 m: {(_dd < 0.3).sum()}, 0.3-0.6: {((_dd >= 0.3) & (_dd < 0.6)).sum()}, sin lámina cerca: {(_dd >= 0.6).sum()}')
+        _nuevos = [n_ for n_, d_ in zip(_nuevos, _dd) if d_ >= 0.3]     # nada de segunda fila junto a una lámina
     for base_, h in _nuevos:
-        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, lados=6)
+        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.7, lados=6)
         _anade(Vp, Tp, Fp, mm_r)
     print(f'balaustres bajo pasamanos vacíos: {len(_nuevos)} (celdas {len(_celdas)}, descartes {_por})')
 # barandilla por lógica: en los bordes del suelo pisable con caída real, sin pared, sin suelo al lado a la misma altura
@@ -157,7 +172,18 @@ if os.path.exists(_cfg):
             if np.ptp(pts_, 0).min() < 0.05: continue
             try: H_ = ConvexHull(pts_)
             except Exception: continue
-            hv = pts_[H_.vertices]; mp_ = {v: i for i, v in enumerate(H_.vertices)}
+            hv = pts_[H_.vertices].copy(); mp_ = {v: i for i, v in enumerate(H_.vertices)}
+            # que no atraviese paredes: rayo desde el centro de la tela a cada vértice contra las paredes de la colisión
+            _cw2 = np.nonzero(np.abs(nc[:, 1]) < 0.35)[0]; c0_ = pts_.mean(0)
+            Wt_ = Tc[_cw2]; Wt_ = Wt_[np.linalg.norm(Wt_.mean(1) - c0_, axis=1) < 4]
+            if len(Wt_):
+                e1 = Wt_[:, 1] - Wt_[:, 0]; e2 = Wt_[:, 2] - Wt_[:, 0]
+                for iv in range(len(hv)):
+                    dvec = hv[iv] - c0_; pv = np.cross(dvec, e2); det = (e1 * pv).sum(1); ok_ = np.abs(det) > 1e-9
+                    inv = np.where(ok_, 1 / np.where(ok_, det, 1), 0); tv = c0_ - Wt_[:, 0]
+                    u_ = (tv * pv).sum(1) * inv; qv = np.cross(tv, e1); v_ = (dvec[None] * qv).sum(1) * inv; t_ = (e2 * qv).sum(1) * inv
+                    hit = ok_ & (u_ >= 0) & (v_ >= 0) & (u_ + v_ <= 1) & (t_ > 0) & (t_ < 1)
+                    if hit.any(): hv[iv] = c0_ + dvec * max(0.0, t_[hit].min() - 0.04 / (np.linalg.norm(dvec) + 1e-9))
             tris = np.array([[mp_[a_] for a_ in sx] for sx in H_.simplices])
             # orientar hacia fuera
             cc_ = hv.mean(0); n_ = np.cross(hv[tris[:, 1]] - hv[tris[:, 0]], hv[tris[:, 2]] - hv[tris[:, 0]])
@@ -168,6 +194,36 @@ if os.path.exists(_cfg):
             _anade(Vt_, uvt, np.arange(len(Vt_)).reshape(-1, 3), FM[tt_[0]]); quitar_[tt_] = True; hechas += 1
         F = F[~quitar_]; FM = FM[~quitar_]
         print(f'  telas cerradas ({rx_}): {hechas}')
+    for rz in cfg.get('retexturizar', []):
+        lo = np.array(rz['min']); hi = np.array(rz['max'])
+        P3_ = V[F[:, :3]]; cen_ = P3_.mean(1); dentro_ = np.all((cen_ >= lo) & (cen_ <= hi), 1)
+        nn_ = np.cross(P3_[:, 1] - P3_[:, 0], P3_[:, 2] - P3_[:, 0]); nn_ /= np.linalg.norm(nn_, axis=1, keepdims=True) + 1e-12
+        if rz.get('excluir'): dentro_ &= np.array([not _re2.search(rz['excluir'], str(mats.get(m_) or m_), _re2.I) for m_ in FM])
+        idx_ = np.nonzero(dentro_)[0]
+        def _mk(tex):
+            mk = tex[:-4]; mats[mk] = tex; return mk
+        nV_ = []; nT_ = []; nF_ = []; nM_ = []
+        for i in idx_:
+            t3 = P3_[i]; n_ = nn_[i]; yc = cen_[i, 1]
+            if any(np.all((cen_[i] >= np.array(d_['min'])) & (cen_[i] <= np.array(d_['max']))) and abs(n_[d_['eje']]) > 0.8 for d_ in rz.get('descartar', [])): continue
+            if n_[1] > 0.7: tex = rz['suelo']
+            elif n_[1] < -0.7: tex = rz['techo']
+            elif yc < rz['y_suelo'] + rz.get('zocalo', 0.25): tex = rz.get('moldura', rz['pared'])
+            elif yc > rz['y_techo'] - rz.get('cornisa', 0.25): tex = rz.get('moldura', rz['pared'])
+            else: tex = rz['pared']
+            a_ = np.abs(n_).argmax(); uv = t3[:, [k for k in range(3) if k != a_]] / rz.get('escala', 1.2)
+            if a_ != 1: uv = t3[:, [2 if a_ == 0 else 0, 1]] / rz.get('escala', 1.2)
+            _anade(t3.copy(), uv, np.array([[0, 1, 2]]), _mk(tex))
+        keep_ = np.ones(len(F), bool); keep_[idx_] = False; F = F[keep_]; FM = FM[keep_]
+        if rz.get('techo_colision'):
+            nt_ = 0
+            for t3 in Tc[nc[:, 1] > 0.7]:
+                c_ = t3.mean(0)
+                if np.all((c_ >= lo) & (c_ <= hi)):
+                    q3 = t3.copy(); q3[:, 1] = rz['y_techo']; q3 = q3[::-1]
+                    _anade(q3, q3[:, [0, 2]] / rz.get('escala', 1.2), np.array([[0, 1, 2]]), _mk(rz['techo'])); nt_ += 1
+            print(f'  techo añadido: {nt_} triángulos')
+        print(f"  retexturizado {rz.get('que', '')}: {len(idx_)} triángulos")
     for md in cfg.get('modelos', []):          # modelo .obj propio (p. ej. estatua hecha desde fotos), con sus texturas ya en la carpeta de la sala
         Vm_ = []; VTm_ = []; Fm_ = []; Mm_ = []; cur_ = None
         for l_ in open(md['obj']):
@@ -211,6 +267,9 @@ if os.path.exists(_cfg):
         lo = np.array(q['min']); hi = np.array(q['max'])
         cen_ = V[F[:, :3]].mean(1); fuera = ~np.all((cen_ >= lo) & (cen_ <= hi), 1)
         if q.get('mat'): fuera |= np.array([not _re2.search(q['mat'], str(mats.get(m_) or m_), _re2.I) for m_ in FM])
+        if q.get('eje') is not None:
+            P3q = V[F[:, :3]]; nq = np.cross(P3q[:, 1] - P3q[:, 0], P3q[:, 2] - P3q[:, 0]); nq /= np.linalg.norm(nq, axis=1, keepdims=True) + 1e-12
+            fuera |= np.abs(nq[:, q['eje']]) < 0.8
         print(f"  quitados {np.sum(~fuera)} triángulos de UC en {q.get('que', '')}")
         F = F[fuera]; FM = FM[fuera]
 if _ext_f:
