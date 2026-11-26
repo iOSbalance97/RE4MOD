@@ -357,6 +357,7 @@ if os.path.exists(_cfg):
                 m_ = (p0 + p1) / 2; L_ = np.linalg.norm(p1 - p0)
                 if L_ < 0.04 or not dentro_box(*m_): continue
                 if rc.get('solo_paredes_colision') and not _Kc.query_ball_point(m_, 0.3): continue
+                if any(c_[0] <= m_[0] <= c_[1] and c_[2] <= m_[1] <= c_[3] for c_ in rc.get('sin_paredes', [])): continue   # zonas que ya tienen pared propia (p. ej. el hueco de una escalera)
                 _quad(p0, p1, y0, zh, rc['zocalo'], L_, rc.get('zocalo_entero', False)); _quad(p0, p1, zh, zh + 0.08, rc.get('moldura', rc['zocalo']), L_)
                 _quad(p0, p1, zh + 0.08, rc['y_techo'] - _cornisa, rc['pared'], L_)
                 if _cornisa: _quad(p0, p1, rc['y_techo'] - _cornisa, rc['y_techo'], rc.get('moldura', rc['zocalo']), L_)
@@ -367,9 +368,10 @@ if os.path.exists(_cfg):
             if not (lo[0] - _mt <= x_ < hi[0] + _mt): continue
             jj = 0
             while jj < len(zs_):
-                if Mk[ii, jj] and lo[2] - _mt <= zs_[jj] < hi[2] + _mt:
+                _sp = lambda z__: any(c_[0] <= x_ + G_ / 2 <= c_[1] and c_[2] <= z__ + G_ / 2 <= c_[3] for c_ in rc.get('sin_paredes', []))
+                if Mk[ii, jj] and lo[2] - _mt <= zs_[jj] < hi[2] + _mt and not _sp(zs_[jj]):
                     j0 = jj
-                    while jj < len(zs_) and Mk[ii, jj] and zs_[jj] < hi[2] + _mt: jj += 1
+                    while jj < len(zs_) and Mk[ii, jj] and zs_[jj] < hi[2] + _mt and not _sp(zs_[jj]): jj += 1
                     za, zb = zs_[j0], zs_[jj - 1] + G_; xa, xb = x_, x_ + G_
                     for yy, tex, inv in ((y0, rc['suelo'], False), (rc['y_techo'], rc['techo'], True)):
                         q = np.array([[xa, yy, za], [xb, yy, za], [xb, yy, zb], [xa, yy, zb]])
@@ -663,13 +665,14 @@ if os.environ.get('BALAUSTRES_TOTAL'):
         # plantilla: un balaustre torneado de la escalera central de UC (madera 16), enderezado (la escalera tiene pendiente)
         bx0, bx1, bz0, bz1, pend = [float(v) for v in os.environ['BALAUSTRE_UC'].split(',')]
         _mw = np.array([bool(_re2.search('wood16', str(mats.get(m_) or m_))) for m_ in FM])
-        _cw = V[F[:, :3]].mean(1); _sw = _mw & (_cw[:, 0] > bx0) & (_cw[:, 0] < bx1) & (_cw[:, 2] > bz0) & (_cw[:, 2] < bz1)
+        _cw = V[F[:, :3]].mean(1); _sw = _mw & (_cw[:, 0] > bx0) & (_cw[:, 0] < bx1) & (_cw[:, 2] > bz0) & (_cw[:, 2] < bz1) & (_cw[:, 1] < 3.3)
         _Ft = F[_sw]; _mmt = FM[_sw][0]
         _Pt = V[_Ft[:, :3]].reshape(-1, 3).copy(); _Ut = VT[_Ft[:, 3:]].reshape(-1, 2)
         _ax = np.array([(_Pt[:, 0].min() + _Pt[:, 0].max()) / 2, 0, (_Pt[:, 2].min() + _Pt[:, 2].max()) / 2])
         _Pt[:, 1] -= pend * (_Pt[:, 2] - _ax[2])
         _Pt -= [_ax[0], _Pt[:, 1].min(), _ax[2]]; _Ht = _Pt[:, 1].max()
         print(f'  plantilla de balaustre de UC: {len(_Ft)} triángulos, alto {_Ht:.2f} m')
+        _mzb = next((m_ for m_ in set(FM) if _re2.search(os.environ.get('ZOCALO_MAT', 'wood13'), str(mats.get(m_) or m_))), None)
         # esquinero (poste cuadrado con remate) de la barandilla de abajo
         _Fe = _Pe = _Ue = None
         if os.environ.get('ESQUINERO_UC'):
@@ -706,6 +709,18 @@ if os.environ.get('BALAUSTRES_TOTAL'):
             # suavizar el trazado (media móvil) y repartir por longitud
             Qs = Q.copy()
             for c_ in (0, 2): Qs[:, c_] = np.convolve(np.pad(Q[:, c_], 2, mode='edge'), np.ones(5) / 5, mode='valid')
+            # alargar los extremos siguiendo el pasamanos real hasta donde acaba
+            if len(_top):
+                _ktop = cKDTree(_top[:, [0, 2]])
+                for _lado in (0, 1):
+                    e_ = Qs[0] if _lado == 0 else Qs[-1]; f_ = Qs[min(3, len(Qs) - 1)] if _lado == 0 else Qs[max(-4, -len(Qs))]
+                    dv_ = e_[[0, 2]] - f_[[0, 2]]; dv_ /= np.linalg.norm(dv_) + 1e-9; ext_ = []
+                    for s_ in np.arange(0.04, 1.2, 0.04):
+                        q_ = e_[[0, 2]] + dv_ * s_
+                        if not [j for j in _ktop.query_ball_point(q_, 0.07) if abs(_top[j, 1] - (e_[1] + e_[3])) < 0.12]: break
+                        ext_.append([q_[0], e_[1], q_[1], e_[3]])
+                    if ext_:
+                        Qs = np.r_[np.array(ext_[::-1]), Qs] if _lado == 0 else np.r_[Qs, np.array(ext_)]
             L_ = np.r_[0, np.cumsum(np.hypot(*(np.diff(Qs[:, [0, 2]], axis=0)).T))]
             if L_[-1] < 0.3: continue
             # altura: recta ajustada (tramo recto o inclinado), sin saltos
@@ -727,6 +742,13 @@ if os.environ.get('BALAUSTRES_TOTAL'):
                     _postes.append((x_, z_)); tg_ = tang(t_)
                     Pp = _rot(_Pe * [1, (hh_ + 0.17) / _He, 1], tg_[0], tg_[1]) + [x_, ybf(t_), z_]
                     _anade(Pp, _Ue, np.arange(len(Pp)).reshape(-1, 3), _mme); nesq += 1
+            _zb = float(os.environ.get('ZOCALO_BAL', 0.0))
+            if _zb > 0 and _mzb is not None:          # listón inferior sobre el que apoyan (como abajo)
+                for a_, b_ in zip(ts[:-1], ts[1:]):
+                    for t0_, t1_ in zip(np.arange(a_, b_, 0.5), np.r_[np.arange(a_, b_, 0.5)[1:], b_]):
+                        p0_ = np.array([*pos(t0_)]); p1_ = np.array([*pos(t1_)])
+                        Vp, Tp, Fp = _ex.viga(np.array([p0_[0], ybf(t0_) + _zb / 2, p0_[1]]), np.array([p1_[0], ybf(t1_) + _zb / 2, p1_[1]]), ancho=0.15, alto=_zb)
+                        _anade(Vp, Tp, Fp, _mzb)
             # balaustres entre esquinas a paso regular
             for a_, b_ in zip(ts[:-1], ts[1:]):
                 n_ = max(1, int(round((b_ - a_) / PASO)))
@@ -735,7 +757,7 @@ if os.environ.get('BALAUSTRES_TOTAL'):
                     if any(np.hypot(x_ - a2, z_ - c2) < 0.16 for a2, c2 in _puestos): continue
                     if _ko is not None and _ko.query_ball_point([x_, z_], 0.12) and abs(ybf(t_) - _cw16[_ko.query([x_, z_])[1], 1]) < 1.2: continue
                     _puestos.append((x_, z_)); tg_ = tang(t_)
-                    Pp = _rot(_Pt * [1, hh_ / _Ht, 1], tg_[0], tg_[1]) + [x_, ybf(t_), z_]
+                    Pp = _rot(_Pt * [1, (hh_ - _zb) / _Ht, 1], tg_[0], tg_[1]) + [x_, ybf(t_) + _zb, z_]
                     _anade(Pp, _Ut, np.arange(len(Pp)).reshape(-1, 3), _mmt); ncop += 1
         print(f'  esquineros: {nesq}')
         print(f'  balaustres de UC copiados: {ncop}')

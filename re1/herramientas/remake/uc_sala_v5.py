@@ -118,6 +118,7 @@ for tri, n_ in zip(Tc, nc):
             w0 = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / dd; w1 = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / dd
             if w0 < 0 or w1 < 0 or 1 - w0 - w1 < 0: continue
             y = w0 * a[1] + w1 * b[1] + (1 - w0 - w1) * c[1]
+            if y > float(os.environ.get('HUECO_YMAX', 99)): continue          # tapas de colisión por encima (no son suelo)
             hs = alt.get((i, j), [])
             _hb = -0.2 if any(c_[0] <= x <= c_[1] and c_[2] <= z <= c_[3] and c_[4] <= y <= c_[5] for c_ in _HC) else -0.8     # cajas donde lo de debajo es un techo
             if any(_hb < h - y < 0.35 for h, _ in hs): continue

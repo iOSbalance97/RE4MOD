@@ -17,7 +17,7 @@
    "pared": "r100_kabe_a.png",
    "moldura": "st_103wood_b.png",
    "y_suelo": 4.0,
-   "y_techo": 7.35,
+   "y_techo": 7.15,
    "zocalo": "cas_r100_zocalo.png",
    "escala": 1.6,
    "margen_pared": 0.35,
@@ -25,7 +25,15 @@
    "cornisa_h": 0.18,
    "tol_suelo": 0.08,
    "zocalo_entero": true,
-   "solo_paredes_colision": true
+   "solo_paredes_colision": true,
+   "sin_paredes": [
+    [
+     2.1,
+     11.25,
+     -2.9,
+     -1.1
+    ]
+   ]
   },
   {
    "que": "pasillo vertical, ramal y pasillo de abajo",
@@ -44,14 +52,56 @@
    "pared": "r100_kabe_a.png",
    "moldura": "st_103wood_b.png",
    "y_suelo": 4.0,
-   "y_techo": 7.35,
+   "y_techo": 7.15,
    "zocalo": "cas_r100_zocalo.png",
    "escala": 1.6,
    "solo_paredes_colision": true,
    "zocalo_h": 0.95,
    "cornisa_h": 0.18,
    "tol_suelo": 0.08,
-   "zocalo_entero": true
+   "zocalo_entero": true,
+   "sin_paredes": [
+    [
+     2.1,
+     11.25,
+     -2.9,
+     -1.1
+    ]
+   ]
+  },
+  {
+   "que": "extremo oeste (salita y paso a la puerta): paredes donde las tiene el REmake",
+   "min": [
+    -13.6,
+    3.6,
+    -1.6
+   ],
+   "max": [
+    -8.95,
+    7.6,
+    3.05
+   ],
+   "suelo": "r100_wood_b.png",
+   "techo": "st_103tenjou_a.png",
+   "pared": "r100_kabe_a.png",
+   "moldura": "st_103wood_b.png",
+   "y_suelo": 4.0,
+   "y_techo": 7.15,
+   "zocalo": "cas_r100_zocalo.png",
+   "escala": 1.6,
+   "solo_paredes_colision": true,
+   "zocalo_h": 0.95,
+   "cornisa_h": 0.18,
+   "tol_suelo": 0.08,
+   "zocalo_entero": true,
+   "sin_paredes": [
+    [
+     2.1,
+     11.25,
+     -2.9,
+     -1.1
+    ]
+   ]
   }
  ],
  "modelos": [
@@ -68,6 +118,19 @@
     "r100_wood_b": "r100_wood_b.png",
     "st_103tenjou_a": "st_103tenjou_a.png",
     "st_103wood_b": "st_103wood_b.png"
+   }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/tapas_r103/tapas.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "r100_kabe_a": "r100_kabe_a.png",
+    "st_103wood_a": "st_103wood_a.png",
+    "st_103tenjou_a": "st_103tenjou_a.png"
    }
   }
  ],
@@ -88,7 +151,7 @@
    "origen": [
     6.97,
     4.0,
-    1.42
+    1.2
    ],
    "frente": [
     0,
@@ -131,7 +194,7 @@
     {
      "punto": [
       2.28,
-      0.0,
+      0.006,
       -2.04
      ],
      "frente": [
@@ -152,13 +215,13 @@
     },
     {
      "punto": [
-      -12.94,
+      6.97,
       4.0,
-      -0.72
+      1.2
      ],
      "frente": [
-      1,
-      0
+      0,
+      1
      ]
     }
    ]
@@ -358,6 +421,222 @@
      ]
     }
    ]
+  },
+  {
+   "que": "sof\u00e1 del sal\u00f3n de UC",
+   "min": [
+    -10.6,
+    3.95,
+    -1.15
+   ],
+   "max": [
+    -8.4,
+    5.2,
+    -0.15
+   ],
+   "mat": "sofa",
+   "origen": [
+    -9.49,
+    4.0,
+    -0.66
+   ],
+   "frente": [
+    0,
+    1
+   ],
+   "destinos": [
+    {
+     "punto": [
+      -11.3,
+      4.0,
+      1.2
+     ],
+     "frente": [
+      1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "que": "butaca de UC",
+   "min": [
+    -8.6,
+    3.95,
+    -0.1
+   ],
+   "max": [
+    -7.6,
+    5.1,
+    1.3
+   ],
+   "mat": "sofa",
+   "origen": [
+    -8.1,
+    4.0,
+    0.58
+   ],
+   "frente": [
+    -1,
+    0
+   ],
+   "destinos": [
+    {
+     "punto": [
+      -9.6,
+      4.0,
+      0.6
+     ],
+     "frente": [
+      -1,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "que": "alfombra del sal\u00f3n de UC",
+   "min": [
+    -10.9,
+    3.95,
+    -0.35
+   ],
+   "max": [
+    -8.4,
+    4.05,
+    1.55
+   ],
+   "mat": "jutan",
+   "origen": [
+    -9.65,
+    4.0,
+    0.6
+   ],
+   "frente": [
+    0,
+    1
+   ],
+   "destinos": [
+    {
+     "punto": [
+      -10.45,
+      4.006,
+      1.4
+     ],
+     "frente": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "que": "mesita con l\u00e1mpara de UC",
+   "min": [
+    -8.35,
+    3.95,
+    -0.97
+   ],
+   "max": [
+    -7.68,
+    5.2,
+    -0.29
+   ],
+   "mat": "komono|wood_c",
+   "origen": [
+    -8.0,
+    4.0,
+    -0.63
+   ],
+   "frente": [
+    0,
+    1
+   ],
+   "destinos": [
+    {
+     "punto": [
+      -11.42,
+      4.0,
+      2.45
+     ],
+     "frente": [
+      0,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "que": "cuadro del sal\u00f3n en la sala oeste",
+   "min": [
+    -10.4,
+    5.0,
+    -1.4
+   ],
+   "max": [
+    -8.3,
+    6.5,
+    -1.05
+   ],
+   "mat": "picture",
+   "origen": [
+    -9.35,
+    4.0,
+    -1.32
+   ],
+   "frente": [
+    0,
+    1
+   ],
+   "destinos": [
+    {
+     "punto": [
+      -10.45,
+      4.0,
+      2.77
+     ],
+     "frente": [
+      0,
+      -1
+     ]
+    }
+   ]
+  },
+  {
+   "que": "puerta blanca de UC en la puerta r112",
+   "min": [
+    -11.5,
+    3.9,
+    0.7
+   ],
+   "max": [
+    -10.9,
+    6.5,
+    2.1
+   ],
+   "mat": "wood_b|yuka_a",
+   "origen": [
+    -11.2,
+    4.0,
+    1.44
+   ],
+   "frente": [
+    1,
+    0
+   ],
+   "destinos": [
+    {
+     "punto": [
+      -12.98,
+      4.0,
+      -0.72
+     ],
+     "frente": [
+      1,
+      0
+     ]
+    }
+   ]
   }
  ],
  "quitar": [
@@ -374,6 +653,61 @@
     1.5
    ],
    "mat": "door|tesu|wood_a"
+  },
+  {
+   "que": "rellenos de UC dentro de la caja de la escalera (parpadeo)",
+   "min": [
+    2.15,
+    -1.0,
+    -3.1
+   ],
+   "max": [
+    10.9,
+    7.5,
+    -1.0
+   ],
+   "mat": "."
+  },
+  {
+   "que": "muebles de UC en su sitio original (ya copiados a la salita)",
+   "min": [
+    -10.95,
+    3.9,
+    -1.15
+   ],
+   "max": [
+    -7.55,
+    5.3,
+    1.6
+   ],
+   "mat": "sofa|jutan|komono|wood_c"
+  },
+  {
+   "que": "artesonado de UC del tramo central (trozos de atlas grises)",
+   "min": [
+    -9.0,
+    6.97,
+    1.3
+   ],
+   "max": [
+    10.95,
+    8.0,
+    2.95
+   ]
+  },
+  {
+   "que": "puerta original de r10f (medio cortada por la reconstrucci\u00f3n; va su copia entera)",
+   "min": [
+    6.15,
+    3.9,
+    1.05
+   ],
+   "max": [
+    7.95,
+    6.25,
+    1.5
+   ],
+   "mat": "door_a|wood_a|tesu|yuka"
   }
  ]
 }

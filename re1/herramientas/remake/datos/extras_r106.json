@@ -210,7 +210,7 @@
    "y1": 7.3,
    "ancho": 0.4,
    "alto_min": 0.8,
-   "rodapie": "wood13",
+   "rodapie": "wood14",
    "alto_rodapie": 0.35
   }
  ],
@@ -220,7 +220,7 @@
    "tol": 0.12,
    "dilatar": 0.4,
    "bajo": 0.03,
-   "mat": "lug15",
+   "mat": "ceilling01",
    "cajas": [
     [
      2.8,
