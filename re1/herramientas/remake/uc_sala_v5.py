@@ -85,7 +85,9 @@ CEL = 0.2
 # alturas de suelo de UC por celda
 alt = {}
 hor = np.abs(nu[:, 1]) > 0.7
+_HIGN = os.environ.get('HUECO_IGNORAR')
 for tri, mm in zip(Tu[hor], FM[hor]):
+    if _HIGN and _re.search(_HIGN, str(mats.get(mm) or mm), _re.I): continue          # techo de abajo visto como suelo: no cuenta
     x0, z0 = tri[:, [0, 2]].min(0); x1, z1 = tri[:, [0, 2]].max(0)
     for i in range(int(np.floor(x0 / CEL)), int(np.floor(x1 / CEL)) + 1):
         for j in range(int(np.floor(z0 / CEL)), int(np.floor(z1 / CEL)) + 1):
@@ -128,6 +130,8 @@ if huecos:
     tr_ = cKDTree(pts_ * [1, 3, 1])
     for (i, j, _), y in huecos.items():
         _, q = tr_.query([(i + .5) * CEL, y * 3, (j + .5) * CEL]); mm = mats_[q]
+        if os.environ.get('HUECO_MAT') and any(c_[0] <= (i + .5) * CEL <= c_[1] and c_[2] <= (j + .5) * CEL <= c_[3] and c_[4] <= y <= c_[5] for c_ in _HC):
+            mm = next((m2 for m2 in set(FM) if _re.search(os.environ['HUECO_MAT'], str(mats.get(m2) or m2), _re.I)), mm)          # suelo de verdad (alfombra), no lo más cercano
         quad([[i * CEL, y + 0.01, j * CEL], [i * CEL, y + 0.01, (j + 1) * CEL], [(i + 1) * CEL, y + 0.01, (j + 1) * CEL], [(i + 1) * CEL, y + 0.01, j * CEL]], mm, (0, 2))
 nsuelo = len(nuevas_f) // 2
 # paredes: triángulos de pared de la colisión sin superficie de UC cerca

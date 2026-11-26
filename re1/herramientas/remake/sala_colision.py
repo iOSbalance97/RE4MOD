@@ -100,6 +100,7 @@ for t3, nn in zip(T[pared], n[pared]):
     for _pp in PAREDES_PLANAS:
         c_ = t3.mean(0)
         if _pp[0] <= c_[0] <= _pp[1] and _pp[2] <= c_[1] <= _pp[3] and _pp[4] <= c_[2] <= _pp[5]: _plano = _pp[6]; _hplano = _pp[7] if len(_pp) > 7 else 99
+    if os.environ.get('DEPURA') and t3[:, 0].mean() < -14.2: print('pared final', np.round(t3.mean(0), 2), _lad, _plano)
     if _lad[1] and not _lad[0]: nh = -nh          # nh apunta al paso
     elif _lad[0] == _lad[1]: _plano = 0.0 if _plano is None else _plano          # dudoso: sin relieve (nunca hacia dentro)
     nu_ = max(1, int(np.ceil((pr.max() - pr.min()) / 0.35))); nv_ = max(2, int(np.ceil((yb - ya) / 0.35)))
@@ -123,6 +124,8 @@ for t3, nn in zip(T[pared], n[pared]):
             if eA: d *= min(1.0, u * LL / 0.45)
             if eB: d *= min(1.0, (1 - u) * LL / 0.45)
             if _plano is not None: d = _plano if (q[1] - yf) < (_hplano if _plano else 99) else 0.0
+            for cl in CELDAS:          # la pared de la celda, plana: la reja queda pegada a ella
+                if cl[0] - 0.45 <= q[0] <= cl[1] + 0.45 and abs(q[2] - cl[2]) < 0.6: d = d * min(1.0, max(0.0, max(cl[0] - 0.15 - q[0], q[0] - cl[1] - 0.15) / 0.3))
             G[j, i] = q - nh * max(d, 0.0) + np.array([0, 0.05 * _ruido(q, 3.0, 2.0) * (0 < j < nv_) * (_plano is None), 0])
             UV[j, i] = [(pr.min() + (pr.max() - pr.min()) * u) / E, q[1] / E]
     for j in range(nv_):
@@ -138,13 +141,14 @@ for t3, nn in zip(T[pared], n[pared]):
                  [[0, ya / E], [_plano / E, ya / E], [_plano / E, ytj / E], [0, ytj / E]])
         q0, q1 = A_ * [1, 0, 1] + [0, ya + _hplano + 0.02, 0], B_ * [1, 0, 1] + [0, ya + _hplano + 0.02, 0]
         quad(TEX['pared'], [q0, q1, q1 - nh * _plano, q0 - nh * _plano], [[0, 0], [LL / E, 0], [LL / E, _plano / E], [0, _plano / E]])     # dintel
-    if _plano is not None and not (_lad[0] ^ _lad[1]): continue
+    if _plano or (_plano is not None and not (_lad[0] ^ _lad[1])): continue          # sin respaldo detrás de un rebaje (taparía la boca)
     # respaldo liso por detrás del relieve: tapa las rendijas entre paredes (sin invadir nunca el paso)
     dh_ = (B_ - A_) * np.array([1, 0, 1]); dh_ /= np.linalg.norm(dh_) + 1e-12; ytb = G[:, :, 1].max() + 0.2
     def _libre(p_):
         h_ = heights(TF, p_[0], p_[2]); return not (len(h_) and np.any(np.abs(h_ - ya) < 1.0))
     ext_a = max([e for e in (0.0, 0.1, 0.2, 0.3) if _libre(A_ - dh_ * e - nh * 0.42)] or [0.0]); ext_b = max([e for e in (0.0, 0.1, 0.2, 0.3) if _libre(B_ + dh_ * e - nh * 0.42)] or [0.0])
     if any(not _libre(A_ + (B_ - A_) * f_ - nh * 0.42) for f_ in (0.25, 0.5, 0.75)): continue
+    if any(not (max(A_[0], B_[0]) < cl[0] - 0.2 or min(A_[0], B_[0]) > cl[1] + 0.2) and abs((A_[2] + B_[2]) / 2 - cl[2]) < 0.8 for cl in CELDAS): continue     # no tapar la celda
     Ab = A_ - dh_ * ext_a - nh * 0.42; Bb = B_ + dh_ * ext_b - nh * 0.42
     quad(TEX['pared'], [np.array([Ab[0], ya - 0.1, Ab[2]]), np.array([Bb[0], ya - 0.1, Bb[2]]), np.array([Bb[0], ytb, Bb[2]]), np.array([Ab[0], ytb, Ab[2]])],
          [[(pr.min() - 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, ytb / E], [(pr.min() - 0.5) / E, ytb / E]])
@@ -158,6 +162,11 @@ if CUEVA and ESQ:
         oo = np.mean([ESQ[j][1] for j in grp], 0)
         if len(grp) < 2 or np.linalg.norm(oo) < 0.2: continue
         oo /= np.linalg.norm(oo); c_ = p_ + oo * 0.2; yb_ = min(ESQ[j][2] for j in grp) - 0.1
+        _inv = False
+        for k_ in range(12):
+            q_ = c_ + 0.27 * np.array([np.cos(k_ * np.pi / 6), 0, np.sin(k_ * np.pi / 6)]); hq = heights(TF, q_[0], q_[2])
+            if np.any((hq > yb_ - 0.5) & (hq < yb_ + 2.2)): _inv = True; break
+        if _inv: continue          # invadiría el paso (se veía como una pared que sobresale)
         yt_ = _y_techo(p_[0] - oo[0] * 0.1, p_[2] - oo[2] * 0.1, yb_ + 0.1) + 0.15
         L8 = 8; R_ = 0.26
         for k in range(L8):
@@ -229,12 +238,15 @@ if CUEVA:
     nobj = 0
     # rejas (celdas excavadas en la roca) a un lado y otro del túnel
     _Im.fromarray(np.full((8, 8, 3), 6, np.uint8)).save(f'{out}/cas_negro.png')
+    _ro = np.asarray(_Im.open(f'{CAS}/{TEX["pared"]}.png').convert('RGB'), np.float32) * 0.22
+    _Im.fromarray(np.clip(_ro, 0, 255).astype(np.uint8)).save(f'{out}/cas_roca_celda.png')
     for (xa_, xb_, zw, lado, y0) in CELDAS:
-        x0 = (xa_ + xb_) / 2; zf = zw + lado * 1.3; yt_ = y0 + 2.15
+        x0 = (xa_ + xb_) / 2; zf = zw + lado * 1.8; yt_ = y0 + 2.15
         for q_ in ([[xa_, y0, zf], [xb_, y0, zf], [xb_, yt_, zf], [xa_, yt_, zf]], [[xa_, y0, zw], [xa_, y0, zf], [xa_, yt_, zf], [xa_, yt_, zw]],
                    [[xb_, y0, zw], [xb_, y0, zf], [xb_, yt_, zf], [xb_, yt_, zw]], [[xa_, yt_, zw], [xb_, yt_, zw], [xb_, yt_, zf], [xa_, yt_, zf]],
-                   [[xa_, y0 - 0.02, zw], [xb_, y0 - 0.02, zw], [xb_, y0 - 0.02, zf], [xa_, y0 - 0.02, zf]]):
-            quad('cas_negro', [np.array(p_, float) for p_ in q_], [[0, 0], [1, 0], [1, 1], [0, 1]])
+                   [[xa_ - 0.1, y0 - 0.01, zw - lado * 0.12], [xb_ + 0.1, y0 - 0.01, zw - lado * 0.12], [xb_ + 0.1, y0 - 0.01, zf], [xa_ - 0.1, y0 - 0.01, zf]]):
+            P4 = [np.array(p_, float) for p_ in q_]; ext_ = [np.ptp([p[c] for p in P4]) for c in (0, 1, 2)]
+            quad('cas_roca_celda', P4, [[0, 0], [max(ext_[0], ext_[2]) / E, 0], [max(ext_[0], ext_[2]) / E, max(ext_[1], min(ext_[0], ext_[2])) / E], [0, max(ext_[1], min(ext_[0], ext_[2])) / E]])
         # marco de roca sobre la celda (tapa el canto superior)
         quad(TEX['pared'], [np.array([xa_ - 0.2, yt_, zw]), np.array([xb_ + 0.2, yt_, zw]), np.array([xb_ + 0.2, yt_ + 0.6, zw + lado * 0.15]), np.array([xa_ - 0.2, yt_ + 0.6, zw + lado * 0.15])],
              [[(xa_ - 0.2) / E, yt_ / E], [(xb_ + 0.2) / E, yt_ / E], [(xb_ + 0.2) / E, (yt_ + 0.6) / E], [(xa_ - 0.2) / E, (yt_ + 0.6) / E]])
@@ -243,7 +255,7 @@ if CUEVA:
         for xb in (x0 - 0.66, x0 + 0.66): _cil([xb, y0 - 0.02, zw], [xb, y0 + 2.1, zw], 0.035, 'cas_hierro', lados=6)
         nobj += 1
     # cadenas colgando del techo
-    for x0, dz, L in ((-5.4, 0.35, 1.1), (-8.6, -0.4, 0.8), (-9.9, 0.3, 1.3), (-12.4, -0.25, 0.9)):
+    for x0, dz, L in ((-5.4, 0.35, 1.1), (-8.6, -0.4, 0.8), (-9.3, 0.3, 1.3), (-13.4, -0.25, 0.9)):
         c, hw = _centro(x0)
         if c is None: continue
         z0 = c + dz; yf = _suelo(x0, z0) or 0.0; yt = _y_techo(x0, z0, yf) + 0.05
@@ -256,6 +268,37 @@ if CUEVA:
             y -= 0.06; k += 1
         nobj += 1
     # grilletes en la pared: argolla y cadena corta
+    # boca de piedra al final del túnel: arco de dovelas y escalones que bajan a oscuras (la siguiente sala está en otro nivel)
+    if os.environ.get('PORTAL'):
+        px_, = [float(v) for v in os.environ['PORTAL'].split(',')]
+        wz = [t3 for t3, nn in zip(T[pared], n[pared]) if abs(nn[0]) > 0.9 and abs(t3[:, 0].mean() - px_) < 0.25]
+        if wz:
+            zs_ = np.concatenate([t3[:, 2] for t3 in wz]); za_, zb_ = zs_.min(), zs_.max(); zc_ = (za_ + zb_) / 2; hw_ = (zb_ - za_) / 2
+            yf_ = float(heights(TF, px_ + 0.4, zc_).min()); D_ = 1.6
+            for k in range(6):                      # escalones hacia abajo dentro del rebaje
+                xa_, xb_ = px_ - k * D_ / 6, px_ - (k + 1) * D_ / 6; yy = yf_ - 0.17 * (k + 1)
+                quad(TEX['huella'], [np.array([xa_, yy, za_]), np.array([xb_, yy, za_]), np.array([xb_, yy, zb_]), np.array([xa_, yy, zb_])], [[xa_ / E, za_ / E], [xb_ / E, za_ / E], [xb_ / E, zb_ / E], [xa_ / E, zb_ / E]])
+                quad(TEX['tabica'], [np.array([xa_, yy, za_]), np.array([xa_, yy + 0.17, za_]), np.array([xa_, yy + 0.17, zb_]), np.array([xa_, yy, zb_])], [[za_ / E, yy / E], [za_ / E, (yy + 0.17) / E], [zb_ / E, (yy + 0.17) / E], [zb_ / E, yy / E]])
+            for zz in (za_, zb_):                   # costados bajo las jambas
+                quad(TEX['pared'], [np.array([px_, yf_ - 1.3, zz]), np.array([px_ - D_, yf_ - 1.3, zz]), np.array([px_ - D_, yf_ + 0.05, zz]), np.array([px_, yf_ + 0.05, zz])], [[0, 0], [D_ / E, 0], [D_ / E, 1.35 / E], [0, 1.35 / E]])
+            quad('cas_negro', [np.array([px_ - D_ + 0.02, yf_ - 1.3, za_]), np.array([px_ - D_ + 0.02, yf_ - 1.3, zb_]), np.array([px_ - D_ + 0.02, yf_ + 2.4, zb_]), np.array([px_ - D_ + 0.02, yf_ + 2.4, za_])], [[0, 0], [1, 0], [1, 1], [0, 1]])
+            # arco de dovelas de piedra delante de la boca
+            R_ = hw_ + 0.05; yc_ = yf_ + 2.35 - R_; nd_ = 9
+            for k in range(12):                    # enjutas: tapan las esquinas del hueco por encima del arco
+                a0, a1 = np.pi * k / 12, np.pi * (k + 1) / 12
+                p0 = np.array([px_ + 0.01, yc_ + R_ * np.sin(a0), zc_ + R_ * np.cos(a0)]); p1 = np.array([px_ + 0.01, yc_ + R_ * np.sin(a1), zc_ + R_ * np.cos(a1)])
+                quad(TEX['pared'], [p0, p1, np.array([p1[0], yf_ + 2.45, p1[2]]), np.array([p0[0], yf_ + 2.45, p0[2]])], [[p0[2] / E, p0[1] / E], [p1[2] / E, p1[1] / E], [p1[2] / E, (yf_ + 2.45) / E], [p0[2] / E, (yf_ + 2.45) / E]])
+            for k in range(nd_):
+                a0, a1 = np.pi * k / nd_, np.pi * (k + 1) / nd_
+                for r0, r1 in ((R_, R_ + 0.28),):
+                    pts = [np.array([px_ + 0.02, yc_ + r * np.sin(a), zc_ + r * np.cos(a)]) for r, a in ((r0, a0), (r1, a0), (r1, a1), (r0, a1))]
+                    quad(TEX['huella'], pts, [[0, 0], [0.3, 0], [0.3, 0.3], [0, 0.3]])
+                    for p0, p1 in ((pts[0], pts[3]), (pts[1], pts[2])):          # canto de la dovela
+                        quad(TEX['huella'], [p0, p1, p1 - [0.25, 0, 0], p0 - [0.25, 0, 0]], [[0, 0], [0.3, 0], [0.3, 0.2], [0, 0.2]])
+            for zz in (zc_ - R_ - 0.14, zc_ + R_ + 0.14):          # pilastras del arco
+                caja_ = [np.array([px_ + 0.03, yf_, zz - 0.14]), np.array([px_ + 0.03, yf_, zz + 0.14]), np.array([px_ + 0.03, yc_, zz + 0.14]), np.array([px_ + 0.03, yc_, zz - 0.14])]
+                quad(TEX['huella'], caja_, [[0, 0], [0.3, 0], [0.3, (yc_ - yf_) / E], [0, (yc_ - yf_) / E]])
+            print('boca de piedra al final del túnel, ancho %.2f' % (2 * hw_))
     print(f'objetos de la cueva: {nobj}')
 for _ex in [e for e in os.environ.get('MODELOS_EXTRA', '').split(';') if e]:
     _d = os.path.dirname(_ex); _mt = {}; _m = None

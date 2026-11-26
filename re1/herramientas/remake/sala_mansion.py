@@ -7,11 +7,12 @@ from collections import defaultdict
 from PIL import Image
 sys.path.insert(0, '/home/claude/tools'); from hmap import floors, heights
 r, out = sys.argv[1], sys.argv[2]; os.makedirs(out, exist_ok=True)
-CAS = '/home/claude/uc/m/r103'
+CAS = os.environ.get('CAS', '/home/claude/uc/m/r103')
 OSC = float(os.environ.get('OSCURO', 0.8))
 TEXF = {'cas_papel_verde': 0.62}
 TEX = dict(papel='cas_papel_verde', zocalo='cas_zocalo', listel='cas_listel', techo='cas_techo_cas', suelo='cas_tablas',
            huella='cas_tablas', tabica='cas_listel', puerta='cas_puerta', marco='cas_listel', pomo='cas_pomo')
+if os.environ.get('TEXJSON'): TEX.update(json.loads(os.environ['TEXJSON'])); TEXF = {}
 for t in set(TEX.values()):
     im = np.asarray(Image.open(f'{CAS}/{t}.png').convert('RGB'), np.float32) * OSC * TEXF.get(t, 1.0)
     Image.fromarray(np.clip(im, 0, 255).astype(np.uint8)).save(f'{out}/{t}.png')
@@ -21,6 +22,10 @@ for l in open(col):
     if l.startswith('v '): V.append([float(x) for x in l.split()[1:4]])
     elif l.startswith('f '): Fi.append([int(x.split('/')[0]) - 1 for x in l.split()[1:4]])
 V = np.array(V); Fi = np.array(Fi); T = V[Fi]
+if os.environ.get('CAJA'):
+    _c = [float(v) for v in os.environ['CAJA'].split(',')]; _m = T.mean(1)
+    _k = (_m[:, 0] >= _c[0]) & (_m[:, 0] <= _c[1]) & (_m[:, 1] >= _c[2]) & (_m[:, 1] <= _c[3]) & (_m[:, 2] >= _c[4]) & (_m[:, 2] <= _c[5])
+    T = T[_k]
 n = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]); a = np.linalg.norm(n, axis=1) / 2; n /= 2 * a[:, None] + 1e-12
 TF = floors(col); ALTO = float(os.environ.get('ALTO', 3.0))
 geo = defaultdict(list)
@@ -39,6 +44,9 @@ def techo_y(x, z, yf):
     h = heights(TF, x, z); h = h[h > yf + 0.5]
     return yf + (min(ALTO, h.min() - yf - 0.12) if len(h) else ALTO)
 plano = n[:, 1] > 0.97; rampa = (n[:, 1] > 0.45) & ~plano; pared = np.abs(n[:, 1]) < 0.35
+if os.environ.get('SIN_TECHOS_COL'):          # superficies de colisión que hacen de techo (hay suelo 2.5-3.6 m debajo)
+    _tc = np.array([bool(np.any((heights(TF, *c_[[0, 2]]) < c_[1] - 2.5) & (heights(TF, *c_[[0, 2]]) > c_[1] - 3.6))) for c_ in T.mean(1)])
+    plano &= ~_tc; rampa &= ~_tc
 E = 1.4
 # ---------------- suelos y techos
 for t3 in T[plano]:
@@ -46,7 +54,7 @@ for t3 in T[plano]:
     tri(TEX['suelo'], t3, t3[:, [0, 2]] / E)
     q = t3.copy(); q[:, 1] = [techo_y(p[0], p[2], p[1]) for p in t3]; tri(TEX['techo'], q, q[:, [0, 2]] / 1.0)
 # ---------------- paredes por bandas: zócalo, listel, papel y cornisa
-BANDAS = [(0.0, 0.95, 'zocalo', 0.95), (0.95, 1.03, 'listel', 0.5), (1.03, ALTO - 0.16, 'papel', 0.9), (ALTO - 0.16, ALTO + 0.4, 'listel', 0.5)]
+BANDAS = [(0.0, 0.95, 'zocalo', 0.95), (0.95, 1.03, 'listel', 0.5), (1.03, ALTO - 0.16, 'papel', float(os.environ.get('PAPEL_ESC', 0.9))), (ALTO - 0.16, ALTO + 0.4, 'listel', 0.5)]
 npar = 0
 for t3, nn in zip(T[pared], n[pared]):
     h_ = np.array([-nn[2], 0, nn[0]]); h_ /= np.linalg.norm(h_) + 1e-12
@@ -108,7 +116,7 @@ for g, lst in grupo.items():
             quad(TEX['zocalo'], [pt(ua, vv, y0 - 0.02), pt(ub, vv, y0 - 0.02), pt(ub, vv, yt), pt(ua, vv, yt)], [[ua / 0.95, 0], [ub / 0.95, 0], [ub / 0.95, (yt - y0) / 0.95], [ua / 0.95, (yt - y0) / 0.95]])
     esc += 1
 # ---------------- puertas: hoja de madera con marco en la pared más cercana a cada puerta del REmake
-G = json.load(open('/home/claude/re1gc/work/puertas_remake.json')).get(r, [])
+G = [] if os.environ.get('SIN_PUERTAS') else json.load(open('/home/claude/re1gc/work/puertas_remake.json')).get(r, [])
 Wc = [(t3, nn) for t3, nn in zip(T[pared], n[pared])]
 npu = 0
 for d in G:

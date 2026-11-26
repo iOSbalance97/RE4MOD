@@ -148,6 +148,74 @@ if os.path.exists(_cfg):
         Vp, Tp, Fp = _ex.torneado((col['x'], y0, col['z']), col['y1'] - y0, _ex.PERFIL_COLUMNA, escala_r=col['r'], lados=14, uv_vueltas=1, uv_alto=1.5)
         _anade(Vp, Tp, Fp, mm)
     print(f"columnas añadidas: {len(cfg.get('columnas', []))}")
+    for cp_ in cfg.get('copiar', []):          # copiar una pieza de UC (puerta, lámpara, mueble) a otros sitios, girada
+        lo_ = np.array(cp_['min']); hi_ = np.array(cp_['max']); cen_ = V[F[:, :3]].mean(1)
+        sel_ = np.all((cen_ >= lo_) & (cen_ <= hi_), 1)
+        if cp_.get('mat'): sel_ &= np.array([bool(_re2.search(cp_['mat'], str(mats.get(m_) or m_), _re2.I)) for m_ in FM])
+        Fs_ = F[sel_]; Ms_ = FM[sel_]
+        if not len(Fs_): print('  copiar: nada en', cp_.get('que')); continue
+        P0 = V[Fs_[:, :3]].reshape(-1, 3); U0 = VT[Fs_[:, 3:]].reshape(-1, 2)
+        org = np.array(cp_['origen'], float); th0 = np.arctan2(*cp_.get('frente', [0, 1]))          # frente de la pieza (x, z)
+        for d_ in cp_['destinos']:
+            th = np.arctan2(d_['frente'][0], d_['frente'][1]) - th0; c, s_ = np.cos(th), np.sin(th)
+            L_ = P0 - org; Pn = np.stack([c * L_[:, 0] + s_ * L_[:, 2], L_[:, 1], -s_ * L_[:, 0] + c * L_[:, 2]], 1) + np.array(d_['punto'], float)
+            for k_, m_ in enumerate(Ms_):
+                _anade(Pn[3 * k_:3 * k_ + 3], U0[3 * k_:3 * k_ + 3], np.array([[0, 1, 2]]), m_)
+        print(f"  copiado {cp_.get('que')}: {len(Fs_)} triángulos x {len(cp_['destinos'])}")
+    for zs_ in cfg.get('suelo_junto_pared', []):          # tira de suelo pegada a las paredes altas: tapa la rendija entre el suelo de UC y la pared
+        _cf = f'/home/claude/re1gc/salas/{r}/colision.obj'; _Vc = []; _Fc = []
+        for l_ in open(_cf):
+            if l_.startswith('v '): _Vc.append([float(x) for x in l_.split()[1:4]])
+            elif l_.startswith('f '): _Fc.append([int(x.split('/')[0]) - 1 for x in l_.split()[1:4]])
+        _Tc = np.array(_Vc)[np.array(_Fc)]; _nc = np.cross(_Tc[:, 1] - _Tc[:, 0], _Tc[:, 2] - _Tc[:, 0]); _nc /= np.linalg.norm(_nc, axis=1, keepdims=True) + 1e-12
+        _cu = V[F[:, :3]]; _nu = np.cross(_cu[:, 1] - _cu[:, 0], _cu[:, 2] - _cu[:, 0]); _nu /= np.linalg.norm(_nu, axis=1, keepdims=True) + 1e-12
+        _hz = np.abs(_nu[:, 1]) > 0.9; _ch = _cu[_hz].mean(1); _mh = FM[_hz]; _kh = cKDTree(_ch)
+        nst = 0
+        for t3, nn in zip(_Tc, _nc):
+            if abs(nn[1]) > 0.3 or np.ptp(t3[:, 1]) < zs_.get('alto_min', 2.0): continue
+            ya_ = t3[:, 1].min()
+            if not (zs_['y0'] <= ya_ <= zs_['y1']): continue
+            nh = np.array([nn[0], 0, nn[2]]) / (np.hypot(nn[0], nn[2]) + 1e-12)
+            c_ = t3.mean(0); hs1 = _heights(_TF, *(c_ + nh * 0.3)[[0, 2]]); hs2 = _heights(_TF, *(c_ - nh * 0.3)[[0, 2]])
+            ok1 = len(hs1) and np.abs(hs1 - ya_).min() < 0.15; ok2 = len(hs2) and np.abs(hs2 - ya_).min() < 0.15
+            if ok1 == ok2: continue
+            if not ok1: nh = -nh
+            h_ = np.array([-nh[2], 0, nh[0]]); pr = t3 @ h_; A_ = t3[pr.argmin()] * [1, 0, 1] + [0, ya_ + 0.006, 0]; B_ = t3[pr.argmax()] * [1, 0, 1] + [0, ya_ + 0.006, 0]
+            if np.linalg.norm(B_ - A_) < 0.05: continue
+            d_, j_ = _kh.query(((A_ + B_) / 2 + nh * 0.6) * [1, 1, 1], k=8); cand = [_mh[k] for k, dd in zip(j_, d_) if abs(_ch[k][1] - ya_) < 0.3]
+            if not cand: continue
+            from collections import Counter as _Cn
+            mm_ = _Cn(cand).most_common(1)[0][0]; W_ = zs_.get('ancho', 0.4)
+            q = np.array([A_ - nh * 0.03, B_ - nh * 0.03, B_ + nh * W_, A_ + nh * W_])
+            _anade(q, q[:, [0, 2]] / 1.2, np.array([[0, 1, 2], [0, 2, 3]]), mm_); nst += 1
+            if zs_.get('rodapie'):          # rodapié: tapa la rendija vertical entre la pared y el suelo
+                mr_ = next((m_ for m_ in set(FM) if _re2.search(zs_['rodapie'], str(mats.get(m_) or m_))), None)
+                if mr_ is not None:
+                    a2 = A_ + nh * 0.02; b2 = B_ + nh * 0.02; L2 = np.linalg.norm(B_ - A_)
+                    q = np.array([a2 - [0, 0.08, 0], b2 - [0, 0.08, 0], b2 + [0, zs_.get('alto_rodapie', 0.28), 0], a2 + [0, zs_.get('alto_rodapie', 0.28), 0]])
+                    _anade(q, np.array([[0, 0], [L2 / 0.6, 0], [L2 / 0.6, 0.5], [0, 0.5]]), np.array([[0, 1, 2], [0, 2, 3]]), mr_)
+        print(f'  tiras de suelo junto a la pared: {nst}')
+    for sb_ in cfg.get('suelo_bajo', []):          # suelo de respaldo un poco por debajo del pisable (ensanchado): lo que asome por las rendijas es alfombra, no el vacío
+        from scipy import ndimage as _nd2
+        mb_ = next((m_ for m_ in set(FM) if _re2.search(sb_['mat'], str(mats.get(m_) or m_))), None)
+        G2 = 0.1; nsb = 0
+        for cj in sb_['cajas']:
+            xs2 = np.arange(cj[0], cj[1], G2); zs2 = np.arange(cj[2], cj[3], G2); Mk2 = np.zeros((len(xs2), len(zs2)), bool)
+            for ii, x_ in enumerate(xs2):
+                for jj, z_ in enumerate(zs2):
+                    h_ = _heights(_TF, x_ + G2 / 2, z_ + G2 / 2); Mk2[ii, jj] = len(h_) > 0 and np.abs(h_ - sb_['y']).min() < sb_.get('tol', 0.15)
+            Mk2 = _nd2.binary_dilation(Mk2, iterations=int(sb_.get('dilatar', 0.4) / G2))
+            yb_ = sb_['y'] - sb_.get('bajo', 0.03)
+            for ii in range(len(xs2)):
+                jj = 0
+                while jj < len(zs2):
+                    if Mk2[ii, jj]:
+                        j0 = jj
+                        while jj < len(zs2) and Mk2[ii, jj]: jj += 1
+                        q = np.array([[xs2[ii], yb_, zs2[j0]], [xs2[ii] + G2, yb_, zs2[j0]], [xs2[ii] + G2, yb_, zs2[jj - 1] + G2], [xs2[ii], yb_, zs2[jj - 1] + G2]])
+                        _anade(q, q[:, [0, 2]] / 1.2, np.array([[0, 1, 2], [0, 2, 3]]), mb_); nsb += 1
+                    else: jj += 1
+        print(f'  suelo de respaldo: {nsb} tiras')
     for es_ in cfg.get('escaleras', []):          # tramo de escalera que UC no tiene (solo dejaba ver el techo de abajo como franjas)
         mh_ = next((m_ for m_ in set(FM) if _re2.search(es_['huella'], str(mats.get(m_) or m_))), None)
         mt_ = next((m_ for m_ in set(FM) if _re2.search(es_['tabica'], str(mats.get(m_) or m_))), None) or mh_
@@ -254,9 +322,10 @@ if os.path.exists(_cfg):
         F = F[~dentro_]; FM = FM[~dentro_]
         def _mk(tex):
             mk = tex[:-4]; mats[mk] = tex; return mk
-        def _quad(p0, p1, y0, y1, tex, ulen):
+        def _quad(p0, p1, y0, y1, tex, ulen, ajustar_v=False):
             q = np.array([[p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p1[0], y1, p1[1]], [p0[0], y1, p0[1]]])
             uv = np.array([[0, y0], [ulen, y0], [ulen, y1], [0, y1]]) / E_
+            if ajustar_v: uv = np.array([[0, 0], [ulen / E_, 0], [ulen / E_, 1], [0, 1]])          # la textura entera en la altura de la banda
             _anade(q, uv, np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]), _mk(tex))     # dos caras
         ns_ = np.zeros(3, int)
         # zona pisable en rejilla (con margen), agujeros interiores (objetos) rellenos -> solo el contorno exterior lleva pared
@@ -266,19 +335,32 @@ if os.path.exists(_cfg):
         Mk = np.zeros((len(xs_), len(zs_)), bool)
         for ii, x_ in enumerate(xs_):
             for jj, z_ in enumerate(zs_):
-                h_ = _heights(_TF, x_, z_); Mk[ii, jj] = len(h_) > 0 and np.abs(h_ - rc['y_suelo']).min() < 0.3
+                h_ = _heights(_TF, x_, z_); Mk[ii, jj] = len(h_) > 0 and np.abs(h_ - rc['y_suelo']).min() < rc.get('tol_suelo', 0.3)
         Mk = _nd.binary_fill_holes(_nd.binary_closing(Mk, iterations=2))
         _mp = rc.get('margen_pared', -0.02)
         dentro_box = lambda x_, z_: lo[0] - _mp < x_ < hi[0] + _mp and lo[2] - _mp < z_ < hi[2] + _mp
         y0 = rc['y_suelo']; zh = y0 + rc.get('zocalo_h', 0.9)
+        if rc.get('solo_paredes_colision'):          # solo donde la colisión tiene pared (no en la boca de una escalera o un paso)
+            _cf = f'/home/claude/re1gc/salas/{r}/colision.obj'; _Vc = []; _Fc = []
+            for l_ in open(_cf):
+                if l_.startswith('v '): _Vc.append([float(x) for x in l_.split()[1:4]])
+                elif l_.startswith('f '): _Fc.append([int(x.split('/')[0]) - 1 for x in l_.split()[1:4]])
+            _Tc = np.array(_Vc)[np.array(_Fc)]; _nc = np.cross(_Tc[:, 1] - _Tc[:, 0], _Tc[:, 2] - _Tc[:, 0]); _nc /= np.linalg.norm(_nc, axis=1, keepdims=True) + 1e-12
+            _Tc = _Tc[(np.abs(_nc[:, 1]) < 0.3) & (_Tc[:, :, 1].max(1) > y0 + 0.5) & (_Tc[:, :, 1].min(1) < y0 + 0.5)]
+            _Pc = np.concatenate([np.random.default_rng(0).dirichlet([1, 1, 1], 40) @ t_ for t_ in _Tc]) if len(_Tc) else np.zeros((1, 3)) + 1e9
+            _Kc = cKDTree(_Pc[:, [0, 2]])
+        _cornisa = rc.get('cornisa_h', 0.0)
         for cont in _ms.find_contours(np.pad(Mk.astype(float), 1), 0.5):
             cont = _ms.approximate_polygon(cont - 1, tolerance=1.2)
             pts = np.stack([xs_[0] + cont[:, 0] * G_, zs_[0] + cont[:, 1] * G_], 1)
             for p0, p1 in zip(pts[:-1], pts[1:]):
                 m_ = (p0 + p1) / 2; L_ = np.linalg.norm(p1 - p0)
                 if L_ < 0.04 or not dentro_box(*m_): continue
-                _quad(p0, p1, y0, zh, rc['zocalo'], L_); _quad(p0, p1, zh, zh + 0.08, rc.get('moldura', rc['zocalo']), L_)
-                _quad(p0, p1, zh + 0.08, rc['y_techo'], rc['pared'], L_); ns_[2] += 1
+                if rc.get('solo_paredes_colision') and not _Kc.query_ball_point(m_, 0.3): continue
+                _quad(p0, p1, y0, zh, rc['zocalo'], L_, rc.get('zocalo_entero', False)); _quad(p0, p1, zh, zh + 0.08, rc.get('moldura', rc['zocalo']), L_)
+                _quad(p0, p1, zh + 0.08, rc['y_techo'] - _cornisa, rc['pared'], L_)
+                if _cornisa: _quad(p0, p1, rc['y_techo'] - _cornisa, rc['y_techo'], rc.get('moldura', rc['zocalo']), L_)
+                ns_[2] += 1
         # suelo y techo: filas de la silueta dentro de la caja
         for ii, x_ in enumerate(xs_):
             _mt = max(_mp, 0.0)
@@ -588,15 +670,30 @@ if os.environ.get('BALAUSTRES_TOTAL'):
         _Pt[:, 1] -= pend * (_Pt[:, 2] - _ax[2])
         _Pt -= [_ax[0], _Pt[:, 1].min(), _ax[2]]; _Ht = _Pt[:, 1].max()
         print(f'  plantilla de balaustre de UC: {len(_Ft)} triángulos, alto {_Ht:.2f} m')
-        # balaustres de la planta alta: cadenas ordenadas y paso regular igual que abajo
-        _arr = [(b_, h_) for b_, h_ in _bal if b_[1] >= _ycopia]; _bal = [(b_, h_) for b_, h_ in _bal if b_[1] < _ycopia]
+        # esquinero (poste cuadrado con remate) de la barandilla de abajo
+        _Fe = _Pe = _Ue = None
+        if os.environ.get('ESQUINERO_UC'):
+            ex0, ex1, ez0, ez1 = [float(v) for v in os.environ['ESQUINERO_UC'].split(',')]
+            _me = np.array([bool(_re2.search('wood24', str(mats.get(m_) or m_))) for m_ in FM])
+            _se = _me & (_cw[:, 0] > ex0) & (_cw[:, 0] < ex1) & (_cw[:, 2] > ez0) & (_cw[:, 2] < ez1) & (_cw[:, 1] < 3.3)
+            _Fe = F[_se]; _mme = FM[_se][0]; _Pe = V[_Fe[:, :3]].reshape(-1, 3).copy(); _Ue = VT[_Fe[:, 3:]].reshape(-1, 2)
+            _axe = np.array([(_Pe[:, 0].min() + _Pe[:, 0].max()) / 2, _Pe[:, 1].min(), (_Pe[:, 2].min() + _Pe[:, 2].max()) / 2]); _Pe -= _axe; _He = _Pe[:, 1].max()
+            print(f'  plantilla de esquinero de UC: {len(_Fe)} triángulos, alto {_He:.2f} m')
+        def _rot(P, tx, tz):
+            th = np.arctan2(tx, tz); c, s_ = np.cos(th), np.sin(th)
+            return np.stack([c * P[:, 0] + s_ * P[:, 2], P[:, 1], -s_ * P[:, 0] + c * P[:, 2]], 1)
+        # balaustres originales de UC (no duplicar encima)
+        _orig = []
+        if True:
+            _cw16 = _cw[_mw]; _ko = cKDTree(_cw16[:, [0, 2]]) if len(_cw16) else None
+        _arr = [(b_, h_) for b_, h_ in _bal if b_[1] >= _ycopia]; _bal = []          # los finos de antes ya no se ponen en ningún sitio
         P_ = np.array([[b_[0], b_[1], b_[2], h_] for b_, h_ in _arr]) if _arr else np.zeros((0, 4))
-        usado = np.zeros(len(P_), bool); ncop = 0; PASO = float(os.environ.get('PASO_BALAUSTRE', 0.188))
+        usado = np.zeros(len(P_), bool); ncop = 0; nesq = 0; PASO = float(os.environ.get('PASO_BALAUSTRE', 0.188))
         _tb = cKDTree(P_[:, [0, 2]]) if len(P_) else None
-        _puestos = []
+        _puestos = []; _postes = []
         while len(P_) and not usado.all():
             i0 = int(np.nonzero(~usado)[0][0]); cad = [i0]; usado[i0] = True
-            for _dir in (0, 1):          # crecer la cadena por los dos extremos
+            for _dir in (0, 1):
                 while True:
                     j = cad[-1] if _dir == 0 else cad[0]
                     cand = [k for k in _tb.query_ball_point(P_[j, [0, 2]], 0.32) if not usado[k] and abs(P_[k, 1] - P_[j, 1]) < 0.3]
@@ -605,16 +702,43 @@ if os.environ.get('BALAUSTRES_TOTAL'):
                     if _dir == 0: cad.append(k)
                     else: cad.insert(0, k)
             Q = P_[cad]
-            if len(Q) < 2: continue
-            L_ = np.r_[0, np.cumsum(np.hypot(*(np.diff(Q[:, [0, 2]], axis=0)).T))]
-            n_ = max(1, int(round(L_[-1] / PASO)))
-            for t_ in np.linspace(0, L_[-1], n_ + 1):
-                x_ = np.interp(t_, L_, Q[:, 0]); z_ = np.interp(t_, L_, Q[:, 2]); yb_ = np.interp(t_, L_, Q[:, 1]); hh_ = np.interp(t_, L_, Q[:, 3])
-                if any(np.hypot(x_ - a_, z_ - c_) < 0.12 for a_, c_ in _puestos): continue
-                _puestos.append((x_, z_))
-                Pp = _Pt * [1, hh_ / _Ht, 1] + [x_, yb_, z_]
-                _anade(Pp, _Ut, np.arange(len(Pp)).reshape(-1, 3), _mmt); ncop += 1
-        print(f'  balaustres de UC copiados en la planta alta: {ncop}')
+            if len(Q) < 3: continue
+            # suavizar el trazado (media móvil) y repartir por longitud
+            Qs = Q.copy()
+            for c_ in (0, 2): Qs[:, c_] = np.convolve(np.pad(Q[:, c_], 2, mode='edge'), np.ones(5) / 5, mode='valid')
+            L_ = np.r_[0, np.cumsum(np.hypot(*(np.diff(Qs[:, [0, 2]], axis=0)).T))]
+            if L_[-1] < 0.3: continue
+            # altura: recta ajustada (tramo recto o inclinado), sin saltos
+            A_ = np.polyfit(L_, Qs[:, 1], 1); hh_ = float(np.median(Qs[:, 3]))
+            if abs(A_[0]) < 0.06: A_ = np.array([0.0, float(np.median(Qs[:, 1]))])
+            ybf = lambda t_: float(np.polyval(A_, t_))
+            def pos(t_): return np.interp(t_, L_, Qs[:, 0]), np.interp(t_, L_, Qs[:, 2])
+            def tang(t_):
+                a0 = pos(max(0, t_ - 0.2)); a1 = pos(min(L_[-1], t_ + 0.2)); d_ = np.array(a1) - np.array(a0); return d_ / (np.linalg.norm(d_) + 1e-9)
+            # esquinas: extremos y cambios de dirección
+            ts = [0.0, L_[-1]]
+            for t_ in np.arange(0.3, L_[-1] - 0.3, 0.05):
+                if abs(tang(t_ - 0.25) @ tang(t_ + 0.25)) < 0.8 and all(abs(t_ - u_) > 0.5 for u_ in ts): ts.append(t_)
+            ts = sorted(ts)
+            if _Fe is not None:
+                for t_ in ts:
+                    x_, z_ = pos(t_)
+                    if any(np.hypot(x_ - a_, z_ - c_) < 0.3 for a_, c_ in _postes): continue
+                    _postes.append((x_, z_)); tg_ = tang(t_)
+                    Pp = _rot(_Pe * [1, (hh_ + 0.17) / _He, 1], tg_[0], tg_[1]) + [x_, ybf(t_), z_]
+                    _anade(Pp, _Ue, np.arange(len(Pp)).reshape(-1, 3), _mme); nesq += 1
+            # balaustres entre esquinas a paso regular
+            for a_, b_ in zip(ts[:-1], ts[1:]):
+                n_ = max(1, int(round((b_ - a_) / PASO)))
+                for t_ in np.linspace(a_, b_, n_ + 1)[1:-1]:
+                    x_, z_ = pos(t_)
+                    if any(np.hypot(x_ - a2, z_ - c2) < 0.16 for a2, c2 in _puestos): continue
+                    if _ko is not None and _ko.query_ball_point([x_, z_], 0.12) and abs(ybf(t_) - _cw16[_ko.query([x_, z_])[1], 1]) < 1.2: continue
+                    _puestos.append((x_, z_)); tg_ = tang(t_)
+                    Pp = _rot(_Pt * [1, hh_ / _Ht, 1], tg_[0], tg_[1]) + [x_, ybf(t_), z_]
+                    _anade(Pp, _Ut, np.arange(len(Pp)).reshape(-1, 3), _mmt); ncop += 1
+        print(f'  esquineros: {nesq}')
+        print(f'  balaustres de UC copiados: {ncop}')
     for base_, h in _bal:
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.65, lados=6)
         _anade(Vp, Tp, Fp, _mm_b)

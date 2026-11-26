@@ -1,0 +1,27 @@
+{
+ "R": [
+  [
+   1,
+   0,
+   0
+  ],
+  [
+   0,
+   1,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "s": 0.952,
+ "t": [
+  0.17,
+  4.0,
+  0.11
+ ],
+ "espejo": false,
+ "nota": "ajustada a mano: puertas de UC sobre las del REmake (comedor x-4.0, pasillo x-1.7, r10f x7.0)"
+}

@@ -19,7 +19,7 @@ P = np.concatenate([V[v] for _, v, _ in sel]); zf = P[:, 2].max(); y0 = P[:, 1].
 L = lambda p: np.array([p[0] - 0.0, p[1] - y0, p[2] - zf])          # local: frente en z=0, hacia +z
 TF = floors('/home/claude/re1gc/salas/r31a/colision.obj')
 zz = [z for z in np.arange(0.5, 4.5, 0.02) if len(heights(TF, -14.25, z))]; cz = (min(zz) + max(zz)) / 2; yf = float(heights(TF, -14.25, cz).min())
-puertas = {'verja': lambda q: np.array([q[0] - 0.02, q[1] + 10.0, q[2] - 4.85]),               # arriba: pared z=-4.85, mira a +z
+puertas = {'verja': lambda q: np.array([q[0] - 0.02, q[1] + 10.0, q[2] - 4.85 - 0.14]),               # arriba: pared z=-4.85, mira a +z
            'verja_r315': lambda q: np.array([q[2] - 14.38, q[1] + yf, -q[0] + cz])}          # final del túnel: pared x=-14.38, mira a +x
 for nm, tr in puertas.items():
     with open(f'{out}/{nm}.obj', 'w') as f:
