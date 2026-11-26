@@ -194,6 +194,52 @@ if os.path.exists(_cfg):
             _anade(Vt_, uvt, np.arange(len(Vt_)).reshape(-1, 3), FM[tt_[0]]); quitar_[tt_] = True; hechas += 1
         F = F[~quitar_]; FM = FM[~quitar_]
         print(f'  telas cerradas ({rx_}): {hechas}')
+    for rc in cfg.get('reconstruir', []):
+        lo = np.array(rc['min']); hi = np.array(rc['max']); E_ = rc.get('escala', 1.5)
+        cen_ = V[F[:, :3]].mean(1); dentro_ = np.all((cen_ >= lo) & (cen_ <= hi), 1)
+        if rc.get('conservar'): dentro_ &= np.array([not _re2.search(rc['conservar'], str(mats.get(m_) or m_), _re2.I) for m_ in FM])
+        F = F[~dentro_]; FM = FM[~dentro_]
+        def _mk(tex):
+            mk = tex[:-4]; mats[mk] = tex; return mk
+        def _quad(p0, p1, y0, y1, tex, ulen):
+            q = np.array([[p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p1[0], y1, p1[1]], [p0[0], y1, p0[1]]])
+            uv = np.array([[0, y0], [ulen, y0], [ulen, y1], [0, y1]]) / E_
+            _anade(q, uv, np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]), _mk(tex))     # dos caras
+        ns_ = np.zeros(3, int)
+        # zona pisable en rejilla (con margen), agujeros interiores (objetos) rellenos -> solo el contorno exterior lleva pared
+        from scipy import ndimage as _nd
+        from skimage import measure as _ms
+        G_ = 0.05; mg = 0.6; xs_ = np.arange(lo[0] - mg, hi[0] + mg, G_); zs_ = np.arange(lo[2] - mg, hi[2] + mg, G_)
+        Mk = np.zeros((len(xs_), len(zs_)), bool)
+        for ii, x_ in enumerate(xs_):
+            for jj, z_ in enumerate(zs_):
+                h_ = _heights(_TF, x_, z_); Mk[ii, jj] = len(h_) > 0 and np.abs(h_ - rc['y_suelo']).min() < 0.3
+        Mk = _nd.binary_fill_holes(_nd.binary_closing(Mk, iterations=2))
+        dentro_box = lambda x_, z_: lo[0] + 0.02 < x_ < hi[0] - 0.02 and lo[2] + 0.02 < z_ < hi[2] - 0.02
+        y0 = rc['y_suelo']; zh = y0 + rc.get('zocalo_h', 0.9)
+        for cont in _ms.find_contours(np.pad(Mk.astype(float), 1), 0.5):
+            cont = _ms.approximate_polygon(cont - 1, tolerance=1.2)
+            pts = np.stack([xs_[0] + cont[:, 0] * G_, zs_[0] + cont[:, 1] * G_], 1)
+            for p0, p1 in zip(pts[:-1], pts[1:]):
+                m_ = (p0 + p1) / 2; L_ = np.linalg.norm(p1 - p0)
+                if L_ < 0.04 or not dentro_box(*m_): continue
+                _quad(p0, p1, y0, zh, rc['zocalo'], L_); _quad(p0, p1, zh, zh + 0.08, rc.get('moldura', rc['zocalo']), L_)
+                _quad(p0, p1, zh + 0.08, rc['y_techo'], rc['pared'], L_); ns_[2] += 1
+        # suelo y techo: filas de la silueta dentro de la caja
+        for ii, x_ in enumerate(xs_):
+            if not (lo[0] <= x_ < hi[0]): continue
+            jj = 0
+            while jj < len(zs_):
+                if Mk[ii, jj] and lo[2] <= zs_[jj] < hi[2]:
+                    j0 = jj
+                    while jj < len(zs_) and Mk[ii, jj] and zs_[jj] < hi[2]: jj += 1
+                    za, zb = zs_[j0], zs_[jj - 1] + G_; xa, xb = x_, x_ + G_
+                    for yy, tex, inv in ((y0, rc['suelo'], False), (rc['y_techo'], rc['techo'], True)):
+                        q = np.array([[xa, yy, za], [xb, yy, za], [xb, yy, zb], [xa, yy, zb]])
+                        _anade(q, q[:, [0, 2]] / E_, np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]), _mk(tex))
+                    ns_[0] += 1
+                else: jj += 1
+        print(f"  reconstruido {rc.get('que', '')}: quitados {dentro_.sum()} de UC; suelo {ns_[0]}, techo {ns_[1]}, paredes {ns_[2]}")
     for rz in cfg.get('retexturizar', []):
         lo = np.array(rz['min']); hi = np.array(rz['max'])
         P3_ = V[F[:, :3]]; cen_ = P3_.mean(1); dentro_ = np.all((cen_ >= lo) & (cen_ <= hi), 1)
@@ -383,9 +429,16 @@ if os.environ.get('BALAUSTRES_TOTAL'):
                 if len(h) and (best is None or h.max() > best): best = float(h.max())
             if best is not None: return best
         return None
+    _pan = []
+    for i_ in np.nonzero(np.array([bool(_re2.search(r'handrail01', str(mats.get(m_) or m_), _re2.I)) for m_ in FM]))[0]:
+        t3 = V[F[i_, :3]]; a_ = np.linalg.norm(np.cross(t3[1] - t3[0], t3[2] - t3[0])) / 2
+        _pan.append(np.random.default_rng(i_ + 7).dirichlet([1, 1, 1], int(np.clip(a_ / 0.0008, 3, 400))) @ t3)
+    _pan = np.concatenate(_pan) if _pan else np.zeros((0, 3)); _Tp = cKDTree(_pan[:, [0, 2]]) if len(_pan) else None
     def _macizo_debajo(x, y0, y1, z):
-        for j in _Ts.query_ball_point([x, z], 0.06):
-            if y0 <= _Ss[j, 1] <= y1: return True          # panel tallado, poste o pared: ya hay barandilla maciza
+        if sum(1 for j in _Ts.query_ball_point([x, z], 0.2) if y0 <= _Ss[j, 1] <= y1) >= 3: return True   # panel tallado, poste o pared
+        if _Tp is not None:                                  # panel tallado de pasamanos (barandilla ya dibujada)
+            ii = _Tp.query_ball_point([x, z], 0.2)
+            if sum(1 for j in ii if y0 <= _pan[j, 1] <= y1) >= 3: return True
         return False
     # el pasamanos: la parte alta de las muestras macizas (vigas), agrupada en tramos rectos
     _grid = {}
@@ -404,6 +457,11 @@ if os.environ.get('BALAUSTRES_TOTAL'):
         if _macizo_debajo(p[0], yb + 0.25 * h, yb + 0.75 * h, p[2]): _mot['macizo'] += 1; continue
         if any(np.hypot(p[0] - q[0], p[2] - q[2]) < 0.14 and abs(yb - q[1]) < 0.45 for q, _ in _bal): _mot['repetido'] += 1; continue
         _bal.append(((p[0], yb, p[2]), h))
+    for zb in cfg_zonas_sin if 'cfg_zonas_sin' in dir() else []: pass
+    _sin = json.load(open(f'/home/claude/re1gc/work/extras_{r}.json')).get('sin_balaustres', []) if os.path.exists(f'/home/claude/re1gc/work/extras_{r}.json') else []
+    _antes = len(_bal)
+    _bal = [(b_, h_) for b_, h_ in _bal if not any(z_[0] <= b_[0] <= z_[1] and z_[2] <= b_[2] <= z_[3] and b_[1] >= z_[4] for z_ in _sin)]
+    print(f'  zonas con barandilla tallada (sin balaustres nuevos): quitados {_antes - len(_bal)}')
     _mm_b = next((m_ for m_ in set(FM) if 'handrail01' in str(mats.get(m_) or m_)), None) or mm_r
     for base_, h in _bal:
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.65, lados=6)

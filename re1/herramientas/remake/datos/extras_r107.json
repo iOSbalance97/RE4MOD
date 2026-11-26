@@ -35,44 +35,54 @@
  "cerrar": [
   "r103OBJ10|r103OBJ11"
  ],
- "retexturizar": [
+ "reconstruir": [
   {
-   "que": "pasillo del fondo (como el REmake: alfombra y damasco azul)",
+   "que": "pasillo en L (texturas del castillo de RE4)",
    "min": [
     1.5,
     -0.2,
     -5.0
    ],
    "max": [
-    4.4,
-    3.3,
-    -2.45
+    8.5,
+    3.4,
+    -2.5
    ],
-   "suelo": "EO_r103yuka3.png",
-   "pared": "EO_r103KABE8.png",
-   "moldura": "EO_r103KABE9.png",
-   "techo": "EO_r103TENJO2.png",
+   "conservar": "GAKU|OBJ1|OBJ2|OBJ3|OBJ4|OBJ5|OBJ6|OBJ7|OBJ8|OBJ9|isu|table|mado_ue|danro|emily|Door|door",
+   "suelo": "cas_tablas.png",
+   "techo": "cas_artesonado.png",
+   "pared": "cas_terciopelo.png",
+   "zocalo": "cas_madera_panel.png",
+   "moldura": "cas_moldura.png",
    "y_suelo": 0.0,
    "y_techo": 2.95,
-   "zocalo": 0.22,
-   "cornisa": 0.3,
-   "excluir": "OBJ10|OBJ11|GAKU|estatua|door|Door",
-   "techo_colision": true,
-   "descartar": [
-    {
-     "min": [
-      3.85,
-      -0.1,
-      -4.7
-     ],
-     "max": [
-      4.4,
-      3.4,
-      -2.55
-     ],
-     "eje": 0
-    }
-   ]
+   "zocalo_h": 0.95,
+   "escala": 1.4
+  }
+ ],
+ "retexturizar": [
+  {
+   "que": "cuarto de las s\u00e1banas (a juego con el pasillo)",
+   "min": [
+    4.1,
+    -0.2,
+    -2.65
+   ],
+   "max": [
+    8.6,
+    3.6,
+    0.15
+   ],
+   "suelo": "cas_tablas.png",
+   "pared": "cas_terciopelo.png",
+   "moldura": "cas_madera_panel.png",
+   "techo": "cas_artesonado.png",
+   "y_suelo": 0.0,
+   "y_techo": 3.0,
+   "zocalo": 0.95,
+   "cornisa": 0.25,
+   "escala": 1.4,
+   "excluir": "GAKU|OBJ|isu|table|mado_ue|danro|emily|Door|door|KERTEN|cas_"
   }
  ]
 }

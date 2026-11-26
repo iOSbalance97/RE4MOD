@@ -142,9 +142,9 @@ nz = ruido(128) * 0.5 + ruido(32) * 0.3 + ruido(8) * 0.2; yy, xx = np.mgrid[0:N,
 vena = np.clip(1 - np.abs(np.sin((xx * 3 + yy * 1.5 + nz * 2.2) * np.pi * 2)), 0, 1) ** 10
 L = np.clip(0.78 + 0.07 * (ruido(16) - 0.5) - 0.20 * vena, 0, 1)
 sucio = cv2.GaussianBlur(ruido(4), (0, 0), 6); L = L * (0.9 + 0.1 * sucio)
-TON = [1.0, 0.84, 0.70, 0.57, 0.46]
+TON = [1.0, 0.80, 0.62, 0.47, 0.34]
 for k, f in enumerate(TON):
-    Image.fromarray((np.clip(np.stack([L * 0.98, L * 0.90, L * 0.76], -1) * f, 0, 1) * 255).astype(np.uint8)).save(f'{out}/marmol_t{k}.png')
+    Image.fromarray((np.clip(np.stack([L * 0.90, L * 0.88, L * 0.85], -1) * f, 0, 1) * 255).astype(np.uint8)).save(f'{out}/marmol_t{k}.png')
 with open(f'{out}/figura.obj', 'w') as fo:
     fo.write('mtllib figura.mtl\n')
     for v in V: fo.write(f'v {v[0]:.4f} {v[1]:.4f} {v[2]:.4f}\n')
