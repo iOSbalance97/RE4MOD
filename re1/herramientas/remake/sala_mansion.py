@@ -56,7 +56,21 @@ for t3 in T[plano]:
 # ---------------- paredes por bandas: zócalo, listel, papel y cornisa
 BANDAS = [(0.0, 0.95, 'zocalo', 0.95), (0.95, 1.03, 'listel', 0.5), (1.03, ALTO - 0.16, 'papel', float(os.environ.get('PAPEL_ESC', 0.9))), (ALTO - 0.16, ALTO + 0.4, 'listel', 0.5)]
 npar = 0
-for t3, nn in zip(T[pared], n[pared]):
+# las dos mitades de un muro sobre una rampa (y los duplicados) se tratan como un solo muro: si no, cada mitad
+# ponía sus bandas desde su diagonal y se solapaban (parpadeo)
+_TP = T[pared]; _NP = n[pared]; _gp = list(range(len(_TP)))
+def _raiz(i):
+    while _gp[i] != i: _gp[i] = _gp[_gp[i]]; i = _gp[i]
+    return i
+for i_ in range(len(_TP)):
+    for j_ in range(i_ + 1, len(_TP)):
+        if _NP[i_] @ _NP[j_] < 0.995 or abs((_TP[j_][0] - _TP[i_][0]) @ _NP[i_]) > 0.03: continue
+        dd_ = np.linalg.norm(_TP[i_][:, None] - _TP[j_][None], axis=2); _sh = np.nonzero(dd_.min(1) < 0.06)[0]
+        if len(_sh) >= 3 or (len(_sh) == 2 and np.hypot(*(_TP[i_][_sh[0]] - _TP[i_][_sh[1]])[[0, 2]]) > 0.1): _gp[_raiz(j_)] = _raiz(i_)
+_GR = {}
+for i_ in range(len(_TP)): _GR.setdefault(_raiz(i_), []).append(i_)
+_MUROS = [(np.concatenate([_TP[k] for k in l_]), _NP[g_], [(_TP[k][a_], _TP[k][b_]) for k in l_ for a_, b_ in ((0, 1), (1, 2), (2, 0))]) for g_, l_ in _GR.items()]
+for t3, nn, _EDG in _MUROS:
     h_ = np.array([-nn[2], 0, nn[0]]); h_ /= np.linalg.norm(h_) + 1e-12
     pr = t3 @ h_; A_, B_ = t3[pr.argmin()], t3[pr.argmax()]
     if pr.max() - pr.min() < 0.03: continue
@@ -73,9 +87,10 @@ for t3, nn in zip(T[pared], n[pared]):
     cols = []
     for i in range(nu_ + 1):
         u = i / nu_; pu = pr.min() + (pr.max() - pr.min()) * u; q = A_ + (B_ - A_) * u; ys_ = []
-        for e0, e1 in ((t3[0], t3[1]), (t3[1], t3[2]), (t3[2], t3[0])):
+        for e0, e1 in _EDG:
             a0, a1 = e0 @ h_, e1 @ h_
-            if min(a0, a1) - 1e-6 <= pu <= max(a0, a1) + 1e-6 and abs(a1 - a0) > 1e-6: ys_.append(e0[1] + (e1[1] - e0[1]) * (pu - a0) / (a1 - a0))
+            if min(a0, a1) - 0.08 <= pu <= max(a0, a1) + 0.08 and abs(a1 - a0) > 0.05:
+                pc_ = min(max(pu, min(a0, a1)), max(a0, a1)); ys_.append(e0[1] + (e1[1] - e0[1]) * (pc_ - a0) / (a1 - a0))
         yf = min(ys_) if ys_ else ya
         # lado del paso para el techo
         ytop = max(techo_y(q[0] + nh[0] * 0.2, q[2] + nh[2] * 0.2, yf), techo_y(q[0] - nh[0] * 0.2, q[2] - nh[2] * 0.2, yf))
@@ -113,6 +128,7 @@ for g, lst in grupo.items():
         quad(TEX['huella'], [pt(ua, v0, yt), pt(ub, v0, yt), pt(ub, v1, yt), pt(ua, v1, yt)], [[ua / E, v0 / E], [ub / E, v0 / E], [ub / E, v1 / E], [ua / E, v1 / E]])
         quad(TEX['tabica'], [pt(ua, v0, yb), pt(ua, v1, yb), pt(ua, v1, yt), pt(ua, v0, yt)], [[v0 / 0.5, 0], [v1 / 0.5, 0], [v1 / 0.5, 0.4], [v0 / 0.5, 0.4]])
         for vv in (v0, v1):
+            if any(abs((pt(0, vv, 0) - t3_[0]) @ nn_) < 0.06 and abs(nn_[1]) < 0.3 for t3_, nn_ in zip(T[pared], n[pared]) if np.hypot(*(t3_.mean(0) - pt((ua + ub) / 2, vv, 0))[[0, 2]]) < 4): continue          # ya hay muro en ese costado: no duplicar (parpadeaba)
             quad(TEX['zocalo'], [pt(ua, vv, y0 - 0.02), pt(ub, vv, y0 - 0.02), pt(ub, vv, yt), pt(ua, vv, yt)], [[ua / 0.95, 0], [ub / 0.95, 0], [ub / 0.95, (yt - y0) / 0.95], [ua / 0.95, (yt - y0) / 0.95]])
     esc += 1
 # ---------------- puertas: hoja de madera con marco en la pared más cercana a cada puerta del REmake

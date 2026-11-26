@@ -709,6 +709,14 @@ if os.environ.get('BALAUSTRES_TOTAL'):
             # suavizar el trazado (media móvil) y repartir por longitud
             Qs = Q.copy()
             for c_ in (0, 2): Qs[:, c_] = np.convolve(np.pad(Q[:, c_], 2, mode='edge'), np.ones(5) / 5, mode='valid')
+            # pegar la fila al eje del pasamanos real (handrail01): sin esto quedaban delante de él
+            if _Tp is not None:
+                for k_ in range(len(Qs)):
+                    ii_ = [j for j in _Tp.query_ball_point(Qs[k_, [0, 2]], 0.45) if Qs[k_, 1] + 0.45 < _pan[j, 1] < Qs[k_, 1] + 1.25]
+                    if len(ii_) < 4: continue
+                    ym_ = _pan[ii_, 1].max(); sel_ = [j for j in ii_ if _pan[j, 1] > ym_ - 0.05]
+                    Qs[k_, 0], Qs[k_, 2] = _pan[sel_, 0].mean(), _pan[sel_, 2].mean(); Qs[k_, 3] = ym_ - 0.06 - Qs[k_, 1]
+                for c_ in (0, 2): Qs[:, c_] = np.convolve(np.pad(Qs[:, c_], 2, mode='edge'), np.ones(5) / 5, mode='valid')
             # alargar los extremos siguiendo el pasamanos real hasta donde acaba
             if len(_top):
                 _ktop = cKDTree(_top[:, [0, 2]])
@@ -757,7 +765,10 @@ if os.environ.get('BALAUSTRES_TOTAL'):
                     if any(np.hypot(x_ - a2, z_ - c2) < 0.16 for a2, c2 in _puestos): continue
                     if _ko is not None and _ko.query_ball_point([x_, z_], 0.12) and abs(ybf(t_) - _cw16[_ko.query([x_, z_])[1], 1]) < 1.2: continue
                     _puestos.append((x_, z_)); tg_ = tang(t_)
-                    Pp = _rot(_Pt * [1, (hh_ - _zb) / _Ht, 1], tg_[0], tg_[1]) + [x_, ybf(t_) + _zb, z_]
+                    _hs = _heights(_TF, x_, z_); _yl = ybf(t_)
+                    if len(_hs) and np.abs(_hs - _yl).min() < 0.6: _yl = float(_hs[np.argmin(np.abs(_hs - _yl))])     # pie en el suelo real (tramos con escalón)
+                    _hl = ybf(t_) + hh_ - _yl
+                    Pp = _rot(_Pt * [1, (_hl - _zb) / _Ht, 1], tg_[0], tg_[1]) + [x_, _yl + _zb, z_]
                     _anade(Pp, _Ut, np.arange(len(Pp)).reshape(-1, 3), _mmt); ncop += 1
         print(f'  esquineros: {nesq}')
         print(f'  balaustres de UC copiados: {ncop}')

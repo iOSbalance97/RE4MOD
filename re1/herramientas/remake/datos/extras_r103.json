@@ -32,6 +32,12 @@
      11.25,
      -2.9,
      -1.1
+    ],
+    [
+     -2.25,
+     -1.2,
+     0.95,
+     1.45
     ]
    ]
   },
@@ -66,6 +72,12 @@
      11.25,
      -2.9,
      -1.1
+    ],
+    [
+     -2.25,
+     -1.2,
+     0.95,
+     1.45
     ]
    ]
   },
@@ -100,6 +112,12 @@
      11.25,
      -2.9,
      -1.1
+    ],
+    [
+     -2.25,
+     -1.2,
+     0.95,
+     1.45
     ]
    ]
   }
@@ -130,7 +148,21 @@
    "texturas": {
     "r100_kabe_a": "r100_kabe_a.png",
     "st_103wood_a": "st_103wood_a.png",
-    "st_103tenjou_a": "st_103tenjou_a.png"
+    "st_103tenjou_a": "st_103tenjou_a.png",
+    "r100_door_a": "r100_door_a.png"
+   }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/ventana_r103/ventana.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "cas_cristal_noche": "cas_cristal_noche.png",
+    "cas_terciopelo": "cas_terciopelo.png",
+    "st_103wood_b": "st_103wood_b.png"
    }
   }
  ],
@@ -151,7 +183,7 @@
    "origen": [
     6.97,
     4.0,
-    1.2
+    1.15
    ],
    "frente": [
     0,
@@ -161,7 +193,7 @@
     {
      "punto": [
       -2.37,
-      4.0,
+      4.006,
       -11.3
      ],
      "frente": [
@@ -172,7 +204,7 @@
     {
      "punto": [
       11.09,
-      4.0,
+      4.006,
       -8.23
      ],
      "frente": [
@@ -183,7 +215,7 @@
     {
      "punto": [
       1.24,
-      4.0,
+      4.006,
       -5.85
      ],
      "frente": [
@@ -194,7 +226,7 @@
     {
      "punto": [
       2.28,
-      0.006,
+      0.012,
       -2.04
      ],
      "frente": [
@@ -205,7 +237,7 @@
     {
      "punto": [
       -2.37,
-      4.0,
+      4.006,
       -3.6
      ],
      "frente": [
@@ -216,12 +248,45 @@
     {
      "punto": [
       6.97,
-      4.0,
+      4.006,
       1.2
      ],
      "frente": [
       0,
       1
+     ]
+    },
+    {
+     "punto": [
+      -1.72,
+      4.006,
+      1.31
+     ],
+     "frente": [
+      0,
+      1
+     ]
+    },
+    {
+     "punto": [
+      -13.01,
+      4.006,
+      -0.72
+     ],
+     "frente": [
+      1,
+      0
+     ]
+    },
+    {
+     "punto": [
+      -4.02,
+      4.006,
+      3.0
+     ],
+     "frente": [
+      0,
+      -1
      ]
     }
    ]
@@ -447,13 +512,13 @@
    "destinos": [
     {
      "punto": [
-      -11.3,
+      -10.6,
       4.0,
-      1.2
+      2.3
      ],
      "frente": [
-      1,
-      0
+      0,
+      -1
      ]
     }
    ]
@@ -483,9 +548,9 @@
    "destinos": [
     {
      "punto": [
-      -9.6,
+      -9.65,
       4.0,
-      0.6
+      0.55
      ],
      "frente": [
       -1,
@@ -519,9 +584,9 @@
    "destinos": [
     {
      "punto": [
-      -10.45,
+      -10.5,
       4.006,
-      1.4
+      1.2
      ],
      "frente": [
       0,
@@ -555,19 +620,19 @@
    "destinos": [
     {
      "punto": [
-      -11.42,
+      -11.5,
       4.0,
-      2.45
+      1.45
      ],
      "frente": [
-      0,
-      1
+      1,
+      0
      ]
     }
    ]
   },
   {
-   "que": "cuadro del sal\u00f3n en la sala oeste",
+   "que": "cuadro del sal\u00f3n, en su sitio original (la reconstrucci\u00f3n del extremo oeste lo cortaba)",
    "min": [
     -10.4,
     5.0,
@@ -591,49 +656,13 @@
    "destinos": [
     {
      "punto": [
-      -10.45,
+      -9.35,
       4.0,
-      2.77
+      -1.32
      ],
      "frente": [
       0,
-      -1
-     ]
-    }
-   ]
-  },
-  {
-   "que": "puerta blanca de UC en la puerta r112",
-   "min": [
-    -11.5,
-    3.9,
-    0.7
-   ],
-   "max": [
-    -10.9,
-    6.5,
-    2.1
-   ],
-   "mat": "wood_b|yuka_a",
-   "origen": [
-    -11.2,
-    4.0,
-    1.44
-   ],
-   "frente": [
-    1,
-    0
-   ],
-   "destinos": [
-    {
-     "punto": [
-      -12.98,
-      4.0,
-      -0.72
-     ],
-     "frente": [
-      1,
-      0
+      1
      ]
     }
    ]
@@ -708,6 +737,34 @@
     1.5
    ],
    "mat": "door_a|wood_a|tesu|yuka"
+  },
+  {
+   "que": "cuadro original (va su copia entera en el mismo sitio)",
+   "min": [
+    -10.4,
+    5.0,
+    -1.4
+   ],
+   "max": [
+    -8.3,
+    6.5,
+    -1.05
+   ],
+   "mat": "picture"
+  },
+  {
+   "que": "puerta de UC a r105 (medio abierta, se ve\u00eda el vac\u00edo): va la copia entera",
+   "min": [
+    -4.65,
+    3.9,
+    2.8
+   ],
+   "max": [
+    -3.4,
+    6.3,
+    3.15
+   ],
+   "mat": "door|tesu"
   }
  ]
 }

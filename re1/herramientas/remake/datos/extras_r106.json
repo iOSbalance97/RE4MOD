@@ -209,9 +209,7 @@
    "y0": 5.9,
    "y1": 7.3,
    "ancho": 0.4,
-   "alto_min": 0.8,
-   "rodapie": "wood14",
-   "alto_rodapie": 0.35
+   "alto_min": 0.8
   }
  ],
  "suelo_bajo": [
@@ -239,6 +237,38 @@
      2.9,
      -3.8,
      -1.1
+    ]
+   ]
+  },
+  {
+   "que": "alfombra",
+   "y": 6.5,
+   "tol": 0.12,
+   "dilatar": 0.0,
+   "bajo": -0.012,
+   "mat": "ceilling01",
+   "cajas": [
+    [
+     -7.2,
+     7.2,
+     -7.2,
+     7.2
+    ]
+   ]
+  },
+  {
+   "que": "alfombra",
+   "y": 7.0,
+   "tol": 0.06,
+   "dilatar": 0.0,
+   "bajo": -0.012,
+   "mat": "ceilling01",
+   "cajas": [
+    [
+     -7.2,
+     7.2,
+     -7.2,
+     7.2
     ]
    ]
   }
