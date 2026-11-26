@@ -67,6 +67,15 @@ _EP = np.array(_EP); _EN = np.array(_EN); _EK = _KD(_EP[:, [0, 2]])
 def _es_esquina(p_):
     ii = [j for j in _EK.query_ball_point([p_[0], p_[2]], 0.12) if -0.5 < _EP[j, 1] - p_[1] < 3.5]
     return any(abs(_EN[a_] @ _EN[b_]) < 0.94 for a_ in ii for b_ in ii)
+PAREDES_PLANAS = [[float(v) for v in c_.split(',')] for c_ in os.environ.get('PAREDES_PLANAS', '').split(';') if c_]
+CELDAS = []
+if CUEVA and os.environ.get('CELDAS'):
+    for c_ in os.environ['CELDAS'].split(';'):
+        x0_, lado_ = [float(v) for v in c_.split(',')]
+        zz_ = [z for z in np.arange(0.3, 4.7, 0.03) if len(heights(TF, x0_, z))]
+        cz_, hw_ = (min(zz_) + max(zz_)) / 2, (max(zz_) - min(zz_)) / 2
+        y0_ = float(heights(TF, x0_, cz_).min()); CELDAS.append((x0_ - 0.66, x0_ + 0.66, cz_ + lado_ * (hw_ + 0.02), lado_, y0_))
+ESQ = []
 # paredes (de doble cara)
 for t3, nn in zip(T[pared], n[pared]):
     h_ = np.array([-nn[2], 0, nn[0]]); h_ /= np.linalg.norm(h_) + 1e-12
@@ -83,11 +92,22 @@ for t3, nn in zip(T[pared], n[pared]):
         yt_ = t3[:, 1].max(); p = [np.array([A_[0], ya, A_[2]]), np.array([B_[0], ya, B_[2]]), np.array([B_[0], yt_, B_[2]]), np.array([A_[0], yt_, A_[2]])]
         quad(TEX['tabica'], p, [[pr.min() / E, ya / E], [pr.max() / E, ya / E], [pr.max() / E, yt_ / E], [pr.min() / E, yt_ / E]]); continue
     nh = np.array([nn[0], 0, nn[2]]); nh /= np.linalg.norm(nh) + 1e-12
-    cen_c = t3.mean(0) + nh * 0.3; hs_ = heights(TF, cen_c[0], cen_c[2])
-    if not (len(hs_) and np.abs(hs_ - t3[:, 1].min()).min() < 0.6): nh = -nh          # la normal apunta al paso
+    _lad = []
+    for _sg in (1, -1):
+        cen_c = t3.mean(0) * [1, 0, 1] + [0, ya, 0] + _sg * nh * 0.3; hs_ = heights(TF, cen_c[0], cen_c[2])
+        _lad.append(bool(len(hs_) and np.abs(hs_ - ya).min() < 0.6))
+    _plano = None; _hplano = 99
+    for _pp in PAREDES_PLANAS:
+        c_ = t3.mean(0)
+        if _pp[0] <= c_[0] <= _pp[1] and _pp[2] <= c_[1] <= _pp[3] and _pp[4] <= c_[2] <= _pp[5]: _plano = _pp[6]; _hplano = _pp[7] if len(_pp) > 7 else 99
+    if _lad[1] and not _lad[0]: nh = -nh          # nh apunta al paso
+    elif _lad[0] == _lad[1]: _plano = 0.0 if _plano is None else _plano          # dudoso: sin relieve (nunca hacia dentro)
     nu_ = max(1, int(np.ceil((pr.max() - pr.min()) / 0.35))); nv_ = max(2, int(np.ceil((yb - ya) / 0.35)))
     G = np.zeros((nv_ + 1, nu_ + 1, 3)); UV = np.zeros((nv_ + 1, nu_ + 1, 2))
     LL = pr.max() - pr.min(); eA = _es_esquina(A_); eB = _es_esquina(B_)
+    if _plano is None:
+        if eA: ESQ.append((A_.copy(), -nh.copy(), ya))
+        if eB: ESQ.append((B_.copy(), -nh.copy(), ya))
     for j in range(nv_ + 1):
         for i in range(nu_ + 1):
             u = i / nu_; v = j / nv_; q = A_ + (B_ - A_) * u
@@ -102,16 +122,51 @@ for t3, nn in zip(T[pared], n[pared]):
             d *= min(1.0, 0.35 + v * 1.6) * min(1.0, (1 - v) * 4.0)          # pegado al suelo abajo y al borde de la bóveda arriba
             if eA: d *= min(1.0, u * LL / 0.45)
             if eB: d *= min(1.0, (1 - u) * LL / 0.45)
-            G[j, i] = q - nh * max(d, 0.0) + np.array([0, 0.05 * _ruido(q, 3.0, 2.0) * (0 < j < nv_), 0])
+            if _plano is not None: d = _plano if (q[1] - yf) < (_hplano if _plano else 99) else 0.0
+            G[j, i] = q - nh * max(d, 0.0) + np.array([0, 0.05 * _ruido(q, 3.0, 2.0) * (0 < j < nv_) * (_plano is None), 0])
             UV[j, i] = [(pr.min() + (pr.max() - pr.min()) * u) / E, q[1] / E]
     for j in range(nv_):
         for i in range(nu_):
+            cq = (G[j, i] + G[j + 1, i + 1]) / 2
+            if any(cl[0] <= cq[0] <= cl[1] and abs(cq[2] - cl[2]) < 0.6 and cq[1] < cl[4] + 2.15 for cl in CELDAS): continue     # hueco de la celda
             quad(TEX['pared'], [G[j, i], G[j, i + 1], G[j + 1, i + 1], G[j + 1, i]], [UV[j, i], UV[j, i + 1], UV[j + 1, i + 1], UV[j + 1, i]])
-    # respaldo liso por detrás del relieve (alargado por los lados): tapa las rendijas entre paredes
+    if _plano:          # jambas del rebaje (detrás de una puerta): cierran los lados entre la pared y el fondo
+        for P0 in (A_, B_):
+            ytj = ya + _hplano + 0.02
+            quad(TEX['pared'], [np.array([P0[0], ya - 0.05, P0[2]]), np.array([P0[0] - nh[0] * _plano, ya - 0.05, P0[2] - nh[2] * _plano]),
+                                np.array([P0[0] - nh[0] * _plano, ytj, P0[2] - nh[2] * _plano]), np.array([P0[0], ytj, P0[2]])],
+                 [[0, ya / E], [_plano / E, ya / E], [_plano / E, ytj / E], [0, ytj / E]])
+        q0, q1 = A_ * [1, 0, 1] + [0, ya + _hplano + 0.02, 0], B_ * [1, 0, 1] + [0, ya + _hplano + 0.02, 0]
+        quad(TEX['pared'], [q0, q1, q1 - nh * _plano, q0 - nh * _plano], [[0, 0], [LL / E, 0], [LL / E, _plano / E], [0, _plano / E]])     # dintel
+    if _plano is not None and not (_lad[0] ^ _lad[1]): continue
+    # respaldo liso por detrás del relieve: tapa las rendijas entre paredes (sin invadir nunca el paso)
     dh_ = (B_ - A_) * np.array([1, 0, 1]); dh_ /= np.linalg.norm(dh_) + 1e-12; ytb = G[:, :, 1].max() + 0.2
-    Ab = A_ - dh_ * 0.5 - nh * 0.42; Bb = B_ + dh_ * 0.5 - nh * 0.42
+    def _libre(p_):
+        h_ = heights(TF, p_[0], p_[2]); return not (len(h_) and np.any(np.abs(h_ - ya) < 1.0))
+    ext_a = max([e for e in (0.0, 0.1, 0.2, 0.3) if _libre(A_ - dh_ * e - nh * 0.42)] or [0.0]); ext_b = max([e for e in (0.0, 0.1, 0.2, 0.3) if _libre(B_ + dh_ * e - nh * 0.42)] or [0.0])
+    if any(not _libre(A_ + (B_ - A_) * f_ - nh * 0.42) for f_ in (0.25, 0.5, 0.75)): continue
+    Ab = A_ - dh_ * ext_a - nh * 0.42; Bb = B_ + dh_ * ext_b - nh * 0.42
     quad(TEX['pared'], [np.array([Ab[0], ya - 0.1, Ab[2]]), np.array([Bb[0], ya - 0.1, Bb[2]]), np.array([Bb[0], ytb, Bb[2]]), np.array([Ab[0], ytb, Ab[2]])],
          [[(pr.min() - 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, ytb / E], [(pr.min() - 0.5) / E, ytb / E]])
+# columnas de roca en las esquinas: tapan la rendija que deja el relieve de dos paredes que se juntan
+if CUEVA and ESQ:
+    usados = np.zeros(len(ESQ), bool); nesq = 0
+    for i_, (p_, o_, y_) in enumerate(ESQ):
+        if usados[i_]: continue
+        grp = [j for j, (q_, _, yq) in enumerate(ESQ) if np.hypot(*(q_ - p_)[[0, 2]]) < 0.15 and abs(yq - y_) < 0.6]
+        for j in grp: usados[j] = True
+        oo = np.mean([ESQ[j][1] for j in grp], 0)
+        if len(grp) < 2 or np.linalg.norm(oo) < 0.2: continue
+        oo /= np.linalg.norm(oo); c_ = p_ + oo * 0.2; yb_ = min(ESQ[j][2] for j in grp) - 0.1
+        yt_ = _y_techo(p_[0] - oo[0] * 0.1, p_[2] - oo[2] * 0.1, yb_ + 0.1) + 0.15
+        L8 = 8; R_ = 0.26
+        for k in range(L8):
+            a0, a1 = 2 * np.pi * k / L8, 2 * np.pi * (k + 1) / L8
+            q = [np.array([c_[0] + R_ * np.cos(a0), yb_, c_[2] + R_ * np.sin(a0)]), np.array([c_[0] + R_ * np.cos(a1), yb_, c_[2] + R_ * np.sin(a1)])]
+            q += [q[1] + [0, yt_ - yb_, 0], q[0] + [0, yt_ - yb_, 0]]
+            quad(TEX['pared'], q, [[k * 0.2, yb_ / E], [(k + 1) * 0.2, yb_ / E], [(k + 1) * 0.2, yt_ / E], [k * 0.2, yt_ / E]])
+        nesq += 1
+    print('columnas de esquina:', nesq)
 # rampas -> escaleras: agrupar por normal parecida y contigüidad
 idx = np.nonzero(rampa)[0]; grupo = {}
 for i in idx:
@@ -173,10 +228,16 @@ if CUEVA:
         h = heights(TF, x, z); return float(h.min()) if len(h) else None
     nobj = 0
     # rejas (celdas excavadas en la roca) a un lado y otro del túnel
-    for x0, lado in ((-6.6, 1), (-11.2, -1), (-13.3, 1)):
-        c, hw = _centro(x0)
-        if c is None: continue
-        zw = c + lado * (hw + 0.02); y0 = _suelo(x0, c)
+    _Im.fromarray(np.full((8, 8, 3), 6, np.uint8)).save(f'{out}/cas_negro.png')
+    for (xa_, xb_, zw, lado, y0) in CELDAS:
+        x0 = (xa_ + xb_) / 2; zf = zw + lado * 1.3; yt_ = y0 + 2.15
+        for q_ in ([[xa_, y0, zf], [xb_, y0, zf], [xb_, yt_, zf], [xa_, yt_, zf]], [[xa_, y0, zw], [xa_, y0, zf], [xa_, yt_, zf], [xa_, yt_, zw]],
+                   [[xb_, y0, zw], [xb_, y0, zf], [xb_, yt_, zf], [xb_, yt_, zw]], [[xa_, yt_, zw], [xb_, yt_, zw], [xb_, yt_, zf], [xa_, yt_, zf]],
+                   [[xa_, y0 - 0.02, zw], [xb_, y0 - 0.02, zw], [xb_, y0 - 0.02, zf], [xa_, y0 - 0.02, zf]]):
+            quad('cas_negro', [np.array(p_, float) for p_ in q_], [[0, 0], [1, 0], [1, 1], [0, 1]])
+        # marco de roca sobre la celda (tapa el canto superior)
+        quad(TEX['pared'], [np.array([xa_ - 0.2, yt_, zw]), np.array([xb_ + 0.2, yt_, zw]), np.array([xb_ + 0.2, yt_ + 0.6, zw + lado * 0.15]), np.array([xa_ - 0.2, yt_ + 0.6, zw + lado * 0.15])],
+             [[(xa_ - 0.2) / E, yt_ / E], [(xb_ + 0.2) / E, yt_ / E], [(xb_ + 0.2) / E, (yt_ + 0.6) / E], [(xa_ - 0.2) / E, (yt_ + 0.6) / E]])
         for xb in np.arange(x0 - 0.6, x0 + 0.61, 0.13): _cil([xb, y0 - 0.02, zw], [xb, y0 + 2.05, zw], 0.014, 'cas_hierro')
         for yy in (y0 + 0.12, y0 + 1.0, y0 + 1.95): _cil([x0 - 0.66, yy, zw], [x0 + 0.66, yy, zw], 0.022, 'cas_hierro', lados=4)
         for xb in (x0 - 0.66, x0 + 0.66): _cil([xb, y0 - 0.02, zw], [xb, y0 + 2.1, zw], 0.035, 'cas_hierro', lados=6)

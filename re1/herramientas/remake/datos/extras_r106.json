@@ -121,6 +121,34 @@
     -6.48
    ],
    "mat": "stone06|pag_"
+  },
+  {
+   "que": "techo de abajo que asomaba como franjas en la escalerilla de arriba",
+   "min": [
+    2.92,
+    5.45,
+    -5.2
+   ],
+   "max": [
+    4.699999999999999,
+    6.6,
+    -3.35
+   ],
+   "mat": "ceilling01"
+  },
+  {
+   "que": "techo de abajo que asomaba como franjas en la escalerilla de arriba",
+   "min": [
+    -4.699999999999999,
+    5.45,
+    -5.2
+   ],
+   "max": [
+    -2.92,
+    6.6,
+    -3.35
+   ],
+   "mat": "ceilling01"
   }
  ],
  "sin_balaustres": [
@@ -153,5 +181,27 @@
    0.5,
    5.9
   ]
+ ],
+ "escaleras": [
+  {
+   "x0": 3.02,
+   "x1": 4.6,
+   "z0": -5.15,
+   "z1": -3.75,
+   "y0": 5.45,
+   "y1": 6.45,
+   "huella": "lug15",
+   "tabica": "wood15"
+  },
+  {
+   "x0": -4.6,
+   "x1": -3.02,
+   "z0": -5.15,
+   "z1": -3.75,
+   "y0": 5.45,
+   "y1": 6.45,
+   "huella": "lug15",
+   "tabica": "wood15"
+  }
  ]
 }

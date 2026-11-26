@@ -148,6 +148,21 @@ if os.path.exists(_cfg):
         Vp, Tp, Fp = _ex.torneado((col['x'], y0, col['z']), col['y1'] - y0, _ex.PERFIL_COLUMNA, escala_r=col['r'], lados=14, uv_vueltas=1, uv_alto=1.5)
         _anade(Vp, Tp, Fp, mm)
     print(f"columnas añadidas: {len(cfg.get('columnas', []))}")
+    for es_ in cfg.get('escaleras', []):          # tramo de escalera que UC no tiene (solo dejaba ver el techo de abajo como franjas)
+        mh_ = next((m_ for m_ in set(FM) if _re2.search(es_['huella'], str(mats.get(m_) or m_))), None)
+        mt_ = next((m_ for m_ in set(FM) if _re2.search(es_['tabica'], str(mats.get(m_) or m_))), None) or mh_
+        x0, x1, z0, z1, y0, y1 = es_['x0'], es_['x1'], es_['z0'], es_['z1'], es_['y0'], es_['y1']
+        N = max(2, int(round((y1 - y0) / 0.17))); ru = (z1 - z0) / N; ri = (y1 - y0) / N; E_ = 0.6
+        for k in range(N):
+            za, zb = z0 + k * ru, z0 + (k + 1) * ru; yt = y0 + (k + 1) * ri; yb_ = y0 + k * ri
+            q = np.array([[x0, yt, za], [x1, yt, za], [x1, yt, zb], [x0, yt, zb]])
+            _anade(q, q[:, [0, 2]] / E_, np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]), mh_)
+            q = np.array([[x0, yb_ - 0.02, za], [x1, yb_ - 0.02, za], [x1, yt, za], [x0, yt, za]])
+            _anade(q, q[:, [0, 1]] / E_, np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]), mt_)
+            for xx in (x0, x1):
+                q = np.array([[xx, y0 - 0.3, za], [xx, y0 - 0.3, zb], [xx, yt, zb], [xx, yt, za]])
+                _anade(q, q[:, [2, 1]] / E_, np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]), mt_)
+        print(f"  escalera añadida: {N} peldaños en x {x0}..{x1}")
     for br_ in cfg.get('brazos', []):           # lámparas de pared que UC dejó flotando: brazo de metal hasta la pared
         import scipy.sparse as _sp
         from scipy.sparse.csgraph import connected_components as _cc
@@ -561,6 +576,45 @@ if os.environ.get('BALAUSTRES_TOTAL'):
             _ext_n += 1
             print(f'  pasamanos alargado hasta la pared en {np.round(p, 2)} hacia {dv}: {hit:.2f} m')
         print(f'  pasamanos alargados: {_ext_n}')
+    _ycopia = float(os.environ.get('BALAUSTRE_UC_Y', 99))
+    if os.environ.get('BALAUSTRE_UC'):
+        # plantilla: un balaustre torneado de la escalera central de UC (madera 16), enderezado (la escalera tiene pendiente)
+        bx0, bx1, bz0, bz1, pend = [float(v) for v in os.environ['BALAUSTRE_UC'].split(',')]
+        _mw = np.array([bool(_re2.search('wood16', str(mats.get(m_) or m_))) for m_ in FM])
+        _cw = V[F[:, :3]].mean(1); _sw = _mw & (_cw[:, 0] > bx0) & (_cw[:, 0] < bx1) & (_cw[:, 2] > bz0) & (_cw[:, 2] < bz1)
+        _Ft = F[_sw]; _mmt = FM[_sw][0]
+        _Pt = V[_Ft[:, :3]].reshape(-1, 3).copy(); _Ut = VT[_Ft[:, 3:]].reshape(-1, 2)
+        _ax = np.array([(_Pt[:, 0].min() + _Pt[:, 0].max()) / 2, 0, (_Pt[:, 2].min() + _Pt[:, 2].max()) / 2])
+        _Pt[:, 1] -= pend * (_Pt[:, 2] - _ax[2])
+        _Pt -= [_ax[0], _Pt[:, 1].min(), _ax[2]]; _Ht = _Pt[:, 1].max()
+        print(f'  plantilla de balaustre de UC: {len(_Ft)} triángulos, alto {_Ht:.2f} m')
+        # balaustres de la planta alta: cadenas ordenadas y paso regular igual que abajo
+        _arr = [(b_, h_) for b_, h_ in _bal if b_[1] >= _ycopia]; _bal = [(b_, h_) for b_, h_ in _bal if b_[1] < _ycopia]
+        P_ = np.array([[b_[0], b_[1], b_[2], h_] for b_, h_ in _arr]) if _arr else np.zeros((0, 4))
+        usado = np.zeros(len(P_), bool); ncop = 0; PASO = float(os.environ.get('PASO_BALAUSTRE', 0.188))
+        _tb = cKDTree(P_[:, [0, 2]]) if len(P_) else None
+        _puestos = []
+        while len(P_) and not usado.all():
+            i0 = int(np.nonzero(~usado)[0][0]); cad = [i0]; usado[i0] = True
+            for _dir in (0, 1):          # crecer la cadena por los dos extremos
+                while True:
+                    j = cad[-1] if _dir == 0 else cad[0]
+                    cand = [k for k in _tb.query_ball_point(P_[j, [0, 2]], 0.32) if not usado[k] and abs(P_[k, 1] - P_[j, 1]) < 0.3]
+                    if not cand: break
+                    k = min(cand, key=lambda k: np.hypot(*(P_[k, [0, 2]] - P_[j, [0, 2]]))); usado[k] = True
+                    if _dir == 0: cad.append(k)
+                    else: cad.insert(0, k)
+            Q = P_[cad]
+            if len(Q) < 2: continue
+            L_ = np.r_[0, np.cumsum(np.hypot(*(np.diff(Q[:, [0, 2]], axis=0)).T))]
+            n_ = max(1, int(round(L_[-1] / PASO)))
+            for t_ in np.linspace(0, L_[-1], n_ + 1):
+                x_ = np.interp(t_, L_, Q[:, 0]); z_ = np.interp(t_, L_, Q[:, 2]); yb_ = np.interp(t_, L_, Q[:, 1]); hh_ = np.interp(t_, L_, Q[:, 3])
+                if any(np.hypot(x_ - a_, z_ - c_) < 0.12 for a_, c_ in _puestos): continue
+                _puestos.append((x_, z_))
+                Pp = _Pt * [1, hh_ / _Ht, 1] + [x_, yb_, z_]
+                _anade(Pp, _Ut, np.arange(len(Pp)).reshape(-1, 3), _mmt); ncop += 1
+        print(f'  balaustres de UC copiados en la planta alta: {ncop}')
     for base_, h in _bal:
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.65, lados=6)
         _anade(Vp, Tp, Fp, _mm_b)
