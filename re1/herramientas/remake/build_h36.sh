@@ -12,6 +12,6 @@ sala() {  # u r st extra_env...
 }
 case $1 in
   r106) sala r102 r106 1 ../uc_alin/r106.json DECIMAR=0.45 LMAX=1.5 BALAUSTRES_TOTAL=1 PASAMANOS_A_PARED=1 NO_MACIZO="stairs|lug15|wood13|wood15" HUECO_CAJAS="3.1,4.6,-5.1,-3.5,5.5,6.6;-4.6,-3.1,-5.1,-3.5,5.5,6.6" ;;
-  r105) sala r101 r105 1 ../uc_alin/al_r101_r105.json DECIMAR=0 LMAX=1.1 MEJORAR="gaku|kaiga" ;;
-  r107) sala r103 r107 1 ../uc_alin/al_r103_r107.json DECIMAR=0.6 LMAX=1.1 QUITAR_PAREDES_PASO=1 MEJORAR="gaku|kaiga" ;;
+  r105) sala r101 r105 1 ../uc_alin/al_r101_r105.json DECIMAR=0 LMAX=1.1 MEJORAR="gaku|kaiga|emily" NIVEL_MIN_MEJ=0.5 ;;
+  r107) sala r103 r107 1 ../uc_alin/al_r103_r107.json DECIMAR=0.6 LMAX=1.1 QUITAR_PAREDES_PASO=1 MEJORAR="gaku|kaiga|emily" NIVEL_MIN_MEJ=0.5 ;;
 esac

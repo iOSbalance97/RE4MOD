@@ -77,10 +77,11 @@ def txz(sala, x, z):
 def ty(sala, y): return float(y + (J[1] - ENT_H[1])) if sala == INICIO else float(y)
 def preparar_inicio():
     base = f'{R1}/re4/re_{INICIO}'; dst = f'{R1}/re4/re_{INICIO}_ini'
-    if os.path.exists(f'{dst}/hecho'): return dst
-    os.makedirs(f'{dst}/col', exist_ok=True)
     col = f'{R1}/salas/{INICIO}/colision.obj'
     obj_ = f'{R1}/salas_uc5/{INICIO}/sala.obj' if os.path.exists(f'{R1}/salas_uc5/{INICIO}/sala.obj') else f'{R1}/salas/{INICIO}/sala.obj'
+    # caché: solo vale si es más nueva que el modelo y la colisión (si no, la sala inicial se quedaba con la versión vieja)
+    if os.path.exists(f'{dst}/hecho') and os.path.getmtime(f'{dst}/hecho') > max(os.path.getmtime(obj_), os.path.getmtime(col)): return dst
+    shutil.rmtree(f'{dst}/mod', ignore_errors=True); os.makedirs(f'{dst}/col', exist_ok=True)
     esp = ','.join(str(x) for x in list(ENT_H / 1000) + list(J) + [GIRO])
     subprocess.run(['python3', '/home/claude/tools/re4room.py', obj_, f'{dst}/mod', '--tex-max', '1024', f'--colocar={esp}'], check=True, capture_output=True)
     L = []

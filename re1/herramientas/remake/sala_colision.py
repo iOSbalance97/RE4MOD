@@ -76,6 +76,12 @@ for t3, nn in zip(T[pared], n[pared]):
     p = [np.array([A_[0], ya, A_[2]]), np.array([B_[0], ya, B_[2]]), np.array([B_[0], yb, B_[2]]), np.array([A_[0], yb, A_[2]])]
     if not CUEVA:
         quad(TEX['pared'], p, [[pr.min() / E, ya / E], [pr.max() / E, ya / E], [pr.max() / E, yb / E], [pr.min() / E, yb / E]]); continue
+    _nh0 = np.array([nn[0], 0, nn[2]]) / (np.hypot(nn[0], nn[2]) + 1e-12); _c0 = t3.mean(0); _amb = 0
+    for _sg in (1, -1):
+        _q = _c0 + _sg * 0.35 * _nh0; _h = heights(TF, _q[0], _q[2]); _amb += int(np.any((_h > ya - 0.6) & (_h < ya + 0.6)))
+    if _amb == 2 and t3[:, 1].max() - ya < 1.3:          # escalón o murete en mitad del paso: solo su altura real
+        yt_ = t3[:, 1].max(); p = [np.array([A_[0], ya, A_[2]]), np.array([B_[0], ya, B_[2]]), np.array([B_[0], yt_, B_[2]]), np.array([A_[0], yt_, A_[2]])]
+        quad(TEX['tabica'], p, [[pr.min() / E, ya / E], [pr.max() / E, ya / E], [pr.max() / E, yt_ / E], [pr.min() / E, yt_ / E]]); continue
     nh = np.array([nn[0], 0, nn[2]]); nh /= np.linalg.norm(nh) + 1e-12
     cen_c = t3.mean(0) + nh * 0.3; hs_ = heights(TF, cen_c[0], cen_c[2])
     if not (len(hs_) and np.abs(hs_ - t3[:, 1].min()).min() < 0.6): nh = -nh          # la normal apunta al paso
@@ -101,6 +107,11 @@ for t3, nn in zip(T[pared], n[pared]):
     for j in range(nv_):
         for i in range(nu_):
             quad(TEX['pared'], [G[j, i], G[j, i + 1], G[j + 1, i + 1], G[j + 1, i]], [UV[j, i], UV[j, i + 1], UV[j + 1, i + 1], UV[j + 1, i]])
+    # respaldo liso por detrás del relieve (alargado por los lados): tapa las rendijas entre paredes
+    dh_ = (B_ - A_) * np.array([1, 0, 1]); dh_ /= np.linalg.norm(dh_) + 1e-12; ytb = G[:, :, 1].max() + 0.2
+    Ab = A_ - dh_ * 0.5 - nh * 0.42; Bb = B_ + dh_ * 0.5 - nh * 0.42
+    quad(TEX['pared'], [np.array([Ab[0], ya - 0.1, Ab[2]]), np.array([Bb[0], ya - 0.1, Bb[2]]), np.array([Bb[0], ytb, Bb[2]]), np.array([Ab[0], ytb, Ab[2]])],
+         [[(pr.min() - 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, ytb / E], [(pr.min() - 0.5) / E, ytb / E]])
 # rampas -> escaleras: agrupar por normal parecida y contigüidad
 idx = np.nonzero(rampa)[0]; grupo = {}
 for i in idx:
@@ -143,6 +154,66 @@ for g, lst in grupo.items():
             if CUEVA: _techo_cueva(T[k])
             else: q = T[k].copy(); q[:, 1] += ALTO; tri(TEX['techo'], q, q[:, [0, 2]] / E)
     esc += 1
+EXT_MTL = {}
+if CUEVA:
+    from PIL import Image as _Im
+    _im = np.asarray(_Im.open(f'{CAS}/cas_hierro.png').convert('RGB'), np.float32); _im = (_im * 0.35 + _im.mean(2, keepdims=True) * 0.65) * 0.5
+    _Im.fromarray(np.clip(_im, 0, 255).astype(np.uint8)).save(f'{out}/cas_hierro.png')
+    def _cil(a, b, r, m, lados=6):
+        a = np.asarray(a, float); b = np.asarray(b, float); d = b - a; L = np.linalg.norm(d); d /= L
+        u = np.cross(d, [0, 1, 0] if abs(d[1]) < 0.9 else [1, 0, 0]); u /= np.linalg.norm(u); w = np.cross(d, u)
+        for k in range(lados):
+            t0, t1 = 2 * np.pi * k / lados, 2 * np.pi * (k + 1) / lados
+            o0 = (u * np.cos(t0) + w * np.sin(t0)) * r; o1 = (u * np.cos(t1) + w * np.sin(t1)) * r
+            quad(m, [a + o0, a + o1, b + o1, b + o0], [[k / lados, 0], [(k + 1) / lados, 0], [(k + 1) / lados, L], [k / lados, L]])
+    def _centro(x):
+        zz = [z for z in np.arange(0.3, 4.7, 0.03) if len(heights(TF, x, z))]
+        return ((min(zz) + max(zz)) / 2, (max(zz) - min(zz)) / 2) if zz else (None, None)
+    def _suelo(x, z):
+        h = heights(TF, x, z); return float(h.min()) if len(h) else None
+    nobj = 0
+    # rejas (celdas excavadas en la roca) a un lado y otro del túnel
+    for x0, lado in ((-6.6, 1), (-11.2, -1), (-13.3, 1)):
+        c, hw = _centro(x0)
+        if c is None: continue
+        zw = c + lado * (hw + 0.02); y0 = _suelo(x0, c)
+        for xb in np.arange(x0 - 0.6, x0 + 0.61, 0.13): _cil([xb, y0 - 0.02, zw], [xb, y0 + 2.05, zw], 0.014, 'cas_hierro')
+        for yy in (y0 + 0.12, y0 + 1.0, y0 + 1.95): _cil([x0 - 0.66, yy, zw], [x0 + 0.66, yy, zw], 0.022, 'cas_hierro', lados=4)
+        for xb in (x0 - 0.66, x0 + 0.66): _cil([xb, y0 - 0.02, zw], [xb, y0 + 2.1, zw], 0.035, 'cas_hierro', lados=6)
+        nobj += 1
+    # cadenas colgando del techo
+    for x0, dz, L in ((-5.4, 0.35, 1.1), (-8.6, -0.4, 0.8), (-9.9, 0.3, 1.3), (-12.4, -0.25, 0.9)):
+        c, hw = _centro(x0)
+        if c is None: continue
+        z0 = c + dz; yf = _suelo(x0, z0) or 0.0; yt = _y_techo(x0, z0, yf) + 0.05
+        y = yt; k = 0
+        while y > yt - L:
+            ang = (k % 2) * np.pi / 2; e = 0.03 * np.array([np.cos(ang), 0, np.sin(ang)])
+            pa = np.array([x0, y, z0]); pb = np.array([x0, y - 0.075, z0])
+            _cil(pa + e, pb + e, 0.008, 'cas_hierro', lados=4); _cil(pa - e, pb - e, 0.008, 'cas_hierro', lados=4)
+            _cil(pa + e, pa - e, 0.008, 'cas_hierro', lados=4); _cil(pb + e, pb - e, 0.008, 'cas_hierro', lados=4)
+            y -= 0.06; k += 1
+        nobj += 1
+    # grilletes en la pared: argolla y cadena corta
+    print(f'objetos de la cueva: {nobj}')
+for _ex in [e for e in os.environ.get('MODELOS_EXTRA', '').split(';') if e]:
+    _d = os.path.dirname(_ex); _mt = {}; _m = None
+    for l in open(os.path.join(_d, os.path.basename(_ex)[:-4] + '.mtl')):
+        if l.startswith('newmtl'): _m = l.split()[1]
+        elif l.startswith('map_Kd'): _mt[_m] = l.split()[1]
+    from PIL import Image as _Im
+    for _m, _t in _mt.items():
+        _im = np.asarray(_Im.open(os.path.join(_d, _t)).convert('RGBA'), np.float32); _im[..., :3] *= float(os.environ.get('OSCURO_EXTRA', 0.6))
+        _Im.fromarray(np.clip(_im, 0, 255).astype(np.uint8), 'RGBA').save(f'{out}/{_m}.png')
+    _V = []; _T = []; _m = None
+    for l in open(_ex):
+        if l.startswith('v '): _V.append([float(x) for x in l.split()[1:4]])
+        elif l.startswith('vt '): _T.append([float(x) for x in l.split()[1:3]])
+        elif l.startswith('usemtl'): _m = l.split()[1]
+        elif l.startswith('f '):
+            q = [x.split('/') for x in l.split()[1:4]]
+            tri(_m, [_V[int(a[0]) - 1] for a in q], [_T[int(a[1]) - 1] for a in q])
+    print('modelo añadido:', _ex)
 with open(f'{out}/sala.mtl', 'w') as fm:
     for m in geo: fm.write(f'newmtl {m}\nKd 1 1 1\nmap_Kd {m}.png\n')
 with open(f'{out}/sala.obj', 'w') as fo:

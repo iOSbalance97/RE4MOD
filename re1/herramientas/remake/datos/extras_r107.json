@@ -27,6 +27,20 @@
     0.3
    ],
    "mat": "GAKU1[2-6]"
+  },
+  {
+   "que": "s\u00e1banas de UC (abiertas por detr\u00e1s): se cambian por muebles tapados enteros",
+   "min": [
+    3.9,
+    -0.3,
+    -3.9
+   ],
+   "max": [
+    8.6,
+    2.5,
+    0.3
+   ],
+   "mat": "OBJ10|OBJ11"
   }
  ],
  "modelos": [
@@ -61,16 +75,14 @@
     "sabana_t1": "cas_sabana_t1.png",
     "sabana_t2": "cas_sabana_t2.png",
     "sabana_t3": "cas_sabana_t3.png",
-    "sabana2_t0": "cas_sabana2_t0.png",
-    "sabana2_t1": "cas_sabana2_t1.png",
-    "sabana2_t2": "cas_sabana2_t2.png",
-    "sabana2_t3": "cas_sabana2_t3.png"
+    "mueble": "cas_armario.png",
+    "moldura": "cas_armario_osc.png",
+    "puerta": "cas_armario.png",
+    "tirador": "EO_r103OBJ13.png"
    }
   }
  ],
- "cerrar": [
-  "r103OBJ10|r103OBJ11"
- ],
+ "cerrar": [],
  "reconstruir": [
   {
    "que": "pasillo en L (texturas del castillo de RE4)",
