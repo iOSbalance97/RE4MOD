@@ -39,12 +39,12 @@ if _mr:
     _alf1 = np.array([_tiene_alfa(m_) for m_ in _SMa]); _Sa1 = S[_alf1]; _Ta1 = cKDTree(_Sa1[:, [0, 2]]) if len(_Sa1) else None
     def _lamina_cerca(x, y0, y1, z):
         return _Ta1 is not None and any(y0 <= _Sa1[j, 1] <= y1 for j in _Ta1.query_ball_point([x, z], 0.3))
-    for base_, h in ([] if os.environ.get('BARANDILLA_RAMPAS') else [bh for bh in _ex.balaustres_escalera(Tc, nc, Pr, _hay_all)
+    for base_, h in ([] if (os.environ.get('BARANDILLA_RAMPAS') or os.environ.get('BALAUSTRES_TOTAL')) else [bh for bh in _ex.balaustres_escalera(Tc, nc, Pr, _hay_all)
                                                                      if not _lamina_cerca(bh[0][0], bh[0][1] + 0.2 * bh[1], bh[0][1] + 0.8 * bh[1], bh[0][2])]):
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.7, lados=6)
         _anade(Vp, Tp, Fp, mm_r); nb_ += 1; _bases1.append(base_)
 # segunda pasada: balaustres justo debajo de cualquier pasamanos que no tenga nada debajo (ni tarjetas con alfa)
-if _mr and not os.environ.get('BARANDILLA_RAMPAS'):
+if _mr and not os.environ.get('BARANDILLA_RAMPAS') and not os.environ.get('BALAUSTRES_TOTAL'):
     _S3 = S; _T3 = cKDTree(_S3[:, [0, 2]])                       # todo cuenta, también las láminas de balaustres de UC
     def _hay_todo(x, y0, y1, z, rad=0.14):
         for j in _T3.query_ball_point([x, z], rad):
@@ -272,9 +272,6 @@ if os.path.exists(_cfg):
             fuera |= np.abs(nq[:, q['eje']]) < 0.8
         print(f"  quitados {np.sum(~fuera)} triángulos de UC en {q.get('que', '')}")
         F = F[fuera]; FM = FM[fuera]
-if _ext_f:
-    V = np.concatenate([V] + _ext_v); VT = np.concatenate([VT] + _ext_t)
-    F = np.concatenate([F, np.array(_ext_f)]); FM = np.concatenate([FM, np.array(_ext_m, dtype=object)])
 
 # pasamanos de UC que cruzan por mitad de un suelo pisable del REmake (UC tiene hueco de escalera donde el REmake tiene rellano)
 _mrail = np.array([bool(_re2.search(r'handrail|tesuri', str(mats.get(m_) or m_), _re2.I)) for m_ in FM])
@@ -359,3 +356,60 @@ if os.path.exists(f'/home/claude/re1gc/work/extras_{r}.json') and json.load(open
                 if j > k and abs(P2_[j][1] - p[1]) < 0.35:
                     Vp, Tp, Fp = _ex.viga(P2_[k] + [0, 0.95, 0], P2_[j] + [0, 0.95, 0], ancho=0.1, alto=0.08); _anade(Vp, Tp, Fp, _mmv2); nv2 += 1
     print(f'barandillas en zonas marcadas: {len(_u2)} balaustres, {nv2} tramos')
+# ---------------- barandilla completa: fuera las láminas de balaustres con transparencia (en el juego solo se ven
+# desde algunos lados) y balaustres reales a paso regular bajo cada pasamanos macizo de UC, siguiendo su inclinación
+if os.environ.get('BALAUSTRES_TOTAL'):
+    _rx = r'handrail|tesuri|rail|saku|rankan'
+    _lam = np.array([bool(_re2.search(_rx, str(mats.get(m_) or m_), _re2.I)) and _tiene_alfa(m_) for m_ in FM])
+    _rx_vig = os.environ.get('MATS_PASAMANOS', r'handrail|wood16')
+    _mac = np.array([bool(_re2.search(_rx_vig, str(mats.get(m_) or m_), _re2.I)) and not _tiene_alfa(m_) for m_ in FM])
+    print(f'láminas de balaustres quitadas: {_lam.sum()} triángulos')
+    from collections import Counter as _Cn
+    print('  pasamanos macizos por material:', _Cn(str(mats.get(m_) or m_) for m_ in FM[_mac]).most_common(6))
+    # muestras del pasamanos macizo
+    _Pm = []
+    for i_ in np.nonzero(_mac)[0]:
+        t3 = V[F[i_, :3]]; a_ = np.linalg.norm(np.cross(t3[1] - t3[0], t3[2] - t3[0])) / 2
+        _Pm.append(np.random.default_rng(i_).dirichlet([1, 1, 1], int(np.clip(a_ / 0.0015, 2, 80))) @ t3)
+    F = F[~_lam]; FM = FM[~_lam]
+    _Pm = np.concatenate(_Pm) if _Pm else np.zeros((0, 3))
+    # lo macizo que no sea pasamanos ni lámina (para no meter balaustres dentro de paneles, paredes, postes)
+    _sol = np.array([not _tiene_alfa(m_) and not _re2.search(r'wood16', str(mats.get(m_) or m_), _re2.I) for m_ in _SMa]); _Ss = S[_sol]; _Ts = cKDTree(_Ss[:, [0, 2]])
+    def _suelo_cerca(x, z, ytop):
+        best = None
+        for rr_ in (0.0, 0.15, 0.3, 0.45):
+            for t_ in (np.linspace(0, 2 * np.pi, 8, endpoint=False) if rr_ else [0.0]):
+                h = _heights(_TF, x + rr_ * np.cos(t_), z + rr_ * np.sin(t_)); h = h[(h < ytop - 0.45) & (h > ytop - 1.3)]
+                if len(h) and (best is None or h.max() > best): best = float(h.max())
+            if best is not None: return best
+        return None
+    def _macizo_debajo(x, y0, y1, z):
+        for j in _Ts.query_ball_point([x, z], 0.06):
+            if y0 <= _Ss[j, 1] <= y1: return True          # panel tallado, poste o pared: ya hay barandilla maciza
+        return False
+    # el pasamanos: la parte alta de las muestras macizas (vigas), agrupada en tramos rectos
+    _grid = {}
+    for p in _Pm:
+        k = (int(np.floor(p[0] / 0.06)), int(np.floor(p[2] / 0.06)))
+        if k not in _grid or p[1] > _grid[k][1]: _grid[k] = p
+    _top = np.array(list(_grid.values())) if _grid else np.zeros((0, 3))
+    _bal = []; _mot = dict(celdas=len(_top), sin_suelo=0, altura=0, macizo=0, repetido=0)
+    _arb_b = None
+    for p in sorted(_top, key=lambda q: (q[0], q[2])):
+        ytop = p[1] - 0.045
+        yb = _suelo_cerca(p[0], p[2], ytop)
+        if yb is None: _mot['sin_suelo'] += 1; continue
+        h = ytop - yb
+        if h < 0.45 or h > 1.25: _mot['altura'] += 1; continue
+        if _macizo_debajo(p[0], yb + 0.25 * h, yb + 0.75 * h, p[2]): _mot['macizo'] += 1; continue
+        if any(np.hypot(p[0] - q[0], p[2] - q[2]) < 0.14 and abs(yb - q[1]) < 0.45 for q, _ in _bal): _mot['repetido'] += 1; continue
+        _bal.append(((p[0], yb, p[2]), h))
+    _mm_b = next((m_ for m_ in set(FM) if 'handrail01' in str(mats.get(m_) or m_)), None) or mm_r
+    for base_, h in _bal:
+        Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.65, lados=6)
+        _anade(Vp, Tp, Fp, _mm_b)
+    print(f'balaustres bajo los pasamanos: {len(_bal)} {_mot}')
+# ---------------- meter en la malla todas las piezas añadidas (siempre al final)
+if _ext_f:
+    V = np.concatenate([V] + _ext_v); VT = np.concatenate([VT] + _ext_t)
+    F = np.concatenate([F, np.array(_ext_f)]); FM = np.concatenate([FM, np.array(_ext_m, dtype=object)])

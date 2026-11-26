@@ -140,10 +140,11 @@ rg = np.random.default_rng(7); N = 512
 def ruido(s_): a = rg.random((N // s_ + 2, N // s_ + 2)); return cv2.resize(a, (N, N), interpolation=cv2.INTER_CUBIC)
 nz = ruido(128) * 0.5 + ruido(32) * 0.3 + ruido(8) * 0.2; yy, xx = np.mgrid[0:N, 0:N] / N
 vena = np.clip(1 - np.abs(np.sin((xx * 3 + yy * 1.5 + nz * 2.2) * np.pi * 2)), 0, 1) ** 10
-L = np.clip(0.80 + 0.05 * (ruido(16) - 0.5) - 0.16 * vena, 0, 1)
+L = np.clip(0.78 + 0.07 * (ruido(16) - 0.5) - 0.20 * vena, 0, 1)
+sucio = cv2.GaussianBlur(ruido(4), (0, 0), 6); L = L * (0.9 + 0.1 * sucio)
 TON = [1.0, 0.84, 0.70, 0.57, 0.46]
 for k, f in enumerate(TON):
-    Image.fromarray((np.stack([L, L * 0.975, L * 0.93], -1) * f * 255).astype(np.uint8)).save(f'{out}/marmol_t{k}.png')
+    Image.fromarray((np.clip(np.stack([L * 0.98, L * 0.90, L * 0.76], -1) * f, 0, 1) * 255).astype(np.uint8)).save(f'{out}/marmol_t{k}.png')
 with open(f'{out}/figura.obj', 'w') as fo:
     fo.write('mtllib figura.mtl\n')
     for v in V: fo.write(f'v {v[0]:.4f} {v[1]:.4f} {v[2]:.4f}\n')
@@ -157,13 +158,17 @@ with open(f'{out}/figura.obj', 'w') as fo:
             uv = Pt[:, [ax for ax in range(3) if ax != a]] / 0.45
             for u in uv: fo.write(f'vt {u[0]:.4f} {u[1]:.4f}\n')
             fo.write(f'f {tri[0]+1}/{nt} {tri[1]+1}/{nt+1} {tri[2]+1}/{nt+2}\n'); nt += 3
-    # mapa (lámina inclinada hacia arriba-delante)
-    nb = len(V) + 1; a_, b_ = 0.26, 0.19; inc = np.radians(40)
-    esq = [(-a_ / 2, -b_ / 2), (a_ / 2, -b_ / 2), (a_ / 2, b_ / 2), (-a_ / 2, b_ / 2)]
-    for x, y in esq: p = mc + [x, y * np.cos(inc), -y * np.sin(inc)]; fo.write(f'v {p[0]:.4f} {p[1]:.4f} {p[2]:.4f}\n')
+    # mapa: tablilla con grosor, inclinada hacia arriba-delante
+    nb = len(V) + 1; a_, b_, g_ = 0.27, 0.20, 0.035; inc = np.radians(40)
+    ex = np.array([1.0, 0, 0]); ey = np.array([0, np.cos(inc), -np.sin(inc)]); ez = np.cross(ex, ey)
+    cs = [mc + ex * sx * a_ / 2 + ey * sy * b_ / 2 + ez * sz * g_ / 2 for sz in (-1, 1) for sy in (-1, 1) for sx in (-1, 1)]
     fo.write('usemtl marmol_t1\n')
+    for p in cs: fo.write(f'v {p[0]:.4f} {p[1]:.4f} {p[2]:.4f}\n')
     for t in ((0, 0), (1, 0), (1, 1), (0, 1)): fo.write(f'vt {t[0]*0.6} {t[1]*0.45}\n')
-    fo.write(f'f {nb}/{nt} {nb+1}/{nt+1} {nb+2}/{nt+2}\nf {nb}/{nt} {nb+2}/{nt+2} {nb+3}/{nt+3}\n')
-    fo.write(f'f {nb}/{nt} {nb+2}/{nt+2} {nb+1}/{nt+1}\nf {nb}/{nt} {nb+3}/{nt+3} {nb+2}/{nt+2}\n')
+    caras = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+    for q in caras:
+        a0, a1, a2, a3 = [nb + i for i in q]
+        fo.write(f'f {a0}/{nt} {a1}/{nt+1} {a2}/{nt+2}\nf {a0}/{nt} {a2}/{nt+2} {a3}/{nt+3}\n')
+        fo.write(f'f {a0}/{nt} {a2}/{nt+2} {a1}/{nt+1}\nf {a0}/{nt} {a3}/{nt+3} {a2}/{nt+2}\n')
 open(f'{out}/figura.mtl', 'w').write(''.join(f'newmtl marmol_t{k}\nmap_Kd marmol_t{k}.png\n' for k in range(5)))
 print('ok', len(F), 'triángulos')

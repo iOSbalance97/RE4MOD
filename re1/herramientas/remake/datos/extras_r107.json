@@ -18,9 +18,9 @@
  "modelos": [
   {
    "obj": "/home/claude/re1gc/modelos/emily/figura.obj",
-   "x": -0.45,
-   "y0": 1.5,
-   "z": 0.25,
+   "x": -0.41,
+   "y0": 1.51,
+   "z": 0.3,
    "giro": -1.5708,
    "escala": 1.0,
    "texturas": {
