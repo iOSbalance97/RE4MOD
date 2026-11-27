@@ -414,17 +414,19 @@ if os.path.exists(_cfg):
                 if L_ < 0.04 or not dentro_box(*m_): continue
                 if rc.get('solo_paredes_colision') and not _Kc.query_ball_point(m_, 0.3): continue
                 if any(c_[0] <= m_[0] <= c_[1] and c_[2] <= m_[1] <= c_[3] for c_ in rc.get('sin_paredes', [])): continue   # zonas que ya tienen pared propia (p. ej. el hueco de una escalera)
-                _quad(p0, p1, y0, zh, rc['zocalo'], L_, rc.get('zocalo_entero', False)); _quad(p0, p1, zh, zh + 0.08, rc.get('moldura', rc['zocalo']), L_)
-                _quad(p0, p1, zh + 0.08, rc['y_techo'] - _cornisa, rc['pared'], L_)
-                if _cornisa: _quad(p0, p1, rc['y_techo'] - _cornisa, rc['y_techo'], rc.get('moldura', rc['zocalo']), L_)
+                _quad(p0, p1, y0 - 0.06, zh, rc['zocalo'], L_, rc.get('zocalo_entero', False)); _quad(p0, p1, zh, zh + 0.08, rc.get('moldura', rc['zocalo']), L_)
+                _quad(p0, p1, zh + 0.08, rc['y_techo'] - _cornisa + (0 if _cornisa else 0.06), rc['pared'], L_)
+                if _cornisa: _quad(p0, p1, rc['y_techo'] - _cornisa, rc['y_techo'] + 0.06, rc.get('moldura', rc['zocalo']), L_)
                 ns_[2] += 1
-        # suelo y techo: filas de la silueta dentro de la caja
+        # suelo y techo: filas de la silueta dentro de la caja (una celda más: pasan por debajo de las paredes, sin rendija en la junta)
+        from scipy import ndimage as _ndr
+        Mk = _ndr.binary_dilation(Mk, iterations=1) if rc.get('suelo_bajo_pared', True) else Mk
         for ii, x_ in enumerate(xs_):
             _mt = max(_mp, 0.0)
             if not (lo[0] - _mt <= x_ < hi[0] + _mt): continue
             jj = 0
             while jj < len(zs_):
-                _sp = lambda z__: any(c_[0] <= x_ + G_ / 2 <= c_[1] and c_[2] <= z__ + G_ / 2 <= c_[3] for c_ in rc.get('sin_paredes', []))
+                _sp = lambda z__: any(c_[0] <= x_ + G_ / 2 <= c_[1] and c_[2] <= z__ + G_ / 2 <= c_[3] for c_ in rc.get('sin_suelo', rc.get('sin_paredes', [])))
                 if Mk[ii, jj] and lo[2] - _mt <= zs_[jj] < hi[2] + _mt and not _sp(zs_[jj]):
                     j0 = jj
                     while jj < len(zs_) and Mk[ii, jj] and zs_[jj] < hi[2] + _mt and not _sp(zs_[jj]): jj += 1
@@ -756,7 +758,7 @@ if os.environ.get('BALAUSTRES_TOTAL'):
         P_ = np.array([[b_[0], b_[1], b_[2], h_] for b_, h_ in _arr]) if _arr else np.zeros((0, 4))
         usado = np.zeros(len(P_), bool); ncop = 0; nesq = 0; PASO = float(os.environ.get('PASO_BALAUSTRE', 0.188))
         _tb = cKDTree(P_[:, [0, 2]]) if len(P_) else None
-        _puestos = []; _postes = []
+        _puestos = []; _postes = []; _stat_bal = [0, 0, 0]; _sinrail = []
         while len(P_) and not usado.all():
             i0 = int(np.nonzero(~usado)[0][0]); cad = [i0]; usado[i0] = True
             for _dir in (0, 1):
@@ -798,6 +800,7 @@ if os.environ.get('BALAUSTRES_TOTAL'):
             A_ = np.polyfit(L_, Qs[:, 1], 1); hh_ = float(np.median(Qs[:, 3]))
             if abs(A_[0]) < 0.06: A_ = np.array([0.0, float(np.median(Qs[:, 1]))])
             ybf = lambda t_: float(np.polyval(A_, t_))
+            print(f'    cadena {np.round(Qs[0, [0, 1, 2]], 2).tolist()} -> {np.round(Qs[-1, [0, 1, 2]], 2).tolist()} L {L_[-1]:.2f}')
             def pos(t_): return np.interp(t_, L_, Qs[:, 0]), np.interp(t_, L_, Qs[:, 2])
             def tang(t_):
                 a0 = pos(max(0, t_ - 0.2)); a1 = pos(min(L_[-1], t_ + 0.2)); d_ = np.array(a1) - np.array(a0); return d_ / (np.linalg.norm(d_) + 1e-9)
@@ -826,17 +829,21 @@ if os.environ.get('BALAUSTRES_TOTAL'):
                 n_ = max(1, int(round((b_ - a_) / PASO)))
                 for t_ in np.linspace(a_, b_, n_ + 1)[1:-1]:
                     x_, z_ = pos(t_)
-                    if any(np.hypot(x_ - a2, z_ - c2) < 0.16 for a2, c2 in _puestos): continue
+                    if any(np.hypot(x_ - a2, z_ - c2) < 0.17 and abs(ybf(t_) - y2) < 0.6 for a2, c2, y2 in _puestos): continue
                     if _ko is not None and _ko.query_ball_point([x_, z_], 0.12) and abs(ybf(t_) - _cw16[_ko.query([x_, z_])[1], 1]) < 1.2: continue
-                    _puestos.append((x_, z_)); tg_ = tang(t_)
+                    _puestos.append((x_, z_, ybf(t_))); tg_ = tang(t_)
                     _hs = _heights(_TF, x_, z_); _yl = ybf(t_)
                     if len(_hs) and np.abs(_hs - _yl).min() < 0.6: _yl = float(_hs[np.argmin(np.abs(_hs - _yl))])     # pie en el suelo real (tramos con escalón)
                     _hl = ybf(t_) + hh_ - _yl
+                    _conr = False
                     if _Tp is not None:          # tope: justo bajo el pasamanos real en ese punto (sigue la pendiente y no asoma por encima)
                         _ir = [j for j in _Tp.query_ball_point([x_, z_], 0.2) if _yl + 0.4 < _pan[j, 1] < _yl + 1.4]
                         if len(_ir) >= 3:
                             _yt = _pan[_ir, 1].max(); _yb = _pan[[j for j in _ir if _pan[j, 1] > _yt - 0.2], 1].min()
-                            _hl = _yb + 0.01 - _yl
+                            _hl = _yb + 0.01 - _yl; _conr = True
+                    _stat_bal[0 if _conr else 1] += 1
+                    if not _conr: _sinrail.append((round(x_, 2), round(_yl, 2), round(z_, 2)))
+                    if any(np.hypot(x_ - a_, z_ - c_) < 0.18 for a_, c_ in _uc_postes + _postes): _stat_bal[2] += 1; continue          # no meterlo dentro de un esquinero
                     Pp = _rot(_Pt * [1, (_hl - _zb) / _Ht, 1], tg_[0], tg_[1]) + [x_, _yl + _zb, z_]
                     _anade(Pp, _Ut, np.arange(len(Pp)).reshape(-1, 3), _mmt); ncop += 1
         print(f'  esquineros: {nesq}', [tuple(np.round(p_, 2)) for p_ in _postes])
@@ -845,7 +852,7 @@ if os.environ.get('BALAUSTRES_TOTAL'):
             from scipy.cluster.hierarchy import fcluster as _fc, linkage as _lk
             _c24 = _cw[_m24]; _l24 = _fc(_lk(_c24, 'single'), 0.3, 'distance') if len(_c24) > 1 else np.array([1])
             print('  esquineros originales de UC arriba:', [tuple(np.round(_c24[_l24 == L_].mean(0), 2)) for L_ in sorted(set(_l24))])
-        print(f'  balaustres de UC copiados: {ncop}')
+        print(f'  balaustres de UC copiados: {ncop}; bajo pasamanos real {_stat_bal[0]}, sin pasamanos encima {_stat_bal[1]} {_sinrail[:20]}, quitados por chocar con un esquinero {_stat_bal[2]}')
     for base_, h in _bal:
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.65, lados=6)
         _anade(Vp, Tp, Fp, _mm_b)

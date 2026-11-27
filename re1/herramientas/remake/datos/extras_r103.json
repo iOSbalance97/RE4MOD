@@ -39,6 +39,14 @@
      0.95,
      1.45
     ]
+   ],
+   "sin_suelo": [
+    [
+     2.1,
+     11.25,
+     -2.9,
+     -1.1
+    ]
    ]
   },
   {
@@ -79,6 +87,14 @@
      0.95,
      1.45
     ]
+   ],
+   "sin_suelo": [
+    [
+     2.1,
+     11.25,
+     -2.9,
+     -1.1
+    ]
    ]
   },
   {
@@ -118,6 +134,14 @@
      -1.2,
      0.95,
      1.45
+    ]
+   ],
+   "sin_suelo": [
+    [
+     2.1,
+     11.25,
+     -2.9,
+     -1.1
     ]
    ]
   }
@@ -163,6 +187,22 @@
     "cas_cristal_noche": "cas_cristal_noche.png",
     "cas_terciopelo": "cas_terciopelo.png",
     "st_103wood_b": "st_103wood_b.png"
+   }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/respaldos_r103/r1.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "cas_r100_zocalo": "cas_r100_zocalo.png",
+    "r100_kabe_a": "r100_kabe_a.png",
+    "r100_wood_b": "r100_wood_b.png",
+    "st_103kabe_a": "st_103kabe_a.png",
+    "st_103tenjou_a": "st_103tenjou_a.png",
+    "st_103yuka_a": "st_103yuka_a.png"
    }
   }
  ],

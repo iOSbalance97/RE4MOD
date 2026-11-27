@@ -48,5 +48,32 @@
    "r": 0.02,
    "alcance": 0.8
   }
+ ],
+ "modelos": [
+  {
+   "obj": "/home/claude/re1gc/modelos/respaldos_r105/r1.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "EO_doamaekabe2": "EO_doamaekabe2.png",
+    "EO_kadohashira": "EO_kadohashira.png",
+    "EO_yokokabekabe": "EO_yokokabekabe.png",
+    "EO_yuka": "EO_yuka.png"
+   }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/respaldos_r105/cristales.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "cas_noche": "cas_noche.png"
+   }
+  }
  ]
 }

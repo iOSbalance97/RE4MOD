@@ -47,7 +47,7 @@ def techo_libre(c):
     h = heights(TF, c[0], c[2]); return True if CUEVA else not np.any((h > c[1] + 0.5) & (h < c[1] + ALTO + 0.2))
 def _y_techo(x, z, yf):
     q0 = np.array([x, 0.0, z]); y = 2.75 + 0.35 * _ruido(q0, 1.3, 3.0) + 0.1 * _ruido(q0, 4.0, 5.0)
-    h = heights(TF, x, z); h = h[h > yf + 0.5]
+    h = heights(TF, x, z); h = h[h > yf + 1.8]          # solo otro tramo de verdad encima (un bloque de 1 m no baja el techo)
     if len(h): y = min(y, h.min() - yf - 0.15)          # nunca atravesar el tramo de encima
     return yf + y
 def _techo_cueva(t3, k=4):
@@ -185,7 +185,7 @@ for t3, nn, _EDG in _MUROS:
 for _cs in [c_ for c_ in os.environ.get('COLUMNAS', '').split(';') if c_]:
     x0_, x1_, z0_, z1_, y0_, y1_ = [float(v) for v in _cs.split(',')]
     cx_, cz_ = (x0_ + x1_) / 2, (z0_ + z1_) / 2; rx_, rz_ = (x1_ - x0_) / 2 + 0.03, (z1_ - z0_) / 2 + 0.03
-    NL_ = 12; NV_ = max(2, int((y1_ - y0_) / 0.35))
+    NL_ = 16; NV_ = max(2, int((y1_ - y0_) / 0.35))
     for k_ in range(NL_):
         for j_ in range(NV_):
             pts_ = []
@@ -193,8 +193,8 @@ for _cs in [c_ for c_ in os.environ.get('COLUMNAS', '').split(';') if c_]:
                 th_ = 2 * np.pi * kk / NL_; yy_ = y0_ + (y1_ - y0_) * jj / NV_
                 # contorno entre círculo y rectángulo (abarca la base cuadrada) con relieve de roca
                 cx2, sz2 = np.cos(th_), np.sin(th_); m_ = max(abs(cx2), abs(sz2))
-                q0_ = np.array([cx_ + rx_ * cx2 / m_ ** 0.6, yy_, cz_ + rz_ * sz2 / m_ ** 0.6])
-                rr_ = 1.0 + 0.08 * _ruido(q0_, 2.5, 7.0)
+                q0_ = np.array([cx_ + rx_ * cx2 / m_, yy_, cz_ + rz_ * sz2 / m_])          # contorno rectangular: abarca toda la base (también las esquinas)
+                rr_ = 1.0 + 0.06 * abs(_ruido(q0_, 2.5, 7.0))
                 pts_.append(np.array([cx_ + (q0_[0] - cx_) * rr_, yy_, cz_ + (q0_[2] - cz_) * rr_]))
             u0_, u1_ = k_ / NL_ * 2.4, (k_ + 1) / NL_ * 2.4; v0_, v1_ = (y0_ + (y1_ - y0_) * j_ / NV_) / E, (y0_ + (y1_ - y0_) * (j_ + 1) / NV_) / E
             quad(TEX['pared'], pts_, [[u0_, v0_], [u1_, v0_], [u1_, v1_], [u0_, v1_]])
@@ -357,6 +357,17 @@ if CUEVA:
                 quad(TEX['huella'], caja_, [[0, 0], [0.3, 0], [0.3, (yc_ - yf_) / E], [0, (yc_ - yf_) / E]])
             print('boca de piedra al final del túnel, ancho %.2f' % (2 * hw_))
     print(f'objetos de la cueva: {nobj}')
+# geometría extra con los materiales de la propia sala (respaldos detrás de rendijas): sin copiar ni oscurecer texturas
+for _gx in [e for e in os.environ.get('GEO_EXTRA', '').split(';') if e and os.path.exists(e)]:
+    _V = []; _T = []; _m = None
+    for l in open(_gx):
+        if l.startswith('v '): _V.append([float(x) for x in l.split()[1:4]])
+        elif l.startswith('vt '): _T.append([float(x) for x in l.split()[1:3]])
+        elif l.startswith('usemtl'): _m = l.split()[1]
+        elif l.startswith('f '):
+            q_ = [x.split('/') for x in l.split()[1:4]]
+            tri(_m, [_V[int(a_[0]) - 1] for a_ in q_], [_T[int(a_[1]) - 1] for a_ in q_], dos=False)
+    print('geometría extra:', _gx)
 for _ex in [e for e in os.environ.get('MODELOS_EXTRA', '').split(';') if e]:
     _d = os.path.dirname(_ex); _mt = {}; _m = None
     for l in open(os.path.join(_d, os.path.basename(_ex)[:-4] + '.mtl')):

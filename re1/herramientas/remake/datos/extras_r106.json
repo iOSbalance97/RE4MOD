@@ -287,6 +287,28 @@
      7.6
     ]
    ]
+  },
+  {
+   "que": "relleno bajo paredes laterales",
+   "y": 6.5,
+   "tol": 0.12,
+   "dilatar": 0.6,
+   "bajo": 0.02,
+   "mat": "ceilling01",
+   "cajas": [
+    [
+     4.55,
+     7.4,
+     -7.4,
+     3.45
+    ],
+    [
+     -7.4,
+     -4.55,
+     -7.4,
+     3.45
+    ]
+   ]
   }
  ],
  "ajustar": [
@@ -409,14 +431,59 @@
  ],
  "modelos": [
   {
-   "obj": "/home/claude/re1gc/modelos/fondo_r106/fondo.obj",
+   "obj": "/home/claude/re1gc/modelos/respaldos_r106/r1.obj",
    "x": 0.0,
    "y0": 0.0,
    "z": 0.0,
    "giro": 0.0,
    "escala": 1.0,
    "texturas": {
-    "yg_wall04": "yg_wall04.png"
+    "cas_noche": "cas_noche.png",
+    "st_103door_b": "st_103door_b.png",
+    "yg_ceilling01": "yg_ceilling01.png",
+    "yg_door08": "yg_door08.png",
+    "yg_floor2": "yg_floor2.png",
+    "yg_portrate01": "yg_portrate01.png",
+    "yg_stone14": "yg_stone14.png",
+    "yg_wall01": "yg_wall01.png",
+    "yg_wall04": "yg_wall04.png",
+    "yg_wall12": "yg_wall12.png",
+    "yg_wall13": "yg_wall13.png",
+    "yg_wall15": "yg_wall15.png",
+    "yg_wood10": "yg_wood10.png",
+    "yg_wood11": "yg_wood11.png",
+    "yg_wood12": "yg_wood12.png",
+    "yg_wood17": "yg_wood17.png"
+   }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/respaldos_r106/r2.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "cas_noche": "cas_noche.png",
+    "yg_ceilling01": "yg_ceilling01.png",
+    "yg_floor1": "yg_floor1.png",
+    "yg_floor3": "yg_floor3.png",
+    "yg_portrate01": "yg_portrate01.png",
+    "yg_wall12": "yg_wall12.png",
+    "yg_wall15": "yg_wall15.png",
+    "yg_wood10": "yg_wood10.png",
+    "yg_wood11": "yg_wood11.png"
+   }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/respaldos_r106/cristales.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "cas_noche": "cas_noche.png"
    }
   }
  ]

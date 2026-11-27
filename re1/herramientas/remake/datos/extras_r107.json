@@ -80,6 +80,25 @@
     "puerta": "cas_armario.png",
     "tirador": "EO_r103OBJ13.png"
    }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/respaldos_r107/r1.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "EO_r103Door1": "EO_r103Door1.png",
+    "EO_r103OBJ14": "EO_r103OBJ14.png",
+    "EO_r103OBJ15": "EO_r103OBJ15.png",
+    "EO_r103TENJO1": "EO_r103TENJO1.png",
+    "EO_r103yuka1": "EO_r103yuka1.png",
+    "cas_artesonado": "cas_artesonado.png",
+    "cas_madera_panel": "cas_madera_panel.png",
+    "cas_tablas": "cas_tablas.png",
+    "cas_terciopelo": "cas_terciopelo.png"
+   }
   }
  ],
  "cerrar": [],
