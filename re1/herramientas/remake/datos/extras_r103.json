@@ -171,9 +171,10 @@
    "escala": 1.0,
    "texturas": {
     "r100_kabe_a": "r100_kabe_a.png",
-    "st_103wood_a": "st_103wood_a.png",
     "st_103tenjou_a": "st_103tenjou_a.png",
-    "r100_door_a": "r100_door_a.png"
+    "r100_door_a": "r100_door_a.png",
+    "st_103wood_b": "st_103wood_b.png",
+    "cas_madera_103": "cas_madera_103.png"
    }
   },
   {
@@ -204,11 +205,24 @@
     "st_103tenjou_a": "st_103tenjou_a.png",
     "st_103yuka_a": "st_103yuka_a.png"
    }
+  },
+  {
+   "obj": "/home/claude/re1gc/modelos/respaldos_r103/r2.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "r100_kabe_a": "r100_kabe_a.png",
+    "st_103tenjou_a": "st_103tenjou_a.png",
+    "st_103yuka_a": "st_103yuka_a.png"
+   }
   }
  ],
  "copiar": [
   {
-   "que": "puerta de UC (la de r10f) en las dem\u00e1s puertas del REmake",
+   "que": "puerta de UC (la de r10f) en las demás puertas del REmake",
    "min": [
     6.15,
     3.9,
@@ -332,7 +346,7 @@
    ]
   },
   {
-   "que": "l\u00e1mpara de pared de UC",
+   "que": "lámpara de pared de UC",
    "min": [
     -4.5,
     5.7,
@@ -412,7 +426,7 @@
    ]
   },
   {
-   "que": "cuadro del sal\u00f3n de UC",
+   "que": "cuadro del salón de UC",
    "min": [
     -10.4,
     5.0,
@@ -528,7 +542,7 @@
    ]
   },
   {
-   "que": "sof\u00e1 del sal\u00f3n de UC",
+   "que": "sofá del salón de UC",
    "min": [
     -10.6,
     3.95,
@@ -600,7 +614,7 @@
    ]
   },
   {
-   "que": "alfombra del sal\u00f3n de UC",
+   "que": "alfombra del salón de UC",
    "min": [
     -10.9,
     3.95,
@@ -636,7 +650,7 @@
    ]
   },
   {
-   "que": "mesita con l\u00e1mpara de UC",
+   "que": "mesita con lámpara de UC",
    "min": [
     -8.35,
     3.95,
@@ -672,7 +686,7 @@
    ]
   },
   {
-   "que": "cuadro del sal\u00f3n, en su sitio original (la reconstrucci\u00f3n del extremo oeste lo cortaba)",
+   "que": "cuadro del salón, en su sitio original (la reconstrucción del extremo oeste lo cortaba)",
    "min": [
     -10.4,
     5.0,
@@ -765,7 +779,7 @@
    ]
   },
   {
-   "que": "puerta original de r10f (medio cortada por la reconstrucci\u00f3n; va su copia entera)",
+   "que": "puerta original de r10f (medio cortada por la reconstrucción; va su copia entera)",
    "min": [
     6.15,
     3.9,
@@ -793,7 +807,7 @@
    "mat": "picture"
   },
   {
-   "que": "puerta de UC a r105 (medio abierta, se ve\u00eda el vac\u00edo): va la copia entera",
+   "que": "puerta de UC a r105 (medio abierta, se veía el vacío): va la copia entera",
    "min": [
     -4.65,
     3.9,
@@ -810,7 +824,7 @@
  "ajustar": [],
  "mover": [
   {
-   "que": "alfombra larga del pasillo de UC, 1.5 cm por encima del suelo (parpadeaba con \u00e9l)",
+   "que": "alfombra larga del pasillo de UC, 1.5 cm por encima del suelo (parpadeaba con él)",
    "min": [
     -14,
     3.9,

@@ -260,6 +260,7 @@ if os.path.exists(_cfg):
         sel_ = np.nonzero(np.array([bool(_re2.search(br_['mat'], str(m_) + ' ' + str(mats.get(m_) or ''))) for m_ in FM]))[0]
         if not len(sel_): print('  brazos: material no encontrado', br_['mat']); continue
         mm_b = next((m_ for m_ in set(FM) if _re2.search(br_['metal'], str(m_) + ' ' + str(mats.get(m_) or ''))), FM[sel_[0]])
+        if br_.get('textura'): mm_b = br_['textura'][:-4]; mats[mm_b] = br_['textura']          # p. ej. latón propio
         Fs_ = F[sel_, :3]; _, inv_ = np.unique(np.round(V[Fs_.ravel()] * 100).astype(np.int64), axis=0, return_inverse=True); inv_ = inv_.reshape(-1, 3)
         nvv = inv_.max() + 1; A_ = _sp.coo_matrix((np.ones(len(inv_) * 2), (np.r_[inv_[:, 0], inv_[:, 1]], np.r_[inv_[:, 1], inv_[:, 2]])), shape=(nvv, nvv))
         ncc, lab_ = _cc(A_, directed=False); labf = lab_[inv_[:, 0]]
@@ -457,6 +458,9 @@ if os.path.exists(_cfg):
             else: tex = rz['pared']
             a_ = np.abs(n_).argmax(); uv = t3[:, [k for k in range(3) if k != a_]] / rz.get('escala', 1.2)
             if a_ != 1: uv = t3[:, [2 if a_ == 0 else 0, 1]] / rz.get('escala', 1.2)
+            if a_ != 1 and rz.get('escala_uv'):          # paneles: un panel de textura por (ancho x alto), alineado con el origen dado
+                su_, sv_ = rz['escala_uv']; h0_, v0_ = rz.get('origen_uv', [0.0, 0.0])
+                uv = np.stack([(t3[:, 2 if a_ == 0 else 0] - h0_) / su_, (t3[:, 1] - v0_) / sv_], 1)
             _anade(t3.copy(), uv, np.array([[0, 1, 2]]), _mk(tex))
         keep_ = np.ones(len(F), bool); keep_[idx_] = False; F = F[keep_]; FM = FM[keep_]
         if rz.get('techo_colision'):
@@ -862,3 +866,11 @@ if os.environ.get('BALAUSTRES_TOTAL'):
 if _ext_f:
     V = np.concatenate([V] + _ext_v); VT = np.concatenate([VT] + _ext_t)
     F = np.concatenate([F, np.array(_ext_f)]); FM = np.concatenate([FM, np.array(_ext_m, dtype=object)])
+# ---------------- quitar al final (también lo añadido por las operaciones de arriba: rellenos, respaldos...)
+if os.path.exists(_cfg):
+    for q in json.load(open(_cfg)).get('quitar_final', []):
+        lo = np.array(q['min']); hi = np.array(q['max'])
+        cen_ = V[F[:, :3]].mean(1); fuera = ~np.all((cen_ >= lo) & (cen_ <= hi), 1)
+        if q.get('mat'): fuera |= np.array([not _re2.search(q['mat'], str(mats.get(m_) or m_), _re2.I) for m_ in FM])
+        print(f"  quitados al final {np.sum(~fuera)} triángulos en {q.get('que', '')}")
+        F = F[fuera]; FM = FM[fuera]

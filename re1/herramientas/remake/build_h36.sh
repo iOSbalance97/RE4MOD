@@ -6,6 +6,7 @@ sala() {  # u r st extra_env...
   rm -rf /tmp/h36_$r
   env SUAVE_K=12 BRILLO=1.2 DOBLE=1 NIVELES=16 PAGINAS=2 MAXTEX=1 "$@" timeout 3000 python3 uc_sala_v5.py /home/claude/uc/m/$u/sala_sin_env.obj $alin $st $r /tmp/h36_$r > /tmp/h36_$r.log 2>&1 || { echo "$r ERROR"; tail -5 /tmp/h36_$r.log; return 1; }
   python3 noche.py /tmp/h36_$r > /dev/null
+  [ -f extras_$r.json ] && python3 post_quitar.py /tmp/h36_$r extras_$r.json >> /tmp/h36_$r.log
   rm -rf ../salas_uc5/$r; cp -r /tmp/h36_$r ../salas_uc5/$r; cp /tmp/h36_$r.log ../salas_uc5/$r.log
   rm -rf ../re4/re_${r}_uc; timeout 1500 python3 /home/claude/tools/re4room.py ../salas_uc5/$r/sala.obj ../re4/re_${r}_uc/mod --tex-max 1024 > ../salas_uc5/$r.room.log 2>&1 || { echo "$r ERROR re4room"; return 1; }
   echo "$r: $(grep -o 'SMD total.*' ../salas_uc5/$r.room.log)"

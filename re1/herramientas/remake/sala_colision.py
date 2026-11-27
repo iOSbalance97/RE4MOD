@@ -182,6 +182,7 @@ for t3, nn, _EDG in _MUROS:
     quad(TEX['pared'], [np.array([Ab[0], ya - 0.1, Ab[2]]), np.array([Bb[0], ya - 0.1, Bb[2]]), np.array([Bb[0], ytb, Bb[2]]), np.array([Ab[0], ytb, Ab[2]])],
          [[(pr.min() - 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, ytb / E], [(pr.min() - 0.5) / E, ytb / E]])
 # columnas de roca pedidas a mano (x0,x1,z0,z1,y0,y1): p. ej. sobre un bloque, hasta el techo
+CAJAS_CAM = []
 for _cs in [c_ for c_ in os.environ.get('COLUMNAS', '').split(';') if c_]:
     x0_, x1_, z0_, z1_, y0_, y1_ = [float(v) for v in _cs.split(',')]
     cx_, cz_ = (x0_ + x1_) / 2, (z0_ + z1_) / 2; rx_, rz_ = (x1_ - x0_) / 2 + 0.03, (z1_ - z0_) / 2 + 0.03
@@ -196,9 +197,11 @@ for _cs in [c_ for c_ in os.environ.get('COLUMNAS', '').split(';') if c_]:
                 q0_ = np.array([cx_ + rx_ * cx2 / m_, yy_, cz_ + rz_ * sz2 / m_])          # contorno rectangular: abarca toda la base (también las esquinas)
                 rr_ = 1.0 + 0.06 * abs(_ruido(q0_, 2.5, 7.0))
                 pts_.append(np.array([cx_ + (q0_[0] - cx_) * rr_, yy_, cz_ + (q0_[2] - cz_) * rr_]))
-            u0_, u1_ = k_ / NL_ * 2.4, (k_ + 1) / NL_ * 2.4; v0_, v1_ = (y0_ + (y1_ - y0_) * j_ / NV_) / E, (y0_ + (y1_ - y0_) * (j_ + 1) / NV_) / E
+            _per = 2 * ((x1_ - x0_) + (z1_ - z0_)) + 0.24
+            u0_, u1_ = k_ / NL_ * _per / E, (k_ + 1) / NL_ * _per / E; v0_, v1_ = (y0_ + (y1_ - y0_) * j_ / NV_) / E, (y0_ + (y1_ - y0_) * (j_ + 1) / NV_) / E
             quad(TEX['pared'], pts_, [[u0_, v0_], [u1_, v0_], [u1_, v1_], [u0_, v1_]])
     print('columna de roca:', _cs)
+    CAJAS_CAM.append((x0_ - 0.12, x1_ + 0.12, z0_ - 0.12, z1_ + 0.12, y0_, y1_))
 # columnas de roca en las esquinas: tapan la rendija que deja el relieve de dos paredes que se juntan
 if CUEVA and ESQ:
     usados = np.zeros(len(ESQ), bool); nesq = 0
@@ -222,6 +225,7 @@ if CUEVA and ESQ:
             q += [q[1] + [0, yt_ - yb_, 0], q[0] + [0, yt_ - yb_, 0]]
             quad(TEX['pared'], q, [[k * 0.2, yb_ / E], [(k + 1) * 0.2, yb_ / E], [(k + 1) * 0.2, yt_ / E], [k * 0.2, yt_ / E]])
         nesq += 1
+        CAJAS_CAM.append((c_[0] - R_ - 0.1, c_[0] + R_ + 0.1, c_[2] - R_ - 0.1, c_[2] + R_ + 0.1, yb_, yt_))
     print('columnas de esquina:', nesq)
 # rampas -> escaleras: agrupar por normal parecida y contigüidad
 idx = np.nonzero(rampa)[0]; grupo = {}
@@ -398,3 +402,4 @@ with open(f'{out}/sala.obj', 'w') as fo:
             fo.write(f'f {nv}/{nv} {nv+1}/{nv+1} {nv+2}/{nv+2}\n'); nv += 3
 shutil.copy(col, f'{out}/colision.obj')
 print(f'{r}: {sum(len(l) for l in geo.values())} triángulos, {esc} tramos de escalera')
+open(f'{out}/cam_cajas.txt', 'w').write(';'.join(','.join(f'{v:.3f}' for v in c) for c in CAJAS_CAM))

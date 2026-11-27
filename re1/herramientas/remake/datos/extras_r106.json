@@ -149,6 +149,20 @@
     -3.35
    ],
    "mat": "ceilling01"
+  },
+  {
+   "que": "alfombra que asomaba por fuera de la barandilla sobre el hueco central (+x)",
+   "min": [
+    2.2,
+    6.25,
+    -1.28
+   ],
+   "max": [
+    5.25,
+    6.62,
+    0.62
+   ],
+   "mat": "ceilling01"
   }
  ],
  "sin_balaustres": [
@@ -273,7 +287,7 @@
    ]
   },
   {
-   "que": "relleno galer\u00eda norte",
+   "que": "relleno galería norte",
    "y": 7.0,
    "tol": 0.06,
    "dilatar": 0.5,
@@ -411,7 +425,7 @@
  ],
  "bajar_a_suelo": [
   {
-   "que": "piso de arriba (UC lo ten\u00eda a 6.83; el REmake a 6.5)",
+   "que": "piso de arriba (UC lo tenía a 6.83; el REmake a 6.5)",
    "suelo": 6.5,
    "desde": 6.53,
    "hasta": 6.95,
@@ -420,7 +434,7 @@
    "excluir": "wood16|wood24|handrail|ceilling|wood14|wood13|stairs|lug|two_door|door_nob"
   },
   {
-   "que": "galer\u00eda norte (suelo 7.0)",
+   "que": "galería norte (suelo 7.0)",
    "suelo": 7.0,
    "desde": 7.03,
    "hasta": 7.4,
@@ -485,6 +499,98 @@
    "texturas": {
     "cas_noche": "cas_noche.png"
    }
+  }
+ ],
+ "retexturizar": [
+  {
+   "que": "pared lisa del rincón junto a la escalerilla (+x): paneles y zócalo de madera como el resto del vestíbulo",
+   "min": [
+    2.15,
+    5.3,
+    -6.96
+   ],
+   "max": [
+    4.35,
+    9.95,
+    -6.74
+   ],
+   "excluir": "^(?!yg_wall04)",
+   "y_suelo": 5.5,
+   "y_techo": 9.95,
+   "zocalo": 1.0,
+   "cornisa": 0.0,
+   "pared": "cas_panel_vest.png",
+   "moldura": "yg_wood11.png",
+   "suelo": "yg_wall01.png",
+   "techo": "yg_wall01.png",
+   "escala_uv": [
+    1.03,
+    2.45
+   ],
+   "origen_uv": [
+    2.21,
+    6.5
+   ]
+  },
+  {
+   "que": "pared lisa del rincón junto a la escalerilla (-x): paneles y zócalo de madera como el resto del vestíbulo",
+   "min": [
+    -4.35,
+    5.3,
+    -6.96
+   ],
+   "max": [
+    -2.15,
+    9.95,
+    -6.74
+   ],
+   "excluir": "^(?!yg_wall04)",
+   "y_suelo": 5.5,
+   "y_techo": 9.95,
+   "zocalo": 1.0,
+   "cornisa": 0.0,
+   "pared": "cas_panel_vest.png",
+   "moldura": "yg_wood11.png",
+   "suelo": "yg_wall01.png",
+   "techo": "yg_wall01.png",
+   "escala_uv": [
+    1.03,
+    2.45
+   ],
+   "origen_uv": [
+    -4.27,
+    6.5
+   ]
+  }
+ ],
+ "quitar_final": [
+  {
+   "que": "alfombra sobre el hueco central por fuera de la barandilla (+x)",
+   "min": [
+    2.2,
+    6.2,
+    -1.28
+   ],
+   "max": [
+    4.3,
+    6.62,
+    0.62
+   ],
+   "mat": "ceilling01"
+  },
+  {
+   "que": "alfombra sobre el hueco central por fuera de la barandilla (-x)",
+   "min": [
+    -4.3,
+    6.2,
+    -1.28
+   ],
+   "max": [
+    -2.2,
+    6.62,
+    0.62
+   ],
+   "mat": "ceilling01"
   }
  ]
 }
