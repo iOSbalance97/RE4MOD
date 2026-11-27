@@ -181,6 +181,24 @@ for t3, nn, _EDG in _MUROS:
     Ab = A_ - dh_ * ext_a - nh * _dr; Bb = B_ + dh_ * ext_b - nh * _dr
     quad(TEX['pared'], [np.array([Ab[0], ya - 0.1, Ab[2]]), np.array([Bb[0], ya - 0.1, Bb[2]]), np.array([Bb[0], ytb, Bb[2]]), np.array([Ab[0], ytb, Ab[2]])],
          [[(pr.min() - 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, (ya - 0.1) / E], [(pr.max() + 0.5) / E, ytb / E], [(pr.min() - 0.5) / E, ytb / E]])
+# columnas de roca pedidas a mano (x0,x1,z0,z1,y0,y1): p. ej. sobre un bloque, hasta el techo
+for _cs in [c_ for c_ in os.environ.get('COLUMNAS', '').split(';') if c_]:
+    x0_, x1_, z0_, z1_, y0_, y1_ = [float(v) for v in _cs.split(',')]
+    cx_, cz_ = (x0_ + x1_) / 2, (z0_ + z1_) / 2; rx_, rz_ = (x1_ - x0_) / 2 + 0.03, (z1_ - z0_) / 2 + 0.03
+    NL_ = 12; NV_ = max(2, int((y1_ - y0_) / 0.35))
+    for k_ in range(NL_):
+        for j_ in range(NV_):
+            pts_ = []
+            for (kk, jj) in ((k_, j_), (k_ + 1, j_), (k_ + 1, j_ + 1), (k_, j_ + 1)):
+                th_ = 2 * np.pi * kk / NL_; yy_ = y0_ + (y1_ - y0_) * jj / NV_
+                # contorno entre círculo y rectángulo (abarca la base cuadrada) con relieve de roca
+                cx2, sz2 = np.cos(th_), np.sin(th_); m_ = max(abs(cx2), abs(sz2))
+                q0_ = np.array([cx_ + rx_ * cx2 / m_ ** 0.6, yy_, cz_ + rz_ * sz2 / m_ ** 0.6])
+                rr_ = 1.0 + 0.08 * _ruido(q0_, 2.5, 7.0)
+                pts_.append(np.array([cx_ + (q0_[0] - cx_) * rr_, yy_, cz_ + (q0_[2] - cz_) * rr_]))
+            u0_, u1_ = k_ / NL_ * 2.4, (k_ + 1) / NL_ * 2.4; v0_, v1_ = (y0_ + (y1_ - y0_) * j_ / NV_) / E, (y0_ + (y1_ - y0_) * (j_ + 1) / NV_) / E
+            quad(TEX['pared'], pts_, [[u0_, v0_], [u1_, v0_], [u1_, v1_], [u0_, v1_]])
+    print('columna de roca:', _cs)
 # columnas de roca en las esquinas: tapan la rendija que deja el relieve de dos paredes que se juntan
 if CUEVA and ESQ:
     usados = np.zeros(len(ESQ), bool); nesq = 0

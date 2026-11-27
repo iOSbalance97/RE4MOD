@@ -14,9 +14,9 @@ quad((-8.95, 1.30), (-7.40, 1.30), 3.95, 7.25, 'r100_kabe_a')          # respald
 quad((11.08, -1.32), (11.08, -0.95), 3.95, 7.25, 'r100_kabe_a')          # rendija en la esquina de arriba de la escalera
 quad((-3.45, 2.82), (-2.95, 2.82), 3.95, 7.0, 'r100_kabe_a')            # junto al marco de la puerta de r105
 quad((-5.10, 2.82), (-4.55, 2.82), 3.95, 7.0, 'r100_kabe_a')
-quad((-2.40, 1.42), (-2.21, 1.42), 3.95, 7.0, 'st_103wood_a', 0.6)          # jambas: la hoja (1 m) es más estrecha que el paso
-quad((-1.23, 1.42), (-1.04, 1.42), 3.95, 7.0, 'st_103wood_a', 0.6)
-quad((-2.24, 1.415), (-1.20, 1.415), 3.95, 6.2, 'r100_door_a', 1.0)          # alma de la hoja: tapa el hueco del lado de las bisagras
+quad((-2.40, 1.53), (-2.21, 1.53), 3.95, 7.0, 'st_103wood_a', 0.6)          # jambas: la hoja (1 m) es más estrecha que el paso
+quad((-1.23, 1.53), (-1.04, 1.53), 3.95, 7.0, 'st_103wood_a', 0.6)
+quad((-2.24, 1.485), (-1.20, 1.485), 3.95, 6.2, 'r100_door_a', 1.0)          # alma de la hoja: tapa el hueco del lado de las bisagras
 v = []; vt = []; out = []
 for it in Q:
     mat, pts, E = it[:3]; b = len(v)

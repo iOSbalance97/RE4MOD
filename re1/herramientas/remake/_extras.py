@@ -148,6 +148,11 @@ if os.path.exists(_cfg):
         Vp, Tp, Fp = _ex.torneado((col['x'], y0, col['z']), col['y1'] - y0, _ex.PERFIL_COLUMNA, escala_r=col['r'], lados=14, uv_vueltas=1, uv_alto=1.5)
         _anade(Vp, Tp, Fp, mm)
     print(f"columnas añadidas: {len(cfg.get('columnas', []))}")
+    for mv_ in cfg.get('mover', []):          # trasladar una pieza (p. ej. separar 1-2 cm una alfombra del suelo)
+        cen_ = V[F[:, :3]].mean(1); lo = np.array(mv_['min']); hi = np.array(mv_['max'])
+        sel_ = np.all((cen_ >= lo) & (cen_ <= hi), 1) & np.array([bool(_re2.search(mv_['mat'], str(mats.get(m_) or m_), _re2.I)) for m_ in FM])
+        idx_ = np.unique(F[sel_, :3]); V = V.copy(); V[idx_] += np.array(mv_['d'])
+        print(f"  movida {mv_.get('que', '')}: {sel_.sum()} triángulos")
     for cp_ in cfg.get('copiar', []):          # copiar una pieza de UC (puerta, lámpara, mueble) a otros sitios, girada
         lo_ = np.array(cp_['min']); hi_ = np.array(cp_['max']); cen_ = V[F[:, :3]].mean(1)
         sel_ = np.all((cen_ >= lo_) & (cen_ <= hi_), 1)
@@ -294,6 +299,39 @@ if os.path.exists(_cfg):
         idx_ = np.unique(F[sel_, :3]); P_ = V[idx_]; plo = P_.min(0); phi = P_.max(0)
         V = V.copy(); V[idx_] = dlo + (P_ - plo) / np.maximum(phi - plo, 1e-6) * (dhi - dlo)
         print(f"  ajustada {aj.get('que', '')}: {sel_.sum()} triángulos")
+    for bj_ in cfg.get('bajar_a_suelo', []):          # paredes y columnas de UC que acaban por encima del suelo del REmake: estirar su pie hasta él
+        _cfb = f'/home/claude/re1gc/salas/{r}/colision.obj'; _Vb = []; _Fb = []
+        for l_ in open(_cfb):
+            if l_.startswith('v '): _Vb.append([float(x) for x in l_.split()[1:4]])
+            elif l_.startswith('f '): _Fb.append([int(x.split('/')[0]) - 1 for x in l_.split()[1:4]])
+        _Pb = np.array(_Vb)[np.array(_Fb)]; _nb = np.cross(_Pb[:, 1] - _Pb[:, 0], _Pb[:, 2] - _Pb[:, 0]); _nb /= np.linalg.norm(_nb, axis=1, keepdims=True) + 1e-12
+        _Pb = _Pb[(_nb[:, 1] > 0.95) & (np.abs(_Pb[:, :, 1].mean(1) - bj_['suelo']) < 0.1)]
+        def _dist_suelo(q_):          # distancia en planta al suelo pisable (0 si está dentro)
+            best_ = 9e9
+            for t_ in _Pb[:, :, [0, 2]]:
+                a_, b_, c_ = t_; v0 = c_ - a_; v1 = b_ - a_; v2 = q_ - a_
+                d00 = v0 @ v0; d01 = v0 @ v1; d11 = v1 @ v1; den = d00 * d11 - d01 * d01
+                if abs(den) < 1e-12: continue
+                u_ = (d11 * (v2 @ v0) - d01 * (v2 @ v1)) / den; w_ = (d00 * (v2 @ v1) - d01 * (v2 @ v0)) / den
+                if u_ >= 0 and w_ >= 0 and u_ + w_ <= 1: return 0.0
+                for p0, p1 in ((a_, b_), (b_, c_), (c_, a_)):
+                    e_ = p1 - p0; tt = np.clip((q_ - p0) @ e_ / (e_ @ e_ + 1e-12), 0, 1); best_ = min(best_, np.linalg.norm(q_ - (p0 + e_ * tt)))
+            return best_
+        _ok = np.array([not bool(_re2.search(bj_.get('excluir', '^$'), str(mats.get(m_) or m_), _re2.I)) for m_ in FM])
+        _nV = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]); _nV /= np.linalg.norm(_nV, axis=1, keepdims=True) + 1e-12
+        _vert = _ok & (np.abs(_nV[:, 1]) < 0.3)
+        _ids = np.unique(F[_vert, :3]); _y = V[_ids, 1]
+        _sel = _ids[(_y > bj_['desde']) & (_y < bj_['hasta'])]
+        _sel = [i_ for i_ in _sel if _dist_suelo(V[i_, [0, 2]]) < bj_.get('cerca', 0.7)]
+        # solo los vértices que son el pie de su cara (no los de arriba de una cara corta)
+        _pie = set()
+        for f_ in F[_vert, :3]:
+            ys_ = V[f_, 1]
+            for k_ in range(3):
+                if ys_[k_] <= ys_.min() + 1e-4: _pie.add(int(f_[k_]))
+        _sel = np.array([i_ for i_ in _sel if i_ in _pie], int)
+        if len(_sel): V = V.copy(); V[_sel, 1] = bj_['nuevo']
+        print(f"  pies estirados hasta el suelo ({bj_.get('que', '')}): {len(_sel)} vértices")
     for rx_ in cfg.get('cerrar', []):          # telas abiertas (UC solo modeló la cara que ve su cámara): envolvente convexa por pieza
         from scipy.spatial import ConvexHull
         import scipy.sparse as _sp
@@ -700,6 +738,13 @@ if os.environ.get('BALAUSTRES_TOTAL'):
             _Fe = F[_se]; _mme = FM[_se][0]; _Pe = V[_Fe[:, :3]].reshape(-1, 3).copy(); _Ue = VT[_Fe[:, 3:]].reshape(-1, 2)
             _axe = np.array([(_Pe[:, 0].min() + _Pe[:, 0].max()) / 2, _Pe[:, 1].min(), (_Pe[:, 2].min() + _Pe[:, 2].max()) / 2]); _Pe -= _axe; _He = _Pe[:, 1].max()
             print(f'  plantilla de esquinero de UC: {len(_Fe)} triángulos, alto {_He:.2f} m')
+        # esquineros que UC ya tiene arriba: no poner otro encima (salían dobles o desplazados)
+        _m24o = np.array([bool(_re2.search('wood24', str(mats.get(m_) or m_))) for m_ in FM]) & (_cw[:, 1] > _ycopia)
+        _uc_postes = []
+        if _m24o.any():
+            from scipy.cluster.hierarchy import fcluster as _fc0, linkage as _lk0
+            _c0 = _cw[_m24o]; _l0 = _fc0(_lk0(_c0, 'single'), 0.3, 'distance') if len(_c0) > 1 else np.array([1])
+            _uc_postes = [tuple(_c0[_l0 == L_].mean(0)[[0, 2]]) for L_ in sorted(set(_l0))]
         def _rot(P, tx, tz):
             th = np.arctan2(tx, tz); c, s_ = np.cos(th), np.sin(th)
             return np.stack([c * P[:, 0] + s_ * P[:, 2], P[:, 1], -s_ * P[:, 0] + c * P[:, 2]], 1)
@@ -765,6 +810,7 @@ if os.environ.get('BALAUSTRES_TOTAL'):
                 for t_ in ts:
                     x_, z_ = pos(t_)
                     if any(np.hypot(x_ - a_, z_ - c_) < 0.3 for a_, c_ in _postes): continue
+                    if any(np.hypot(x_ - a_, z_ - c_) < 0.9 for a_, c_ in _uc_postes): continue
                     _postes.append((x_, z_)); tg_ = tang(t_)
                     Pp = _rot(_Pe * [1, (hh_ + 0.17) / _He, 1], tg_[0], tg_[1]) + [x_, ybf(t_), z_]
                     _anade(Pp, _Ue, np.arange(len(Pp)).reshape(-1, 3), _mme); nesq += 1
@@ -786,9 +832,19 @@ if os.environ.get('BALAUSTRES_TOTAL'):
                     _hs = _heights(_TF, x_, z_); _yl = ybf(t_)
                     if len(_hs) and np.abs(_hs - _yl).min() < 0.6: _yl = float(_hs[np.argmin(np.abs(_hs - _yl))])     # pie en el suelo real (tramos con escalón)
                     _hl = ybf(t_) + hh_ - _yl
+                    if _Tp is not None:          # tope: justo bajo el pasamanos real en ese punto (sigue la pendiente y no asoma por encima)
+                        _ir = [j for j in _Tp.query_ball_point([x_, z_], 0.2) if _yl + 0.4 < _pan[j, 1] < _yl + 1.4]
+                        if len(_ir) >= 3:
+                            _yt = _pan[_ir, 1].max(); _yb = _pan[[j for j in _ir if _pan[j, 1] > _yt - 0.2], 1].min()
+                            _hl = _yb + 0.01 - _yl
                     Pp = _rot(_Pt * [1, (_hl - _zb) / _Ht, 1], tg_[0], tg_[1]) + [x_, _yl + _zb, z_]
                     _anade(Pp, _Ut, np.arange(len(Pp)).reshape(-1, 3), _mmt); ncop += 1
-        print(f'  esquineros: {nesq}')
+        print(f'  esquineros: {nesq}', [tuple(np.round(p_, 2)) for p_ in _postes])
+        _m24 = np.array([bool(_re2.search('wood24', str(mats.get(m_) or m_))) for m_ in FM]) & (_cw[:, 1] > 4.6)
+        if _m24.any():
+            from scipy.cluster.hierarchy import fcluster as _fc, linkage as _lk
+            _c24 = _cw[_m24]; _l24 = _fc(_lk(_c24, 'single'), 0.3, 'distance') if len(_c24) > 1 else np.array([1])
+            print('  esquineros originales de UC arriba:', [tuple(np.round(_c24[_l24 == L_].mean(0), 2)) for L_ in sorted(set(_l24))])
         print(f'  balaustres de UC copiados: {ncop}')
     for base_, h in _bal:
         Vp, Tp, Fp = _ex.torneado(base_, h, _ex.PERFIL_BALAUSTRE_LIGERO, escala_r=0.65, lados=6)

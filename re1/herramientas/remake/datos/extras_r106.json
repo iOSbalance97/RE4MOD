@@ -271,6 +271,153 @@
      7.2
     ]
    ]
+  },
+  {
+   "que": "relleno galer\u00eda norte",
+   "y": 7.0,
+   "tol": 0.06,
+   "dilatar": 0.5,
+   "bajo": 0.02,
+   "mat": "ceilling01",
+   "cajas": [
+    [
+     -6.7,
+     6.7,
+     3.2,
+     7.6
+    ]
+   ]
+  }
+ ],
+ "ajustar": [
+  {
+   "que": "pomo de la puerta doble (lado de las bisagras -> junto a la otra hoja) z 0.355",
+   "min": [
+    6.397,
+    2.969,
+    0.304
+   ],
+   "max": [
+    6.633,
+    3.178,
+    0.408
+   ],
+   "mat": "two_door_nob2|door_nob1",
+   "a_min": [
+    6.4017,
+    2.9738,
+    1.2426
+   ],
+   "a_max": [
+    6.6277,
+    3.173,
+    1.3374
+   ]
+  },
+  {
+   "que": "pomo de la puerta doble (lado de las bisagras -> junto a la otra hoja) z 2.64",
+   "min": [
+    6.397,
+    2.969,
+    2.586
+   ],
+   "max": [
+    6.633,
+    3.178,
+    2.69
+   ],
+   "mat": "two_door_nob2|door_nob1",
+   "a_min": [
+    6.4018,
+    2.9738,
+    1.6076
+   ],
+   "a_max": [
+    6.6278,
+    3.173,
+    1.7024
+   ]
+  },
+  {
+   "que": "pomo de la puerta doble (lado de las bisagras -> junto a la otra hoja) z -1.19",
+   "min": [
+    -6.61,
+    2.982,
+    -1.241
+   ],
+   "max": [
+    -6.374,
+    3.194,
+    -1.133
+   ],
+   "mat": "two_door_nob2|door_nob1",
+   "a_min": [
+    -6.6054,
+    2.9866,
+    -0.1338
+   ],
+   "a_max": [
+    -6.3794,
+    3.1885,
+    -0.0361
+   ]
+  },
+  {
+   "que": "pomo de la puerta doble (lado de las bisagras -> junto a la otra hoja) z 1.16",
+   "min": [
+    -6.615,
+    2.982,
+    1.108
+   ],
+   "max": [
+    -6.379,
+    3.194,
+    1.216
+   ],
+   "mat": "two_door_nob2|door_nob1",
+   "a_min": [
+    -6.6101,
+    2.9866,
+    -0.004
+   ],
+   "a_max": [
+    -6.3841,
+    3.1885,
+    0.0939
+   ]
+  }
+ ],
+ "bajar_a_suelo": [
+  {
+   "que": "piso de arriba (UC lo ten\u00eda a 6.83; el REmake a 6.5)",
+   "suelo": 6.5,
+   "desde": 6.53,
+   "hasta": 6.95,
+   "nuevo": 6.47,
+   "cerca": 0.7,
+   "excluir": "wood16|wood24|handrail|ceilling|wood14|wood13|stairs|lug|two_door|door_nob"
+  },
+  {
+   "que": "galer\u00eda norte (suelo 7.0)",
+   "suelo": 7.0,
+   "desde": 7.03,
+   "hasta": 7.4,
+   "nuevo": 6.98,
+   "cerca": 0.7,
+   "excluir": "wood16|wood24|handrail|ceilling|wood14|wood13|stairs|lug|two_door|door_nob|door|tesu"
+  }
+ ],
+ "modelos": [
+  {
+   "obj": "/home/claude/re1gc/modelos/fondo_r106/fondo.obj",
+   "x": 0.0,
+   "y0": 0.0,
+   "z": 0.0,
+   "giro": 0.0,
+   "escala": 1.0,
+   "texturas": {
+    "yg_wall04": "yg_wall04.png"
+   }
   }
  ]
 }
